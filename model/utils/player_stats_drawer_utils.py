@@ -1,5 +1,5 @@
-import numpy as np
 import cv2
+
 
 def draw_player_stats(output_video_frames,player_stats):
 
@@ -15,7 +15,6 @@ def draw_player_stats(output_video_frames,player_stats):
         avg_player_2_speed = row['player_2_average_player_speed']
 
         frame = output_video_frames[index]
-        shapes = np.zeros_like(frame, np.uint8)
 
         width=350
         height=230

@@ -1,6 +1,6 @@
 import cv2
 
-from utils import measure_distance, get_center_of_bbox
+from utils import get_center_of_bbox, measure_distance
 from utils.detection_cache import load_detections, save_detections
 
 

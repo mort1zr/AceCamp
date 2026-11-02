@@ -1,0 +1,56 @@
+name: Modelo CI
+
+# Solo se ejecuta cuando cambia el modelo o la propia configuración de la CI;
+# las PRs que solo tocan web/ no la disparan.
+on:
+  pull_request:
+    paths:
+      - "model/**"
+      - ".github/workflows/model-ci.yml"
+      - ".pre-commit-config.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "model/**"
+      - ".github/workflows/model-ci.yml"
+      - ".pre-commit-config.yaml"
+
+jobs:
+  lint-y-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: model
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: model/requirements*.txt
+
+      # PyTorch para CPU (unos 200 MB en vez de varios GB con CUDA).
+      - name: Instalar PyTorch (CPU)
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1 torchvision==0.20.1
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Tests (pytest)
+        run: pytest
+
+  secretos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Buscar secretos (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,18 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+# Notebooks de entrenamiento: tienen errores conocidos que corrige TA-8 (PCIT-45).
+extend-exclude = ["training/*.ipynb"]
+# Respeta la exclusión también cuando pre-commit pasa los archivos uno a uno.
+force-exclude = true
+
+[tool.ruff.lint]
+# Errores reales (pyflakes y errores de sintaxis/estilo graves) y orden de imports.
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["config", "constants", "court_line_detector", "mini_court", "trackers", "utils"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

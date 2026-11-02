@@ -1,18 +1,14 @@
-from utils import (read_video, 
-                   save_video,
-                   measure_distance,
-                   draw_player_stats,
-                   convert_pixel_distance_to_meters
-                   )
-import constants
-from trackers import PlayerTracker,BallTracker
-from court_line_detector import CourtLineDetector
-from mini_court import MiniCourt
-import cv2
-import pandas as pd
 from copy import deepcopy
 
+import cv2
+import pandas as pd
+
+import constants
 from config import config_from_args, resolve_path
+from court_line_detector import CourtLineDetector
+from mini_court import MiniCourt
+from trackers import BallTracker, PlayerTracker
+from utils import convert_pixel_distance_to_meters, draw_player_stats, measure_distance, read_video, save_video
 from utils.detection_cache import cache_path_for, file_sha256
 
 

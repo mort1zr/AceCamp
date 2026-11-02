@@ -1,4 +1,4 @@
-from ultralytics import YOLO 
+from ultralytics import YOLO
 
 model = YOLO('yolov8x')
 
