@@ -12,29 +12,46 @@ import cv2
 import pandas as pd
 from copy import deepcopy
 
+from config import config_from_args, resolve_path
+from utils.detection_cache import cache_path_for, file_sha256
 
-def main():
+
+def main(argv=None):
+    config = config_from_args(argv)
+    paths, models, detection = config["paths"], config["models"], config["detection"]
+
     # Read Video
-    input_video_path = "input_videos/input_video.mp4"
-    video_frames = read_video(input_video_path)
+    input_video_path = resolve_path(paths["input"])
+    if not input_video_path.exists():
+        raise SystemExit(f"No existe el vídeo de entrada: {input_video_path}")
+    video_frames = read_video(str(input_video_path))
+    video_hash = file_sha256(input_video_path)
+    cache_dir = resolve_path(paths["cache_dir"])
 
     # Detect Players and Ball
-    player_tracker = PlayerTracker(model_path='models/yolov8x.pt')
-    ball_tracker = BallTracker(model_path='models/yolo5_last.pt')
+    player_tracker = PlayerTracker(model_path=str(resolve_path(models["players"])), device=detection["device"])
+    ball_tracker = BallTracker(model_path=str(resolve_path(models["ball"])),
+                               conf=detection["ball_confidence"],
+                               device=detection["device"])
 
-    player_detections = player_tracker.detect_frames(video_frames,
-                                                     read_from_stub=False,
-                                                     stub_path=None
-                                                     )
-    ball_detections = ball_tracker.detect_frames(video_frames,
-                                                     read_from_stub=False,
-                                                     stub_path=None
-                                                     )
+    player_detections = player_tracker.detect_frames(
+        video_frames,
+        cache_path=cache_path_for(cache_dir, video_hash, "players", models["players"]),
+        video_hash=video_hash,
+        use_cache=config["use_cache"],
+    )
+    ball_detections = ball_tracker.detect_frames(
+        video_frames,
+        cache_path=cache_path_for(cache_dir, video_hash, "ball", models["ball"],
+                                  conf=detection["ball_confidence"]),
+        video_hash=video_hash,
+        use_cache=config["use_cache"],
+    )
     ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
-    
-    
+
+
     # Court Line Detector model
-    court_model_path = "models/keypoints_model.pth"
+    court_model_path = str(resolve_path(models["court_keypoints"]))
     court_line_detector = CourtLineDetector(court_model_path)
     court_keypoints = court_line_detector.predict(video_frames[0])
 
@@ -45,7 +62,11 @@ def main():
     mini_court = MiniCourt(video_frames[0]) 
 
     # Detect ball shots
-    ball_shot_frames= ball_tracker.get_ball_shot_frames(ball_detections)
+    ball_shot_frames= ball_tracker.get_ball_shot_frames(
+        ball_detections,
+        minimum_change_frames_for_hit=config["shots"]["min_change_frames_for_hit"],
+        rolling_window=config["shots"]["rolling_window"],
+    )
 
     # Convert positions to mini court positions
     player_mini_court_detections, ball_mini_court_detections = mini_court.convert_bounding_boxes_to_mini_court_coordinates(player_detections, 
@@ -142,7 +163,10 @@ def main():
     for i, frame in enumerate(output_video_frames):
         cv2.putText(frame, f"Frame: {i}",(10,30),cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-    save_video(output_video_frames, "output_videos/output_video.avi")
+    output_video_path = resolve_path(paths["output"])
+    output_video_path.parent.mkdir(parents=True, exist_ok=True)
+    save_video(output_video_frames, str(output_video_path))
+    print(f"Vídeo guardado en {output_video_path}")
 
 if __name__ == "__main__":
     main()

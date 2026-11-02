@@ -1,13 +1,23 @@
-from ultralytics import YOLO 
 import cv2
-import pickle
-import sys
-sys.path.append('../')
+
 from utils import measure_distance, get_center_of_bbox
+from utils.detection_cache import load_detections, save_detections
+
 
 class PlayerTracker:
-    def __init__(self,model_path):
-        self.model = YOLO(model_path)
+    def __init__(self, model_path, device=None):
+        self.model_path = model_path
+        self.device = device
+        self._model = None
+
+    @property
+    def model(self):
+        # El modelo se carga solo si hace falta: con la caché no se usa.
+        if self._model is None:
+            from ultralytics import YOLO
+
+            self._model = YOLO(self.model_path)
+        return self._model
 
     def choose_and_filter_players(self, court_keypoints, player_detections):
         player_detections_first_frame = player_detections[0]
@@ -38,26 +48,27 @@ class PlayerTracker:
         return chosen_players
 
 
-    def detect_frames(self,frames, read_from_stub=False, stub_path=None):
-        player_detections = []
+    def detect_frames(self, frames, cache_path=None, video_hash=None, use_cache=False):
+        """Detecta y sigue a las personas en cada fotograma.
 
-        if read_from_stub and stub_path is not None:
-            with open(stub_path, 'rb') as f:
-                player_detections = pickle.load(f)
-            return player_detections
+        Si use_cache es True y existe una caché válida para este vídeo
+        (mismo hash), se devuelve sin ejecutar el modelo. Si se da
+        cache_path, el resultado se guarda para la próxima vez.
+        """
+        if use_cache and cache_path is not None:
+            cached = load_detections(cache_path, video_hash)
+            if cached is not None and len(cached) == len(frames):
+                return cached
 
-        for frame in frames:
-            player_dict = self.detect_frame(frame)
-            player_detections.append(player_dict)
-        
-        if stub_path is not None:
-            with open(stub_path, 'wb') as f:
-                pickle.dump(player_detections, f)
-        
+        player_detections = [self.detect_frame(frame) for frame in frames]
+
+        if cache_path is not None:
+            save_detections(cache_path, player_detections, video_hash)
+
         return player_detections
 
     def detect_frame(self,frame):
-        results = self.model.track(frame, persist=True)[0]
+        results = self.model.track(frame, persist=True, device=self.device, verbose=False)[0]
         id_name_dict = results.names
 
         player_dict = {}

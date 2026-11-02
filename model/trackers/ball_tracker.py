@@ -1,11 +1,24 @@
-from ultralytics import YOLO 
 import cv2
-import pickle
 import pandas as pd
 
+from utils.detection_cache import load_detections, save_detections
+
+
 class BallTracker:
-    def __init__(self,model_path):
-        self.model = YOLO(model_path)
+    def __init__(self, model_path, conf=0.15, device=None):
+        self.model_path = model_path
+        self.conf = conf
+        self.device = device
+        self._model = None
+
+    @property
+    def model(self):
+        # El modelo se carga solo si hace falta: con la caché no se usa.
+        if self._model is None:
+            from ultralytics import YOLO
+
+            self._model = YOLO(self.model_path)
+        return self._model
 
     def interpolate_ball_positions(self, ball_positions):
         ball_positions = [x.get(1,[]) for x in ball_positions]
@@ -20,7 +33,7 @@ class BallTracker:
 
         return ball_positions
 
-    def get_ball_shot_frames(self,ball_positions):
+    def get_ball_shot_frames(self, ball_positions, minimum_change_frames_for_hit=25, rolling_window=5):
         ball_positions = [x.get(1,[]) for x in ball_positions]
         # convert the list into pandas dataframe
         df_ball_positions = pd.DataFrame(ball_positions,columns=['x1','y1','x2','y2'])
@@ -28,9 +41,8 @@ class BallTracker:
         df_ball_positions['ball_hit'] = 0
 
         df_ball_positions['mid_y'] = (df_ball_positions['y1'] + df_ball_positions['y2'])/2
-        df_ball_positions['mid_y_rolling_mean'] = df_ball_positions['mid_y'].rolling(window=5, min_periods=1, center=False).mean()
+        df_ball_positions['mid_y_rolling_mean'] = df_ball_positions['mid_y'].rolling(window=rolling_window, min_periods=1, center=False).mean()
         df_ball_positions['delta_y'] = df_ball_positions['mid_y_rolling_mean'].diff()
-        minimum_change_frames_for_hit = 25
         for i in range(1,len(df_ball_positions)- int(minimum_change_frames_for_hit*1.2) ):
             negative_position_change = df_ball_positions['delta_y'].iloc[i] >0 and df_ball_positions['delta_y'].iloc[i+1] <0
             positive_position_change = df_ball_positions['delta_y'].iloc[i] <0 and df_ball_positions['delta_y'].iloc[i+1] >0
@@ -53,26 +65,27 @@ class BallTracker:
 
         return frame_nums_with_ball_hits
 
-    def detect_frames(self,frames, read_from_stub=False, stub_path=None):
-        ball_detections = []
+    def detect_frames(self, frames, cache_path=None, video_hash=None, use_cache=False):
+        """Detecta la pelota en cada fotograma.
 
-        if read_from_stub and stub_path is not None:
-            with open(stub_path, 'rb') as f:
-                ball_detections = pickle.load(f)
-            return ball_detections
+        Si use_cache es True y existe una caché válida para este vídeo
+        (mismo hash), se devuelve sin ejecutar el modelo. Si se da
+        cache_path, el resultado se guarda para la próxima vez.
+        """
+        if use_cache and cache_path is not None:
+            cached = load_detections(cache_path, video_hash)
+            if cached is not None and len(cached) == len(frames):
+                return cached
 
-        for frame in frames:
-            player_dict = self.detect_frame(frame)
-            ball_detections.append(player_dict)
-        
-        if stub_path is not None:
-            with open(stub_path, 'wb') as f:
-                pickle.dump(ball_detections, f)
-        
+        ball_detections = [self.detect_frame(frame) for frame in frames]
+
+        if cache_path is not None:
+            save_detections(cache_path, ball_detections, video_hash)
+
         return ball_detections
 
     def detect_frame(self,frame):
-        results = self.model.predict(frame,conf=0.15)[0]
+        results = self.model.predict(frame, conf=self.conf, device=self.device, verbose=False)[0]
 
         ball_dict = {}
         for box in results.boxes:
