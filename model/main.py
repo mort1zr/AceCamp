@@ -8,7 +8,15 @@ from config import config_from_args, resolve_path
 from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
 from trackers import BallTracker, PlayerTracker
-from utils import convert_pixel_distance_to_meters, draw_player_stats, measure_distance, read_video, save_video
+from utils import (
+    convert_pixel_distance_to_meters,
+    draw_player_stats,
+    get_video_info,
+    measure_distance,
+    read_video,
+    save_video,
+    speed_km_per_hour,
+)
 from utils.detection_cache import cache_path_for, file_sha256
 
 
@@ -20,6 +28,7 @@ def main(argv=None):
     input_video_path = resolve_path(paths["input"])
     if not input_video_path.exists():
         raise SystemExit(f"No existe el vídeo de entrada: {input_video_path}")
+    video_info = get_video_info(input_video_path)
     video_frames = read_video(str(input_video_path))
     video_hash = file_sha256(input_video_path)
     cache_dir = resolve_path(paths["cache_dir"])
@@ -87,7 +96,7 @@ def main(argv=None):
     for ball_shot_ind in range(len(ball_shot_frames)-1):
         start_frame = ball_shot_frames[ball_shot_ind]
         end_frame = ball_shot_frames[ball_shot_ind+1]
-        ball_shot_time_in_seconds = (end_frame-start_frame)/24 # 24fps
+        shot_frames = end_frame - start_frame
 
         # Get distance covered by the ball
         distance_covered_by_ball_pixels = measure_distance(ball_mini_court_detections[start_frame][1],
@@ -98,7 +107,7 @@ def main(argv=None):
                                                                            ) 
 
         # Speed of the ball shot in km/h
-        speed_of_ball_shot = distance_covered_by_ball_meters/ball_shot_time_in_seconds * 3.6
+        speed_of_ball_shot = speed_km_per_hour(distance_covered_by_ball_meters, shot_frames, video_info.fps)
 
         # player who the ball
         player_positions = player_mini_court_detections[start_frame]
@@ -114,7 +123,7 @@ def main(argv=None):
                                                                            mini_court.get_width_of_mini_court()
                                                                            ) 
 
-        speed_of_opponent = distance_covered_by_opponent_meters/ball_shot_time_in_seconds * 3.6
+        speed_of_opponent = speed_km_per_hour(distance_covered_by_opponent_meters, shot_frames, video_info.fps)
 
         current_player_stats= deepcopy(player_stats_data[-1])
         current_player_stats['frame_num'] = start_frame
@@ -161,7 +170,7 @@ def main(argv=None):
 
     output_video_path = resolve_path(paths["output"])
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
-    save_video(output_video_frames, str(output_video_path))
+    save_video(output_video_frames, str(output_video_path), fps=video_info.fps)
     print(f"Vídeo guardado en {output_video_path}")
 
 if __name__ == "__main__":
