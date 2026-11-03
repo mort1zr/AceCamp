@@ -153,8 +153,8 @@ export default function Precios() {
           aria-label="AceCam, volver al inicio"
           className="group inline-flex items-center gap-3 rounded-md"
         >
-          <span className="inline-flex size-12 items-center justify-center rounded-full border-2 border-line3 text-text2 ring-text transition-[translate,border-color,color,box-shadow] duration-300 group-hover:-translate-x-1 group-hover:border-text group-hover:text-text group-hover:ring-1">
-            <Icon name="arrowBack" size={22} strokeWidth={2.4} />
+          <span className="inline-flex size-9 items-center justify-center rounded-full border-2 border-line3 text-text2 ring-text transition-[translate,border-color,color,box-shadow] duration-300 group-hover:-translate-x-1 group-hover:border-text group-hover:text-text group-hover:ring-1">
+            <Icon name="arrowBack" size={17} strokeWidth={2.4} />
           </span>
           <Logo size={56} wordmarkClassName="text-4xl" />
         </LinkDeslizante>
