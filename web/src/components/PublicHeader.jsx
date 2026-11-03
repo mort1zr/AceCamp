@@ -4,9 +4,9 @@ import ThemeToggle from './ThemeToggle.jsx'
 
 const anchors = [
   { href: '#el-problema', label: 'El problema' },
-  { href: '#como-funciona', label: 'Cómo funciona' },
+  { href: '#la-solucion', label: 'La solución' },
   { href: '#que-mide', label: 'Qué mide' },
-  { href: '#funciones', label: 'Funciones' },
+  { href: '#como-funciona', label: 'Cómo funciona' },
 ]
 
 export default function PublicHeader() {

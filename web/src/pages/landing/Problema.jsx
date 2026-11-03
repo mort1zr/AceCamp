@@ -302,7 +302,7 @@ export default function Problema() {
             ))}
           </ul>
 
-          <h3 id="como-funciona" className="mt-12 text-3xl sm:text-4xl">
+          <h3 id="la-solucion" className="mt-12 text-3xl sm:text-4xl">
             <Escrito indice={siguiente()} escritos={escritos} />
           </h3>
 

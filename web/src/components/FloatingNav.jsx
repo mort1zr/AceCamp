@@ -9,7 +9,7 @@ const EXPANDIR_MS = 500
 const CERRAR_MS = 220
 
 const enlaces = [
-  { to: '/#funciones', label: 'Producto', className: 'hidden sm:block' },
+  { to: '/#como-funciona', label: 'Producto', className: 'hidden sm:block' },
   { to: '/precios', label: 'Precios', desliza: true },
   { to: '/login', label: 'Ingresar' },
 ]
