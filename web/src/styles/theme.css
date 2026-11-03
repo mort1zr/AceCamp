@@ -7,6 +7,16 @@
   --good: #8FD49C;      --bad: #E58A6A;
   --series1: #D0623A;   --series2: #5A93D8;   --series3: #8E9A1C;   --series4: #9B6FD6;
   --faint: #5E574E;
+
+  --ace-ui-text: var(--text);
+  --ace-ui-card: var(--surface);
+  --ace-ui-field: var(--surface2);
+  --ace-ui-border: var(--line2);
+  --ace-ui-muted: var(--muted);
+  --ace-ui-accent: var(--accent-ink);
+  --ace-ui-positive: var(--good);
+  --ace-ui-negative: var(--bad);
+
   color-scheme: dark;
 }
 
