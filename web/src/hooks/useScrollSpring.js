@@ -4,7 +4,10 @@ const STIFFNESS = 0.05
 const DAMPING = 0.8
 const FRAME_MS = 1000 / 60
 
-export function useScrollSpring(ref, { start, end, property = '--scroll-progress' }) {
+export function useScrollSpring(
+  ref,
+  { start, end, property = '--scroll-progress', relative = false },
+) {
   useEffect(() => {
     const node = ref.current
     if (!node || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -14,7 +17,12 @@ export function useScrollSpring(ref, { start, end, property = '--scroll-progress
     let frame = null
     let lastTime = 0
 
-    const readTarget = () => Math.min(Math.max((window.scrollY - start) / (end - start), 0), 1)
+    const readTarget = () => {
+      const scroll = relative
+        ? window.innerHeight - node.getBoundingClientRect().top
+        : window.scrollY
+      return Math.min(Math.max((scroll - start) / (end - start), 0), 1)
+    }
 
     const tick = (time) => {
       const steps = Math.min((time - lastTime) / FRAME_MS, 2)
@@ -43,5 +51,5 @@ export function useScrollSpring(ref, { start, end, property = '--scroll-progress
       window.removeEventListener('scroll', wake)
       if (frame !== null) cancelAnimationFrame(frame)
     }
-  }, [ref, start, end, property])
+  }, [ref, start, end, property, relative])
 }
