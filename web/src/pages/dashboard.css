@@ -19,5 +19,6 @@
 .dashboard-panel-heading h2 { font-size: 1.15rem; font-weight: 500; margin: 0; }
 .dashboard-unit { font-size: 0.75rem; color: var(--players-muted); }
 .dashboard-footnote { margin: 1.5rem 0 0; color: var(--players-muted); font-size: 0.75rem; }
+.dashboard-data-notice { border-left: 2px solid var(--players-ink); padding: 0.75rem 1rem; margin: 1.25rem 0; color: var(--players-muted); font-size: 0.8125rem; }
 @media (max-width: 960px) { .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 540px) { .dashboard-page .players-page-heading { align-items: stretch; } .dashboard-player-select { width: 100%; margin-top: 0.5rem; } .dashboard-metrics { grid-template-columns: minmax(0, 1fr); } }

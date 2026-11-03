@@ -65,7 +65,16 @@ Selector de jugador, tarjetas y estados de carga/vacío/error con ejemplos
 identificados. El cálculo real y el gráfico corresponden a PCIT-139 y PCIT-140.
 Contrato de integración: [src/lib/services/DASHBOARD_UI.md](src/lib/services/DASHBOARD_UI.md).
 
-## Carpetas del proyecto
+## Consulta y cálculos de Dashboard (PCIT-139)
+
+Estructura de consulta por jugador/organización y agregación de KPIs preparada.
+La conexión con el JSON de Aaron queda pendiente: no se adivinan campos ni se
+presenta el SDK simulado como una integración real.
+Contrato propuesto y fórmulas: [src/lib/services/DASHBOARD_DATA.md](src/lib/services/DASHBOARD_DATA.md).
+En `/dashboard.html`, el escenario «Sin indicadores» muestra cómo se tratan
+resultados todavía no compatibles.
+
+## Estructura de carpetas
 
 ```
 web/
