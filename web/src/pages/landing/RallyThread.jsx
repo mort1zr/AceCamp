@@ -23,6 +23,9 @@ const BALL_VIEWPORT_POSITION = 0.5
 const END_INSET = 170
 const END_LIFT = 170
 const ARRIVED_WITHIN = 6
+const END_MARK = 7
+const END_LEAD = 230
+const LEAD_RAMP = 260
 const FRAME_MS = 1000 / 60
 
 function buildRally(width, height, start, boundaries, gap, reachable) {
@@ -210,7 +213,8 @@ export default function RallyThread() {
 
     const readTarget = () => {
       const targetY = followY(hostRef.current.getBoundingClientRect().top)
-      return sampler.lengthAtY(targetY) / total
+      const mix = Math.min(Math.max((targetY - (end.y - END_LEAD - LEAD_RAMP)) / LEAD_RAMP, 0), 1)
+      return sampler.lengthAtY(targetY + END_LEAD * mix * mix * (3 - 2 * mix)) / total
     }
 
     const tail = tailRef.current
@@ -245,16 +249,35 @@ export default function RallyThread() {
         brush.strokeStyle = guideColor
         brush.beginPath()
         let last = target.sample(target.length)
+        let complete = true
         brush.moveTo(last.x * dpr, last.y * dpr)
         for (let at = target.length + GUIDE_STEP; at <= total; at += GUIDE_STEP) {
           const point = target.sample(at)
-          if (Math.hypot(point.x - last.x, point.y - last.y) > GUIDE_STEP * 3) break
+          if (Math.hypot(point.x - last.x, point.y - last.y) > GUIDE_STEP * 3) {
+            complete = false
+            break
+          }
           brush.lineTo(point.x * dpr, point.y * dpr)
           last = point
-          if (point.y > window.innerHeight + 40) break
+          if (point.y > window.innerHeight + 40) {
+            complete = false
+            break
+          }
         }
         brush.stroke()
         brush.setLineDash([])
+
+        if (complete && total - target.length > ARRIVED_WITHIN) {
+          const mark = target.sample(total)
+          brush.lineWidth = GUIDE_STROKE * 1.6 * dpr
+          brush.lineCap = 'round'
+          brush.beginPath()
+          brush.moveTo((mark.x - END_MARK) * dpr, (mark.y - END_MARK) * dpr)
+          brush.lineTo((mark.x + END_MARK) * dpr, (mark.y + END_MARK) * dpr)
+          brush.moveTo((mark.x + END_MARK) * dpr, (mark.y - END_MARK) * dpr)
+          brush.lineTo((mark.x - END_MARK) * dpr, (mark.y + END_MARK) * dpr)
+          brush.stroke()
+        }
       }
 
       brush.lineWidth = TAIL_STROKE * dpr
@@ -371,7 +394,7 @@ export default function RallyThread() {
       themeWatcher.disconnect()
       if (frame !== null) cancelAnimationFrame(frame)
     }
-  }, [rally])
+  }, [rally, end])
 
   return (
     <div
