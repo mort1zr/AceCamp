@@ -62,7 +62,7 @@ export default function Hero() {
                 Empieza gratis
               </Button>
               <a
-                href="#como-funciona"
+                href="#video-demo"
                 className="group inline-flex items-center gap-2.5 rounded-full py-1 pr-3 pl-1 text-sm font-medium text-text2 transition-colors hover:text-text"
               >
                 <span className="grid size-8 place-content-center rounded-full border border-line2 bg-surface text-text transition-colors group-hover:border-accent-line group-hover:text-accent-ink">
