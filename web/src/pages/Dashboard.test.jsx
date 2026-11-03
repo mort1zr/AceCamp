@@ -36,7 +36,7 @@ describe('Dashboard v1 · interfaz PCIT-138', () => {
     expect(within(card('Dobles faltas')).getByText('0')).toBeTruthy()
     expect(screen.getByText('Modo demostración')).toBeTruthy()
     expect(screen.getAllByText('Valor de ejemplo')).toHaveLength(4)
-    expect(screen.getByText('La evolución aún no está disponible')).toBeTruthy()
+    expect(screen.getByText('Ver datos del gráfico')).toBeTruthy()
   })
 
   it('al cambiar a un jugador sin estadísticas, oculta todos los valores anteriores', async () => {

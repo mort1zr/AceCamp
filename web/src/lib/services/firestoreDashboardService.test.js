@@ -110,4 +110,15 @@ describe('Consulta Dashboard (SDK simulado)', () => {
     onSnapshot.mock.calls[0][1]({ docs: [] })
     expect(receive.mock.calls[0][0].metrics).toEqual({ analyzedMatches: 0, averageServeSpeed: null, firstServeInRate: null, doubleFaults: null })
   })
+
+  it('publica resumen y evolución del mismo snapshot y decodifica una vez cada partido', async () => {
+    const decodeStatistics = vi.fn(row => row.statistics)
+    const receive = vi.fn()
+    make({ decodeStatistics }).subscribePlayer('p1', receive, vi.fn())
+    await vi.waitFor(() => expect(onSnapshot).toHaveBeenCalledTimes(1))
+    onSnapshot.mock.calls[0][1](snapshot('dated', { matchDate: '2026-01-01', statistics: { schemaVersion: DASHBOARD_STATISTICS_SCHEMA, playerId: 'p1', serveSpeed: { sumKmh: 260, sampleCount: 2 } } }))
+    expect(decodeStatistics).toHaveBeenCalledTimes(1)
+    expect(receive.mock.calls[0][0].metrics.averageServeSpeed).toBe(130)
+    expect(receive.mock.calls[0][0].evolution).toMatchObject({ playerId: 'p1', points: [{ matchId: 'dated', date: '2026-01-01', averageServeSpeed: 130 }] })
+  })
 })

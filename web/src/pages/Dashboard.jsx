@@ -34,7 +34,7 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
           <section aria-labelledby="dashboard-metrics-title"><div className="players-list-heading"><h2 id="dashboard-metrics-title">Resumen de rendimiento</h2><span>{sample ? 'Ejemplos de interfaz' : 'Indicadores disponibles'}</span></div><DashboardMetrics metrics={ready ? overview.data?.metrics : null} sample={sample} /></section>
           {ready && overview.data?.coverage?.incompatibleMatches > 0 && <p className="dashboard-data-notice" role="status">Algunos análisis terminados aún no tienen indicadores disponibles. El resumen incluye únicamente los resultados verificables.</p>}
           {(overview.status === 'unavailable' || !overview.data?.metrics || overview.data?.coverage?.compatibleMatches === 0 || Object.values(overview.data.metrics).every(value => value == null)) && <div className="dashboard-panel dashboard-state"><EmptyState title={overview.status === 'unavailable' ? 'Los indicadores aún no están disponibles' : 'Todavía no hay estadísticas para este jugador'} description="Las métricas disponibles aparecerán aquí cuando se reciban los resultados de sus análisis." /></div>}
-          <EvolutionPanel playerId={selected.id} renderEvolution={ready ? renderEvolution : undefined} />
+          <EvolutionPanel playerId={selected.id} evolution={ready ? overview.data?.evolution : undefined} sample={sample} renderEvolution={ready ? renderEvolution : undefined} />
         </>}
       </>}
       <p className="dashboard-footnote">Los datos ausentes se muestran como «Sin datos». Un cero solo se muestra cuando está presente en el resumen.</p>

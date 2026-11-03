@@ -74,7 +74,15 @@ Contrato propuesto y fórmulas: [src/lib/services/DASHBOARD_DATA.md](src/lib/ser
 En `/dashboard.html`, el escenario «Sin indicadores» muestra cómo se tratan
 resultados todavía no compatibles.
 
-## Estructura de carpetas
+## Evolución con Recharts (PCIT-140)
+
+El Dashboard incluye el gráfico y una tabla de las mediciones por partido.
+Los valores ausentes dejan huecos; no se sustituyen por ceros ni se dibujan
+tendencias con un único dato. Los ejemplos de `/dashboard.html` son ficticios.
+La conexión real con el modelo sigue pendiente.
+Detalles: [src/lib/services/DASHBOARD_EVOLUTION.md](src/lib/services/DASHBOARD_EVOLUTION.md).
+
+## Directorios
 
 ```
 web/
