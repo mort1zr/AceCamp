@@ -3,19 +3,19 @@ import Icon from '../../components/Icon.jsx'
 import { rallyLocal } from '../../lib/rallyLocal.js'
 import { createTrack } from '../../lib/track.js'
 
-const titulo = 'Cada partido tiene datos. Nadie los está midiendo.'
+const titulo = 'Cada partido tiene datos. Nadie los está *midiendo*.'
 
 const problemas = [
   'Revisar un partido toma *horas*.',
-  'Las postulaciones no dicen cuánto saca ni cuánto corre un jugador.',
-  'Comparar candidatos termina siendo por intuición.',
+  'Los apuntes manuales dejan la *mitad* del partido fuera.',
+  'Sin datos, cada decisión es una *apuesta*.',
 ]
 
-const subtitulo = 'Con AceCam, solo necesitas tres pasos:'
+const subtitulo = 'Con *AceCam*, solo necesitas tres pasos:'
 
 const pasos = [
   { icon: 'upload', title: 'Sube el video', text: 'Un archivo o un link de YouTube.' },
-  { icon: 'ai', title: 'AceCam lo analiza por ti', text: 'Detecta recorrido, saques y golpes.' },
+  { icon: 'ai', title: '*AceCam* lo analiza por ti', text: 'Detecta recorrido, saques y golpes.' },
   { icon: 'report', title: 'Tú recibes el reporte', text: 'Estadísticas, clips y PDF.' },
 ]
 

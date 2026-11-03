@@ -181,7 +181,7 @@ export default function QueMide() {
               Mapa de calor
             </p>
             <p className="mt-3 text-sm text-text2">
-              Dónde se paró el jugador durante todo el partido.
+              Dónde estuvo el jugador durante todo el partido.
             </p>
             <CanchaDeCalor />
           </Card>

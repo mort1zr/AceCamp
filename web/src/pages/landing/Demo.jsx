@@ -10,7 +10,7 @@ export default function Demo() {
       id="como-funciona"
       title={
         <>
-          ¿Cómo funciona <span className="text-accent-ink">AceCam</span>?
+          Así funciona <span className="text-accent-ink">AceCam</span>
         </>
       }
       lead="Sube tu partido, AceCam se encarga por ti."
