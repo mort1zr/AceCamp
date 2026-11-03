@@ -33,6 +33,7 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 | `npm run lint` | Revisa el código con oxlint |
 | `npm test` | Pruebas de los componentes compartidos |
 | `npm run emulators` | Emuladores locales de Auth, Firestore y Storage |
+| `npm run seed` | Carga datos de ejemplo en los emuladores (con los emuladores ya encendidos) |
 
 ## Firebase (PCIT-20)
 
@@ -77,6 +78,16 @@ npm run dev
 | Firestore | 8080 |
 | Storage | 9199 |
 | Interfaz de los emuladores | 4000 |
+
+Con los emuladores encendidos, `npm run seed` carga dos organizaciones con
+jugadores, partidos y postulaciones de ejemplo. Puedes iniciar sesión con
+`coach@acecam.test` / `acecam123`.
+
+### Esquema de datos (PCIT-22)
+
+Colecciones, campos y estados: [docs/firestore-schema.md](../docs/firestore-schema.md).
+Los nombres de colecciones y estados se importan desde
+[src/lib/schema.js](src/lib/schema.js); no los escribas a mano.
 
 La configuración vive en la raíz del repositorio (`firebase.json`, `.firebaserc`,
 `firestore.rules`, `storage.rules`), porque la web y el modelo comparten el mismo
