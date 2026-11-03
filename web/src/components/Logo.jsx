@@ -1,13 +1,13 @@
-export default function Logo({ size = 30, withWordmark = true, className = '' }) {
+export default function Logo({
+  size = 30,
+  withWordmark = true,
+  className = '',
+  wordmarkClassName = 'text-2xl',
+}) {
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <svg width={size} height={size} viewBox="0 0 30 30" aria-hidden="true">
-        <path
-          d="M3 25h24"
-          stroke="var(--faint)"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
+        <path d="M3 25h24" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" />
         <ellipse cx="15" cy="24.6" rx="6" ry="1.6" fill="var(--series1)" />
         <circle cx="15" cy="12" r="7.5" fill="var(--accent)" />
         <path
@@ -18,7 +18,9 @@ export default function Logo({ size = 30, withWordmark = true, className = '' })
         />
       </svg>
       {withWordmark ? (
-        <span className="font-display text-2xl leading-none font-bold tracking-wide text-text">
+        <span
+          className={`font-display leading-none font-bold tracking-wide text-text ${wordmarkClassName}`}
+        >
           AceCam
         </span>
       ) : null}
