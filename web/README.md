@@ -42,7 +42,15 @@ el build habitual. Contratos y uso: [src/components/ui/README.md](src/components
 La separación de acceso a datos se describe en
 [src/lib/services/README.md](src/lib/services/README.md).
 
-## Estructura
+## Jugadores v1 (PCIT-26)
+
+Vista de desarrollo: `http://localhost:5173/jugadores.html`.
+Permite probar lista y alta sin recargar, con datos ficticios en memoria.
+La conexión real depende de Firebase/Auth y el esquema compartido de Axel;
+no se usa el modo demo como respaldo en producción.
+Contrato de servicio y pasos de integración: [src/lib/services/PLAYERS.md](src/lib/services/PLAYERS.md).
+
+## Estructura del proyecto
 
 ```
 web/

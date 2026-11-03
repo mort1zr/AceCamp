@@ -1,0 +1,82 @@
+import { useEffect, useId, useRef, useState } from 'react'
+import { playersErrorMessage, validatePlayer } from '../../lib/players.js'
+
+export default function PlayerForm({ service, onCancel, onCreated }) {
+  const id = useId()
+  const nameRef = useRef(null)
+  const active = useRef(false)
+  const submitting = useRef(false)
+  const [values, setValues] = useState({ fullName: '', birthDate: '', academy: '', consentAccepted: false })
+  const [errors, setErrors] = useState({})
+  const [saveError, setSaveError] = useState(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    active.current = true
+    nameRef.current?.focus()
+    return () => { active.current = false }
+  }, [])
+
+  const update = event => {
+    const { name, value, type, checked } = event.target
+    setValues(previous => ({ ...previous, [name]: type === 'checkbox' ? checked : value }))
+    setErrors(previous => ({ ...previous, [name]: undefined }))
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    if (submitting.current) return
+    const validation = validatePlayer(values)
+    setErrors(validation)
+    if (Object.keys(validation).length) {
+      event.currentTarget.elements.namedItem(Object.keys(validation)[0])?.focus()
+      return
+    }
+    submitting.current = true
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const player = await service.create(values)
+      if (active.current) onCreated(player)
+    } catch (error) {
+      if (active.current) setSaveError(playersErrorMessage(error, 'create'))
+    } finally {
+      submitting.current = false
+      if (active.current) setSaving(false)
+    }
+  }
+
+  return (
+    <section className="players-form-panel" aria-labelledby={`${id}-title`}>
+      <div className="players-form-heading"><div><p className="players-eyebrow">Un nuevo comienzo</p><h2 id={`${id}-title`}>Registrar jugador</h2><p>Agrega sus datos básicos para comenzar el seguimiento.</p></div><span className="players-required-note">* Campos obligatorios</span></div>
+      <form onSubmit={submit} noValidate aria-label="Registrar jugador" aria-busy={saving}>
+        <fieldset disabled={saving} className="players-form-fields">
+          <div className="players-form-grid">
+            <div className="players-field players-field-wide">
+              <label htmlFor={`${id}-name`}>Nombre completo *</label>
+              <input ref={nameRef} id={`${id}-name`} name="fullName" autoComplete="off" maxLength={120} required value={values.fullName} onChange={update} aria-invalid={Boolean(errors.fullName)} aria-describedby={errors.fullName ? `${id}-name-error` : undefined} placeholder="Nombre y apellidos" />
+              {errors.fullName && <p className="players-field-error" id={`${id}-name-error`}>{errors.fullName}</p>}
+            </div>
+            <div className="players-field">
+              <label htmlFor={`${id}-birth`}>Fecha de nacimiento *</label>
+              <input id={`${id}-birth`} name="birthDate" type="date" required value={values.birthDate} onChange={update} aria-invalid={Boolean(errors.birthDate)} aria-describedby={errors.birthDate ? `${id}-birth-error` : undefined} />
+              {errors.birthDate && <p className="players-field-error" id={`${id}-birth-error`}>{errors.birthDate}</p>}
+            </div>
+            <div className="players-field">
+              <label htmlFor={`${id}-academy`}>Academia <span>(opcional)</span></label>
+              <input id={`${id}-academy`} name="academy" maxLength={120} value={values.academy} onChange={update} aria-invalid={Boolean(errors.academy)} aria-describedby={errors.academy ? `${id}-academy-error` : undefined} placeholder="Academia o club" />
+              {errors.academy && <p className="players-field-error" id={`${id}-academy-error`}>{errors.academy}</p>}
+            </div>
+          </div>
+          <div className="players-consent">
+            <label htmlFor={`${id}-consent`}><input id={`${id}-consent`} name="consentAccepted" type="checkbox" checked={values.consentAccepted} onChange={update} required aria-invalid={Boolean(errors.consentAccepted)} aria-describedby={`${id}-consent-note${errors.consentAccepted ? ` ${id}-consent-error` : ''}`} /><span>Confirmo que el jugador o su apoderado ha sido informado y autorizó el registro de sus datos para el seguimiento deportivo. *</span></label>
+            <p id={`${id}-consent-note`}>La autorización es obligatoria. El registro guardará quién la confirmó y cuándo.</p>
+            {errors.consentAccepted && <p className="players-field-error" id={`${id}-consent-error`}>{errors.consentAccepted}</p>}
+          </div>
+          {saveError && <p role="alert" className="players-save-error">{saveError}</p>}
+          <div className="players-form-actions"><button type="button" className="players-button-secondary" onClick={onCancel}>Cancelar</button><button type="submit" className="players-button-primary">{saving ? 'Guardando…' : 'Guardar jugador'}</button></div>
+        </fieldset>
+      </form>
+    </section>
+  )
+}
