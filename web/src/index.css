@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './styles/theme.css';
+@import 'lenis/dist/lenis.css';
 
 @layer base {
   html {

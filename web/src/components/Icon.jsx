@@ -17,7 +17,7 @@ const paths = {
   play: 'M8 5.5v13l11-6.5z',
 }
 
-export default function Icon({ name, size = 22, className = '' }) {
+export default function Icon({ name, size = 22, strokeWidth = 1.7, className = '' }) {
   const d = paths[name]
   if (!d) return null
 
@@ -33,7 +33,7 @@ export default function Icon({ name, size = 22, className = '' }) {
       <path
         d={d}
         stroke="currentColor"
-        strokeWidth="1.7"
+        strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeLinejoin="round"
       />

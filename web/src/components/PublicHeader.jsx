@@ -3,6 +3,7 @@ import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 
 const anchors = [
+  { href: '#el-problema', label: 'El problema' },
   { href: '#como-funciona', label: 'Cómo funciona' },
   { href: '#que-mide', label: 'Qué mide' },
   { href: '#funciones', label: 'Funciones' },
