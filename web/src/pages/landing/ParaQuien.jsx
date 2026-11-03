@@ -1,4 +1,5 @@
 import Card from '../../components/Card.jsx'
+import Icon from '../../components/Icon.jsx'
 import Reveal from '../../components/Reveal.jsx'
 import Section from '../../components/Section.jsx'
 
@@ -83,16 +84,22 @@ function Reporte() {
 const perfiles = [
   {
     Vista: Comparador,
+    etiqueta: 'Para medir',
+    clave: 'Compara hasta 4 jugadores',
     title: 'Entrenadores y reclutadores',
     text: 'Mide a cada jugador con números, no con impresiones, y compara candidatos lado a lado.',
   },
   {
     Vista: Plantel,
+    etiqueta: 'Para gestionar',
+    clave: 'Todo tu equipo en un panel',
     title: 'Academias, clubes y universidades',
     text: 'Lleva el seguimiento de todos tus jugadores y partidos en un solo lugar.',
   },
   {
     Vista: Reporte,
+    etiqueta: 'Para destacar',
+    clave: 'Reporte listo en PDF',
     title: 'Jugadores y padres',
     text: 'Sube el partido y recibe un reporte listo para compartir con entrenadores o universidades.',
   },
@@ -100,9 +107,16 @@ const perfiles = [
 
 export default function ParaQuien() {
   return (
-    <Section title="¿Para quién es AceCam?" align="center">
+    <Section
+      title={
+        <>
+          ¿Para quién es <span className="text-accent-ink">AceCam</span>?
+        </>
+      }
+      align="center"
+    >
       <div className="mt-12 grid gap-4 md:grid-cols-3">
-        {perfiles.map(({ Vista, title, text }, index) => (
+        {perfiles.map(({ Vista, etiqueta, clave, title, text }, index) => (
           <Reveal key={title} delay={index * 90}>
             <Card className="group flex h-full flex-col overflow-hidden ring-line3 transition hover:border-line3 hover:ring-1">
               <div
@@ -117,9 +131,18 @@ export default function ParaQuien() {
                   <Vista />
                 </div>
               </div>
-              <div className="p-7">
-                <h3 className="text-2xl">{title}</h3>
-                <p className="mt-2 text-text2">{text}</p>
+              <div className="flex flex-1 flex-col p-7">
+                <p className="font-display text-xs tracking-[0.2em] text-electric-ink uppercase">
+                  {etiqueta}
+                </p>
+                <h3 className="mt-2 text-2xl">{title}</h3>
+                <p className="mt-2 mb-6 text-text2">{text}</p>
+                <p className="mt-auto flex items-center gap-2 border-t border-line pt-4 text-sm font-medium text-text">
+                  <span className="grid size-5 place-content-center rounded-full bg-accent text-on-accent">
+                    <Icon name="check" size={13} strokeWidth={2.6} />
+                  </span>
+                  {clave}
+                </p>
               </div>
             </Card>
           </Reveal>
