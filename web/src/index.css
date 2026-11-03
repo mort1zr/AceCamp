@@ -45,3 +45,45 @@
     outline-offset: 2px;
   }
 }
+
+@layer components {
+  .metal-edge,
+  .metal-text {
+    background-image: linear-gradient(
+      110deg,
+      var(--metal-low) 0%,
+      var(--metal-low) 20%,
+      var(--metal-high) 25%,
+      var(--metal-low) 30%,
+      var(--metal-low) 45%,
+      var(--metal-high) 50%,
+      var(--metal-low) 55%,
+      var(--metal-low) 70%,
+      var(--metal-high) 75%,
+      var(--metal-low) 80%,
+      var(--metal-low) 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  .metal-text {
+    background-clip: text;
+    color: transparent;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .metal-edge,
+    .metal-text {
+      animation: metal-sheen 3s linear infinite;
+    }
+  }
+
+  @keyframes metal-sheen {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: 0 0;
+    }
+  }
+}

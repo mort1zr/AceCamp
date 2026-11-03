@@ -87,7 +87,7 @@ export default function RallyThread() {
       {canvas ? (
         <svg width={canvas.width} height={canvas.height} fill="none" className="absolute inset-0">
           <path d={path} stroke="var(--line2)" strokeWidth="1.5" strokeDasharray="4 10" />
-          <path ref={trailRef} d={path} stroke="var(--electric)" strokeWidth="1.5" />
+          <path ref={trailRef} d={path} stroke="var(--accent-line)" strokeWidth="1.5" />
           <circle ref={ballRef} r="7" fill="var(--accent)" stroke="var(--on-accent)" opacity="0" />
         </svg>
       ) : null}

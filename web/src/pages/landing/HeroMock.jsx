@@ -178,7 +178,7 @@ export default function HeroMock() {
     >
       <p className="px-3 pb-2 text-right text-xs text-muted">Datos de ejemplo</p>
 
-      <div className="rounded-t-[22px] border border-b-0 border-line bg-surface p-3 sm:p-4">
+      <div className="rounded-t-[22px] border border-b-0 border-line bg-surface p-3 pb-24 sm:p-4 sm:pb-24">
         <div className="mb-3 flex flex-wrap items-center gap-1 sm:mb-4">
           {pestanas.map((pestana, indice) => (
             <span

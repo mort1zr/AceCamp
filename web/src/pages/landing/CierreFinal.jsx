@@ -13,7 +13,7 @@ export default function CierreFinal() {
         </p>
         <div className="mt-8 flex justify-center">
           <Button to="/registro" size="lg">
-            Prueba gratis tu primer análisis
+            Empieza gratis
           </Button>
         </div>
       </Reveal>

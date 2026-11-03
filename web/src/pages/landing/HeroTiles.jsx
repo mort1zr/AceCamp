@@ -37,7 +37,7 @@ function ScoreTile() {
 
 function CourtTile() {
   return (
-    <svg width="60" height="84" viewBox="0 0 60 84" fill="none" aria-hidden="true">
+    <svg width="52" height="73" viewBox="0 0 60 84" fill="none" aria-hidden="true">
       <path
         d="M4 4h52v76H4zM14 4v76M46 4v76M14 24h32M14 60h32M30 24v36M4 42h52"
         stroke="var(--electric)"
@@ -75,23 +75,23 @@ function LensTile() {
 }
 
 const tiles = [
-  { Content: LensTile, place: 'top-2 left-6 size-28 -rotate-6', delay: 0, to: [200, 480] },
-  { Content: SpeedTile, place: 'top-64 left-20 size-28 rotate-6', delay: 1400, to: [110, 240] },
-  { Content: HeatTile, place: 'top-[27rem] -left-4 size-32 -rotate-3', delay: 2600, to: [220, 170] },
-  { Content: BallTile, place: 'top-6 right-8 size-28 rotate-6', delay: 800, to: [-200, 440] },
-  { Content: ScoreTile, place: 'top-64 right-16 size-28 -rotate-6', delay: 2000, to: [-90, 190] },
-  { Content: CourtTile, place: 'top-[26rem] -right-4 size-32 rotate-3', delay: 3200, to: [-240, 170] },
+  { Content: LensTile, place: 'top-[6%] left-12 size-28 -rotate-6', delay: 0, to: [300, 720] },
+  { Content: SpeedTile, place: 'top-[37%] left-20 size-28 rotate-6 [@media(max-height:720px)]:hidden', delay: 1400, to: [210, 540] },
+  { Content: HeatTile, place: 'bottom-[6%] left-12 size-28 -rotate-3', delay: 2600, to: [280, 380] },
+  { Content: BallTile, place: 'top-[6%] right-12 size-28 rotate-6', delay: 800, to: [-300, 720] },
+  { Content: ScoreTile, place: 'top-[37%] right-20 size-28 -rotate-6 [@media(max-height:720px)]:hidden', delay: 2000, to: [-210, 540] },
+  { Content: CourtTile, place: 'bottom-[6%] right-12 size-28 rotate-3', delay: 3200, to: [-280, 380] },
 ]
 
 export default function HeroTiles() {
   const ref = useRef(null)
-  useScrollSpring(ref, { start: 120, end: 620 })
+  useScrollSpring(ref, { start: 80, end: 700 })
 
   return (
     <div
       ref={ref}
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-10 hidden xl:block"
+      className="pointer-events-none absolute inset-0 z-10 hidden min-[1200px]:block"
     >
       {tiles.map(({ Content, place, delay, to: [x, y] }) => (
         <div
@@ -99,6 +99,7 @@ export default function HeroTiles() {
           className={`absolute will-change-transform ${place}`}
           style={{
             translate: `calc(var(--scroll-progress, 0) * ${x}px) calc(var(--scroll-progress, 0) * ${y}px)`,
+            scale: 'calc(1 - var(--scroll-progress, 0) * 0.5)',
           }}
         >
           <div

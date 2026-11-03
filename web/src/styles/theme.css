@@ -8,6 +8,7 @@
   --series1: #D0623A;   --series2: #5A93D8;   --series3: #8E9A1C;   --series4: #9B6FD6;
   --faint: #5E574E;
   --electric: #4FE3FF;  --electric-ink: #4FE3FF;
+  --metal-low: #A89F93; --metal-high: #FFFFFF;
   --tile-shadow: 0 16px 32px rgb(0 0 0 / 0.45);
 
   --ace-ui-text: var(--text);
@@ -31,6 +32,7 @@
   --good: #2F7A3F;      --bad: #B0432A;
   --faint: #B9B0A2;
   --electric: #0AA5D6;  --electric-ink: #00708F;
+  --metal-low: #45403A; --metal-high: #B9B0A2;
   --tile-shadow: 0 16px 32px rgb(26 24 21 / 0.12);
   color-scheme: light;
 }

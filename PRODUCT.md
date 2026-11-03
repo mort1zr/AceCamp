@@ -24,7 +24,8 @@ Proyecto de carrera de un equipo de 4 personas, gestionado en Jira (proyecto PCI
 - Confirmado: se puede analizar pegando un link de YouTube.
 - Las velocidades son estimaciones a partir del video, no mediciones de radar.
 - Datos de menores: aplica la Ley 29733 de Perú.
-- Por decidir: primer análisis gratis, precios en soles y cancelación sin penalidad. Aparecen en el texto de la landing, pero el equipo aún no los confirma.
+- Confirmado: el primer mes es gratis.
+- Por decidir: precios en soles y cancelación sin penalidad. Aparecen en el texto de la landing, pero el equipo aún no los confirma.
 - Los precios de los planes siguen como `[PRECIO]`.
 
 ## Brand Commitments
