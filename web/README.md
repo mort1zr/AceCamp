@@ -32,6 +32,56 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 | `npm run preview` | Sirve el build de producción |
 | `npm run lint` | Revisa el código con oxlint |
 | `npm test` | Pruebas de los componentes compartidos |
+| `npm run emulators` | Emuladores locales de Auth, Firestore y Storage |
+
+## Firebase (PCIT-20)
+
+La web usa un solo proyecto de Firebase con **Auth** (correo y contraseña),
+**Firestore** y **Storage**. Todo se inicializa una vez en
+[src/lib/firebase.js](src/lib/firebase.js); el resto de la app importa de ahí:
+
+```js
+import { auth, db, storage } from '../lib/firebase.js'
+```
+
+Ningún otro archivo debe llamar a `initializeApp`.
+
+### Configurar el `.env`
+
+```bash
+cp .env.example .env
+```
+
+Completa los valores `VITE_FIREBASE_*` (Configuración del proyecto → General →
+Tus apps → app web, o pídeselos a Axel). `.env` está en `.gitignore`: **nunca se sube**.
+Si falta un valor, la app falla al arrancar con un mensaje que dice cuál.
+
+### Trabajar con los emuladores (recomendado para desarrollar)
+
+Los emuladores corren en tu máquina con el proyecto `demo-acecam`: no tocan
+datos reales y no necesitan credenciales ni el `.env` completo.
+
+Requisitos: Java 11 o superior (los emuladores de Firestore y Storage lo usan).
+
+```bash
+# Terminal 1
+npm run emulators            # UI en http://127.0.0.1:4000
+
+# Terminal 2, con VITE_USE_FIREBASE_EMULATORS=true en .env
+npm run dev
+```
+
+| Servicio | Puerto |
+| --- | --- |
+| Auth | 9099 |
+| Firestore | 8080 |
+| Storage | 9199 |
+| Interfaz de los emuladores | 4000 |
+
+La configuración vive en la raíz del repositorio (`firebase.json`, `.firebaserc`,
+`firestore.rules`, `storage.rules`), porque la web y el modelo comparten el mismo
+proyecto. Por ahora las reglas niegan todo; las reglas por organización llegan
+en PCIT-23 (Firestore) y PCIT-24 (Storage).
 
 ## Componentes compartidos (PCIT-25)
 
@@ -51,11 +101,11 @@ web/
     ├── assets/        Imágenes, íconos y capturas
     ├── components/    Componentes reutilizables
     ├── hooks/         Hooks propios
-    ├── lib/           Utilidades y clientes de servicios
+    ├── lib/           Utilidades y clientes de servicios (firebase.js)
     ├── pages/         Una carpeta o archivo por pantalla
     └── styles/        Variables de tema y estilos globales
 ```
 
 ## Stack
 
-React 19 · Vite · React Router · Tailwind CSS v4
+React 19 · Vite · React Router · Tailwind CSS v4 · Firebase (Auth, Firestore, Storage)

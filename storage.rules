@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Base segura de PCIT-20: todo cerrado.
+// Las reglas de subida de videos por organización llegan en PCIT-24.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
