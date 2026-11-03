@@ -1,47 +1,70 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router'
 import Icon from '../components/Icon.jsx'
 import LinkDeslizante from '../components/LinkDeslizante.jsx'
 import Logo from '../components/Logo.jsx'
 
+const INCLINACION = 8
+
+const tonos = {
+  basico: {
+    tarjeta: 'border-line2 ring-line3 hover:border-line3',
+    brillo: '',
+    boton: 'border border-line3 text-text hover:border-text2',
+    check: 'text-text2',
+  },
+  pro: {
+    tarjeta: 'border-accent-line/60 ring-accent-line hover:border-accent-line',
+    brillo: 'from-accent/12',
+    boton: 'bg-accent text-on-accent hover:opacity-90',
+    check: 'text-accent-ink',
+  },
+  ultra: {
+    tarjeta: 'border-electric/50 ring-electric hover:border-electric',
+    brillo: 'from-electric/12',
+    boton: 'bg-electric text-on-accent hover:opacity-90',
+    check: 'text-electric-ink',
+  },
+}
+
 const planes = [
   {
     nombre: 'Básico',
-    para: 'Para entrenadores que empiezan a medir',
+    para: 'Para jugadores y padres',
     precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
     detalle: 'por mes',
-    base: 'Incluye:',
+    prueba: {
+      titulo: '1 mes de prueba gratis',
+      limites: ['Hasta 2 jugadores', '2 análisis por día', 'Solo videos de YouTube'],
+    },
+    base: 'Con el plan completo:',
     incluye: [
-      'Análisis incluidos al mes',
-      'Dashboard por jugador',
+      'Hasta 4 jugadores',
+      'Dashboard completo por jugador',
       'Videos propios o de YouTube',
       'Reporte en PDF',
     ],
-    accion: { label: 'Empieza ahora', to: '/registro' },
+    accion: { label: 'Prueba gratis', to: '/registro' },
   },
   {
     nombre: 'Pro',
-    para: 'Para academias con varios jugadores',
+    para: 'Para entrenadores y reclutadores',
     precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
     detalle: 'por mes',
     popular: true,
+    tono: 'pro',
     base: 'Todo lo del Básico, más:',
-    incluye: [
-      'Más análisis al mes',
-      'Comparador de jugadores',
-      'Historial de partidos',
-      'Bandeja de reclutamiento',
-    ],
+    incluye: ['Más análisis al mes', 'Más jugadores', 'Bandeja de reclutamiento'],
     accion: { label: 'Empieza ahora', to: '/registro' },
   },
   {
-    nombre: 'Institucional',
-    para: 'Para clubes, federaciones y universidades',
-    precio: { mensual: 'A medida', anual: 'A medida' },
-    detalle: 'Conversemos',
-    destacado: true,
+    nombre: 'Ultra',
+    para: 'Para academias, clubes y universidades',
+    precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
+    detalle: 'por mes',
+    tono: 'ultra',
     base: 'Todo lo de Pro, más:',
-    incluye: ['Volumen por convenio', 'Varios equipos y roles', 'Soporte dedicado'],
+    incluye: ['Muchos más jugadores', 'Muchos más análisis', 'Soporte dedicado'],
     accion: { label: 'Contáctanos', href: 'mailto:consultas@acecam.com' },
   },
 ]
@@ -65,51 +88,87 @@ function Periodo({ anual, onCambiar }) {
         />
       </button>
       <span className={anual ? 'text-text' : 'text-muted'}>Anual</span>
-      <span className="rounded-full bg-accent px-2.5 py-0.5 font-display text-xs font-semibold text-on-accent">
-        2 meses gratis
-      </span>
     </div>
   )
 }
 
 function Plan({ plan, anual }) {
-  const oscuro = plan.destacado
-  const boton = `mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 font-semibold transition-opacity hover:opacity-90 ${
-    oscuro ? 'bg-bg text-text' : plan.popular ? 'bg-accent text-on-accent' : 'bg-text text-bg'
-  }`
+  const tono = tonos[plan.tono ?? 'basico']
+  const boton = `mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 font-semibold transition ${tono.boton}`
+  const tarjetaRef = useRef(null)
+
+  const inclinar = (evento) => {
+    const tarjeta = tarjetaRef.current
+    if (
+      evento.pointerType !== 'mouse' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    )
+      return
+    const rect = tarjeta.getBoundingClientRect()
+    const x = (evento.clientX - rect.left) / rect.width - 0.5
+    const y = (evento.clientY - rect.top) / rect.height - 0.5
+    tarjeta.style.transform = `perspective(900px) rotateX(${-y * INCLINACION}deg) rotateY(${
+      x * INCLINACION
+    }deg) translateY(-6px)`
+  }
+
+  const soltar = () => {
+    tarjetaRef.current.style.transform = ''
+  }
 
   return (
     <article
-      className={`relative flex flex-col rounded-[24px] border p-7 ${
-        oscuro ? 'border-transparent bg-text text-bg' : 'border-line2 bg-surface shadow-tile'
-      }`}
+      ref={tarjetaRef}
+      onPointerMove={inclinar}
+      onPointerLeave={soltar}
+      className={`relative flex flex-col rounded-[24px] border bg-surface p-7 shadow-tile transition-[transform,border-color,box-shadow] duration-300 ease-out will-change-transform hover:ring-1 ${tono.tarjeta}`}
     >
+      {tono.brillo ? (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-0 -z-10 rounded-[24px] bg-linear-to-b ${tono.brillo} to-transparent to-45%`}
+        />
+      ) : null}
       {plan.popular ? (
-        <span className="absolute -top-3 right-6 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 font-display text-xs font-semibold text-on-accent">
-          <Icon name="check" size={14} strokeWidth={2.4} />
+        <span className="absolute -top-4 right-6 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 font-display text-sm font-semibold text-on-accent">
+          <Icon name="check" size={17} strokeWidth={2.4} />
           Más popular
         </span>
       ) : null}
 
       <h2 className="text-2xl">{plan.nombre}</h2>
-      <p className={`mt-1 text-sm ${oscuro ? 'opacity-60' : 'text-muted'}`}>{plan.para}</p>
+      <p className="mt-1 text-sm text-muted">{plan.para}</p>
 
       <p className="mt-8 font-display text-4xl font-semibold">
         {anual ? plan.precio.anual : plan.precio.mensual}
       </p>
-      <p className={`mt-1 text-sm ${oscuro ? 'opacity-60' : 'text-muted'}`}>
+      <p className="mt-1 text-sm text-muted">
         {plan.detalle}
-        {anual && !oscuro ? ', facturado al año' : ''}
+        {anual ? ', facturado al año' : ''}
       </p>
+
+      {plan.prueba ? (
+        <div className="mt-6 rounded-2xl border border-accent-line bg-accent/10 p-4">
+          <p className="font-display text-sm font-semibold text-accent-ink">{plan.prueba.titulo}</p>
+          <ul className="mt-2 space-y-1.5 text-sm text-text2">
+            {plan.prueba.limites.map((limite) => (
+              <li key={limite} className="flex items-center gap-2">
+                <span className="size-1 shrink-0 rounded-full bg-accent-ink" />
+                {limite}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <p className="mt-8 text-sm font-semibold">{plan.base}</p>
       <ul className="mt-3 space-y-2.5 text-sm">
         {plan.incluye.map((item) => (
           <li key={item} className="flex items-center gap-2.5">
-            <span className={oscuro ? 'text-bg' : 'text-electric-ink'}>
+            <span className={tono.check}>
               <Icon name="check" size={16} strokeWidth={2.2} />
             </span>
-            <span className={oscuro ? 'opacity-80' : 'text-text2'}>{item}</span>
+            <span className="text-text2">{item}</span>
           </li>
         ))}
       </ul>
@@ -160,9 +219,12 @@ export default function Precios() {
         </LinkDeslizante>
 
         <header className="mt-16 text-center">
-          <h1 className="mx-auto max-w-2xl text-4xl sm:text-6xl">Planes para medir cada partido</h1>
+          <h1 className="mx-auto max-w-2xl text-4xl sm:text-6xl">
+            Elige cómo quieres medir tu juego
+          </h1>
           <p className="mx-auto mt-4 max-w-md text-lg text-text2">
-            Empieza con un mes gratis. Sin cámaras especiales ni hardware específico.
+            Prueba <span className="text-accent-ink">AceCam</span> gratis durante un mes con el plan
+            Básico.
           </p>
           <Periodo anual={anual} onCambiar={() => setAnual((valor) => !valor)} />
         </header>
