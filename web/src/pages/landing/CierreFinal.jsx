@@ -29,15 +29,15 @@ const flotantes = [
   },
   {
     Contenido: LensTile,
-    lugar: 'top-[42%] left-[6%] rotate-3',
+    lugar: 'top-[42%] left-[15%] rotate-3',
     demora: 1800,
-    desde: [586, 14],
+    desde: [456, 14],
   },
   {
     Contenido: CourtTile,
-    lugar: 'top-[46%] right-[7%] -rotate-3',
+    lugar: 'top-[46%] right-[15%] -rotate-3',
     demora: 2700,
-    desde: [-571, -17],
+    desde: [-456, -17],
   },
   {
     Contenido: HeatTile,
