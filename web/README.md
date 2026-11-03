@@ -58,7 +58,14 @@ y probar una cola en memoria. No transfiere ni procesa videos reales.
 La integración pendiente con Storage, Firestore y el worker se detalla en
 [src/lib/services/ANALYSIS.md](src/lib/services/ANALYSIS.md).
 
-## Carpetas
+## Interfaz de Dashboard (PCIT-138)
+
+Vista de desarrollo: `http://localhost:5173/dashboard.html`.
+Selector de jugador, tarjetas y estados de carga/vacío/error con ejemplos
+identificados. El cálculo real y el gráfico corresponden a PCIT-139 y PCIT-140.
+Contrato de integración: [src/lib/services/DASHBOARD_UI.md](src/lib/services/DASHBOARD_UI.md).
+
+## Carpetas del proyecto
 
 ```
 web/
