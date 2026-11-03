@@ -58,6 +58,11 @@ y probar una cola en memoria. No transfiere ni procesa videos reales.
 La integración pendiente con Storage, Firestore y el worker se detalla en
 [src/lib/services/ANALYSIS.md](src/lib/services/ANALYSIS.md).
 
+PCIT-134 prepara el núcleo de importación HTTPS y validación del archivo en
+[server/video-import](server/video-import/README.md), con pruebas locales.
+Todavía no hay API ni conexión real con Auth/Storage o YouTube; los enlaces de
+la aplicación no se habilitan por este avance.
+
 ## Interfaz de Dashboard (PCIT-138)
 
 Vista de desarrollo: `http://localhost:5173/dashboard.html`.

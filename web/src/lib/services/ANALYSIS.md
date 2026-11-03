@@ -8,9 +8,12 @@ y del worker PCIT-35 de Aaron. No se han sustituido sus implementaciones ni
 fusionado la rama Landing_Rolando. La ruta final `/analizar` ya está prevista
 por PCIT-96; la página de esta rama es `src/pages/Analizar.jsx`.
 
-PCIT-134 es una subtarea de PCIT-27 creada para el importador de enlaces:
+PCIT-134 es una tarea independiente relacionada con PCIT-27 para el importador de enlaces:
 el servicio de archivos de PCIT-24 no cubre descargar un video externo,
-comprobar sus bytes reales y guardarlo en Storage. Su backend sigue pendiente.
+comprobar sus bytes reales y guardarlo en Storage. Su núcleo de servidor y sus
+pruebas locales están en [server/video-import](../../../server/video-import/README.md).
+Quedan pendientes API, Auth/Storage reales y el proveedor de YouTube; todavía
+no habilitar enlaces en producción.
 
 ## Demostración
 
@@ -79,7 +82,8 @@ no certifica el contenido del video ni sustituye validación del servidor.
 
 1. Validar archivo (MP4/MOV, MIME informado, tamaño mayor que cero y dentro del
    límite) o formato de enlace HTTPS directo. Los proveedores de páginas como
-   YouTube no están admitidos por este contrato inicial.
+   YouTube no están admitidos por este contrato inicial. PCIT-134 deberá añadir
+   ese proveedor antes de cerrar el alcance confirmado por PRODUCT.md.
 2. Reservar un ID de documento sin escribir aún el partido; verificar el jugador
    de la organización. La autorización efectiva depende de PCIT-23/24.
 3. Transferir o importar el video con el mismo matchId. El servicio de transferencia
