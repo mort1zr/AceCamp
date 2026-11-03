@@ -11,19 +11,17 @@ import TestimoniosFaq from './landing/TestimoniosFaq.jsx'
 
 export default function Landing() {
   return (
-    <>
+    <div className="relative">
+      <RallyThread />
       <Hero />
-      <div className="relative">
-        <RallyThread />
-        <Problema />
-        <QueMide />
-        <Modulos />
-        <ParaQuien />
-        <Comparacion />
-        <TestimoniosFaq />
-        <PlanesPreview />
-        <CierreFinal />
-      </div>
-    </>
+      <Problema />
+      <QueMide />
+      <Modulos />
+      <ParaQuien />
+      <Comparacion />
+      <TestimoniosFaq />
+      <PlanesPreview />
+      <CierreFinal />
+    </div>
   )
 }

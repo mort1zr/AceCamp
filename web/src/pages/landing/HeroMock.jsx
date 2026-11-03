@@ -1,17 +1,17 @@
 const atributos = [
-  { sigla: 'SAQ', nombre: 'Saque', valor: 89, promedio: 58 },
+  { sigla: 'SAQ', nombre: 'Saque', valor: 100, promedio: 58 },
   { sigla: 'DER', nombre: 'Derecha', valor: 84, promedio: 60 },
-  { sigla: 'REV', nombre: 'Revés', valor: 78, promedio: 54 },
+  { sigla: 'REV', nombre: 'Revés', valor: 78, promedio: 50 },
   { sigla: 'VOL', nombre: 'Volea', valor: 72, promedio: 46 },
-  { sigla: 'MOV', nombre: 'Movimiento', valor: 86, promedio: 62 },
+  { sigla: 'MOV', nombre: 'Movimiento', valor: 100, promedio: 40 },
   { sigla: 'RES', nombre: 'Resistencia', valor: 81, promedio: 56 },
 ]
 
 const metricas = [
-  { nombre: 'Primeros saques', valor: 68 },
-  { nombre: 'Puntos ganados con saque', valor: 74 },
-  { nombre: 'Peloteos ganados', valor: 58 },
-  { nombre: 'Efectividad en la red', valor: 61 },
+  { nombre: 'Primeros saques', valor: '68%', barra: 68 },
+  { nombre: 'Dobles faltas', valor: '4%', barra: 4 },
+  { nombre: 'Promedio de peloteo', valor: '9.4 golpes', barra: 47 },
+  { nombre: 'Partidos ganados', valor: '80%', barra: 80 },
 ]
 
 const forma = ['V', 'V', 'D', 'V', 'V']
@@ -48,7 +48,7 @@ function TarjetaJugador() {
         </svg>
       </div>
 
-      <p className="mt-5 font-display text-2xl font-bold">Jugador de ejemplo</p>
+      <p className="mt-5 font-display text-2xl font-bold">Rolando Roller</p>
       <p className="text-sm">Diestro · Revés a dos manos</p>
 
       <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-1.5 border-t border-on-accent/25 pt-4">
@@ -140,11 +140,11 @@ function Rendimiento() {
             <div className="flex items-baseline justify-between gap-3 text-xs text-text2">
               <span>{metrica.nombre}</span>
               <span className="font-display text-base font-bold text-text tabular-nums">
-                {metrica.valor}%
+                {metrica.valor}
               </span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-chip">
-              <div className="h-full rounded-full bg-electric" style={{ width: `${metrica.valor}%` }} />
+              <div className="h-full rounded-full bg-electric" style={{ width: `${metrica.barra}%` }} />
             </div>
           </li>
         ))}

@@ -1,5 +1,6 @@
 import Button from '../../components/Button.jsx'
 import Icon from '../../components/Icon.jsx'
+import Logo from '../../components/Logo.jsx'
 import MetalPill from '../../components/MetalPill.jsx'
 import HeroMock from './HeroMock.jsx'
 import HeroTiles from './HeroTiles.jsx'
@@ -30,11 +31,12 @@ export default function Hero() {
   return (
     <section className="relative overflow-hidden px-6 pt-10">
       <div className="relative mx-auto max-w-6xl">
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-4 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-0">
+          <Logo size={36} />
           <MetalPill badge="Nuevo">Analiza desde un link de YouTube</MetalPill>
         </div>
 
-        <div className="relative mt-4 flex flex-col justify-center lg:h-[calc(100dvh-19rem)] lg:max-h-[38rem] lg:min-h-[22rem]">
+        <div data-rally-start className="relative mt-4 flex flex-col justify-center lg:h-[calc(100dvh-19rem)] lg:max-h-[38rem] lg:min-h-[22rem]">
           <CourtLines />
           <HeroTiles />
 
@@ -44,12 +46,11 @@ export default function Hero() {
               <span className="rounded-2xl bg-accent px-2.5 whitespace-nowrap text-on-accent">
                 estadísticas
               </span>{' '}
-              de nivel profesional
+              a nivel profesional
             </h1>
 
-            <p className="mx-auto mt-5 max-w-lg text-lg leading-relaxed text-text2 sm:text-xl">
-              Sube un video o pega un link de YouTube. AceCam mide saques, golpes y movimiento por
-              ti.
+            <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-text2 sm:text-xl">
+              Solo sube un video o un link de YouTube. AceCam lo analiza por ti.
             </p>
 
             <div className="mt-7 flex flex-wrap items-center justify-center gap-4">
@@ -67,10 +68,9 @@ export default function Hero() {
 
         <div className="relative z-20 mx-auto mt-8 max-w-5xl">
           <HeroMock />
+          <div className="pointer-events-none absolute -inset-x-1 bottom-0 h-36 bg-linear-to-t from-bg to-transparent" />
         </div>
       </div>
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-36 bg-linear-to-t from-bg to-transparent" />
     </section>
   )
 }

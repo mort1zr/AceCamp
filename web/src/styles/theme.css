@@ -9,6 +9,7 @@
   --faint: #5E574E;
   --electric: #4FE3FF;  --electric-ink: #4FE3FF;
   --metal-low: #A89F93; --metal-high: #FFFFFF;
+  --cloud: #FFFFFF;     --cloud-edge: #FFFFFF;
   --tile-shadow: 0 16px 32px rgb(0 0 0 / 0.45);
 
   --ace-ui-text: var(--text);
@@ -33,6 +34,7 @@
   --faint: #B9B0A2;
   --electric: #0AA5D6;  --electric-ink: #00708F;
   --metal-low: #45403A; --metal-high: #B9B0A2;
+  --cloud: #FFFFFF;     --cloud-edge: #D2CABD;
   --tile-shadow: 0 16px 32px rgb(26 24 21 / 0.12);
   color-scheme: light;
 }
