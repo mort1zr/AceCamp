@@ -88,3 +88,51 @@
     }
   }
 }
+
+:root[data-deslizar]::view-transition-old(root),
+:root[data-deslizar]::view-transition-new(root) {
+  animation-duration: 0.75s;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  animation-fill-mode: both;
+  mix-blend-mode: normal;
+}
+
+:root[data-deslizar='adelante']::view-transition-old(root) {
+  animation-name: salir-izquierda;
+}
+
+:root[data-deslizar='adelante']::view-transition-new(root) {
+  animation-name: entrar-derecha;
+}
+
+:root[data-deslizar='atras']::view-transition-old(root) {
+  animation-name: salir-derecha;
+}
+
+:root[data-deslizar='atras']::view-transition-new(root) {
+  animation-name: entrar-izquierda;
+}
+
+@keyframes salir-izquierda {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes entrar-derecha {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes salir-derecha {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes entrar-izquierda {
+  from {
+    transform: translateX(-100%);
+  }
+}

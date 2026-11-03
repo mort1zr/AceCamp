@@ -1,10 +1,11 @@
 import { Link } from 'react-router'
+import LinkDeslizante from './LinkDeslizante.jsx'
 import Logo from './Logo.jsx'
 
 const year = new Date().getFullYear()
 
 const links = [
-  { to: '/precios', label: 'Precios' },
+  { to: '/precios', label: 'Precios', desliza: true },
   { to: '/registro', label: 'Crear cuenta' },
   { to: '/terminos', label: 'Términos' },
   { to: '/privacidad', label: 'Privacidad' },
@@ -23,13 +24,16 @@ export default function PublicFooter() {
 
         <nav aria-label="Pie de página">
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-text2">
-            {links.map((link) => (
-              <li key={link.to}>
-                <Link to={link.to} className="hover:text-text">
-                  {link.label}
-                </Link>
-              </li>
-            ))}
+            {links.map(({ desliza, ...link }) => {
+              const Enlace = desliza ? LinkDeslizante : Link
+              return (
+                <li key={link.to}>
+                  <Enlace to={link.to} className="hover:text-text">
+                    {link.label}
+                  </Enlace>
+                </li>
+              )
+            })}
           </ul>
         </nav>
       </div>

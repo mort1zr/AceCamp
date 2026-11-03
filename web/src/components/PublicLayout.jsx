@@ -7,6 +7,7 @@ import PublicHeader from './PublicHeader.jsx'
 export default function PublicLayout() {
   const { pathname } = useLocation()
   const esLanding = pathname === '/'
+  const esPrecios = pathname === '/precios'
 
   return (
     <div className="min-h-dvh bg-bg text-text">
@@ -15,6 +16,8 @@ export default function PublicLayout() {
           <FloatingNav />
           <ControlsPill />
         </>
+      ) : esPrecios ? (
+        <ControlsPill />
       ) : (
         <PublicHeader />
       )}

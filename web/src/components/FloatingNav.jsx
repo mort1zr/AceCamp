@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import Icon from './Icon.jsx'
+import LinkDeslizante from './LinkDeslizante.jsx'
 
 const TOPE = 16
 const RELLENO = 6
@@ -9,7 +10,7 @@ const CERRAR_MS = 220
 
 const enlaces = [
   { to: '/#funciones', label: 'Producto', className: 'hidden sm:block' },
-  { to: '/precios', label: 'Precios' },
+  { to: '/precios', label: 'Precios', desliza: true },
   { to: '/login', label: 'Ingresar' },
 ]
 
@@ -92,22 +93,25 @@ export default function FloatingNav() {
           <li className="px-2">
             <span className="block size-2 rounded-full bg-accent" />
           </li>
-          {enlaces.map((enlace) => (
-            <li
-              key={enlace.label}
-              className={`transition-opacity ${enlace.className ?? ''} ${
-                expandido ? 'opacity-100 duration-1000' : 'opacity-0 duration-150'
-              }`}
-            >
-              <Link
-                to={enlace.to}
-                tabIndex={expandido ? undefined : -1}
-                className="block rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap text-text2 transition-colors hover:text-text"
+          {enlaces.map(({ desliza, ...enlace }) => {
+            const Enlace = desliza ? LinkDeslizante : Link
+            return (
+              <li
+                key={enlace.label}
+                className={`transition-opacity ${enlace.className ?? ''} ${
+                  expandido ? 'opacity-100 duration-1000' : 'opacity-0 duration-150'
+                }`}
               >
-                {enlace.label}
-              </Link>
-            </li>
-          ))}
+                <Enlace
+                  to={enlace.to}
+                  tabIndex={expandido ? undefined : -1}
+                  className="block rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap text-text2 transition-colors hover:text-text"
+                >
+                  {enlace.label}
+                </Enlace>
+              </li>
+            )
+          })}
         </ul>
       </div>
 
