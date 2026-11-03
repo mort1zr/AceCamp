@@ -65,7 +65,7 @@ const garantias = [
 function Invitacion() {
   return (
     <div>
-      <h2 className="text-4xl sm:text-5xl">El próximo partido recibe los datos y deja las dudas</h2>
+      <h2 className="text-4xl sm:text-5xl">El próximo partido recibe datos y deja las dudas</h2>
       <p className="mt-4 text-text2">
         Solo sube un video y recibe un reporte de AceCam para tu equipo.
       </p>
