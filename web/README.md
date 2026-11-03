@@ -31,6 +31,16 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 | `npm run build` | Compila a producción en `dist/` |
 | `npm run preview` | Sirve el build de producción |
 | `npm run lint` | Revisa el código con oxlint |
+| `npm test` | Pruebas de los componentes compartidos |
+
+## Componentes compartidos (PCIT-25)
+
+Con el servidor de desarrollo activo, abre `http://localhost:5173/components.html`
+para revisar tarjetas KPI, badges, tabla, selector y estados de carga/vacío/error
+en claro y oscuro. Los valores de esa página son ejemplos y no se publican en
+el build habitual. Contratos y uso: [src/components/ui/README.md](src/components/ui/README.md).
+La separación de acceso a datos se describe en
+[src/lib/services/README.md](src/lib/services/README.md).
 
 ## Estructura
 
