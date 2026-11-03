@@ -1,0 +1,39 @@
+.analysis-layout { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 2rem; margin-top: 2.5rem; align-items: start; }
+.analysis-form { min-width: 0; }
+.analysis-panel { padding: clamp(1.1rem, 3vw, 2rem); border: 1px solid var(--players-line); border-radius: 1rem; background: var(--players-card); margin-bottom: 1rem; }
+.analysis-step-heading { display: flex; align-items: start; gap: 1rem; margin-bottom: 1.75rem; }
+.analysis-step-heading > span { color: var(--players-ink); border: 1px solid var(--players-line); padding: 0.5rem; border-radius: 0.5rem; font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.analysis-step-heading h2 { margin: 0; font-size: 1.2rem; font-weight: 600; }
+.analysis-step-heading p, .analysis-muted { margin: 0.45rem 0; color: var(--players-muted); font-size: 0.8125rem; }
+.analysis-upload { margin-top: 1.25rem; padding: 1.75rem 1rem; text-align: center; border: 1px dashed var(--players-line); border-radius: 0.75rem; background: var(--players-field); }
+.analysis-upload-icon { display: grid; place-items: center; margin: 0 auto 0.75rem; height: 2.5rem; width: 2.5rem; border: 1px solid var(--players-line); border-radius: 50%; color: var(--players-ink); font-size: 1.25rem; }
+.analysis-upload label { display: block; font-size: 0.875rem; font-weight: 500; }
+.analysis-upload p { color: var(--players-muted); font-size: 0.8125rem; margin: 0.5rem 0 1rem; }
+.analysis-upload input { display: block; max-width: 100%; margin: 0.5rem auto; font-size: 0.8125rem; }
+.analysis-upload input::file-selector-button { padding: 0.6rem 0.8rem; margin-right: 0.5rem; background: var(--players-card); border: 1px solid var(--players-line); border-radius: 0.5rem; color: var(--players-text); cursor: pointer; }
+.analysis-upload .analysis-selected-file { margin: 0.75rem 0 0; color: var(--players-ink); overflow-wrap: anywhere; }
+.analysis-upload .players-field-error { color: var(--players-bad); }
+.analysis-url { margin-top: 1.25rem; }
+.analysis-url > p { font-size: 0.8125rem; color: var(--players-muted); }
+.analysis-url .players-field-error { color: var(--players-bad); }
+.analysis-player-row { display: flex; gap: 1rem; align-items: end; }
+.analysis-player-row .players-field { flex: 1; min-width: 0; }
+.analysis-player-row > button { flex-shrink: 0; }
+.players-field select { width: 100%; min-width: 0; min-height: 46px; padding: 0.7rem 0.85rem; border: 1px solid var(--players-line); border-radius: 0.5rem; background: var(--players-field); color: var(--players-text); font: inherit; }
+.players-field select[aria-invalid='true'] { border-color: var(--players-bad); }
+.analysis-position { margin-top: 1.25rem; }
+.analysis-submit { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 0.5rem 0; }
+.analysis-submit p { color: var(--players-muted); font-size: 0.8125rem; max-width: 32ch; margin: 0; }
+.analysis-progress { border: 1px solid var(--players-line); padding: 1rem; border-radius: 0.75rem; margin-top: 1rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.analysis-progress > div { flex: 1; min-width: 150px; font-size: 0.875rem; }
+.analysis-progress p { margin: 0 0 0.5rem; }
+.analysis-progress progress { accent-color: #d7f25c; width: 75%; margin-right: 0.5rem; }
+.analysis-guide { padding: 1.25rem; border-left: 1px solid var(--players-line); position: sticky; top: 1.5rem; }
+.analysis-guide h2 { font-size: 1.25rem; font-weight: 500; margin: 0.75rem 0 1.25rem; }
+.analysis-guide ul { padding-left: 1.1rem; margin: 0; }
+.analysis-guide li, .analysis-guide > p:last-child { color: var(--players-muted); font-size: 0.8125rem; line-height: 1.6; }
+.analysis-guide li { margin-bottom: 1rem; }
+.analysis-guide > p:last-child { padding-top: 1rem; border-top: 1px solid var(--players-line); margin-top: 1.25rem; }
+.analysis-page .ac-table { min-width: 620px; }
+@media (max-width: 960px) { .analysis-layout { grid-template-columns: minmax(0, 1fr); } .analysis-guide { position: static; border-left: 0; border-top: 1px solid var(--players-line); } }
+@media (max-width: 540px) { .analysis-player-row { flex-direction: column; align-items: stretch; } .analysis-submit { align-items: stretch; flex-direction: column; } .analysis-submit > button { width: 100%; } }

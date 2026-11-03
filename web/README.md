@@ -50,7 +50,15 @@ La conexión real depende de Firebase/Auth y el esquema compartido de Axel;
 no se usa el modo demo como respaldo en producción.
 Contrato de servicio y pasos de integración: [src/lib/services/PLAYERS.md](src/lib/services/PLAYERS.md).
 
-## Estructura del proyecto
+## Analizar video v1 (PCIT-27)
+
+Vista de desarrollo: `http://localhost:5173/analizar.html`.
+Permite seleccionar archivo o enlace, vincular/crear jugador, completar el partido
+y probar una cola en memoria. No transfiere ni procesa videos reales.
+La integración pendiente con Storage, Firestore y el worker se detalla en
+[src/lib/services/ANALYSIS.md](src/lib/services/ANALYSIS.md).
+
+## Carpetas
 
 ```
 web/
