@@ -33,7 +33,7 @@ const preguntas = [
 
 export default function TestimoniosFaq() {
   return (
-    <Section id="preguntas" eyebrow="Confianza" title="Lo que dicen y lo que preguntan">
+    <Section id="preguntas" title="Lo que dicen y lo que preguntan">
       <div className="mt-10 grid gap-4 sm:grid-cols-3">
         {[0, 1, 2].map((index) => (
           <Reveal key={index} delay={index * 90}>

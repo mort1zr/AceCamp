@@ -34,7 +34,6 @@ export default function Modulos() {
   return (
     <Section
       id="funciones"
-      eyebrow="Funciones"
       title="Cuatro módulos que cubren el ciclo completo"
     >
       <div className="mt-12 space-y-16 sm:space-y-24">
@@ -44,10 +43,7 @@ export default function Modulos() {
             className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14"
           >
             <Reveal className={index % 2 === 1 ? 'lg:order-2' : ''}>
-              <p className="font-display text-xs font-semibold tracking-[0.22em] text-accent-ink uppercase">
-                {String(index + 1).padStart(2, '0')} · Módulo
-              </p>
-              <h3 className="mt-3 text-2xl sm:text-3xl">{modulo.title}</h3>
+              <h3 className="text-2xl sm:text-3xl">{modulo.title}</h3>
               <p className="mt-4 text-text2">{modulo.text}</p>
               <ul className="mt-5 space-y-2">
                 {modulo.bullets.map((bullet) => (

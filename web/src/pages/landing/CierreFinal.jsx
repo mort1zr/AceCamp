@@ -3,7 +3,7 @@ import Reveal from '../../components/Reveal.jsx'
 
 export default function CierreFinal() {
   return (
-    <section className="border-t border-line px-6 py-20 sm:py-28">
+    <section className="relative px-6 py-20 sm:py-28">
       <Reveal className="mx-auto max-w-3xl text-center">
         <h2 className="text-3xl sm:text-5xl">
           El próximo partido ya puede darte datos en vez de dudas

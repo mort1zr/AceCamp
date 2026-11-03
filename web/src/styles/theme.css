@@ -7,6 +7,7 @@
   --good: #8FD49C;      --bad: #E58A6A;
   --series1: #D0623A;   --series2: #5A93D8;   --series3: #8E9A1C;   --series4: #9B6FD6;
   --faint: #5E574E;
+  --tile-shadow: 0 16px 32px rgb(0 0 0 / 0.45);
 
   --ace-ui-text: var(--text);
   --ace-ui-card: var(--surface);
@@ -28,6 +29,7 @@
   --accent-ink: #5A6B00; --accent-line: #8FA300;
   --good: #2F7A3F;      --bad: #B0432A;
   --faint: #B9B0A2;
+  --tile-shadow: 0 16px 32px rgb(26 24 21 / 0.12);
   color-scheme: light;
 }
 
@@ -67,4 +69,18 @@
   --font-display: 'Barlow Condensed', 'Barlow', ui-sans-serif, sans-serif;
 
   --radius-card: 14px;
+
+  --shadow-tile: var(--tile-shadow);
+
+  --animate-float: float 7s ease-in-out infinite;
+
+  @keyframes float {
+    0%,
+    100% {
+      translate: 0 0;
+    }
+    50% {
+      translate: 0 -10px;
+    }
+  }
 }

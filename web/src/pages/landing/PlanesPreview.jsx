@@ -35,7 +35,6 @@ export default function PlanesPreview() {
   return (
     <Section
       id="planes"
-      eyebrow="Planes"
       title="Elige cuánto quieres analizar"
       align="center"
     >

@@ -23,7 +23,7 @@ const perfiles = [
 
 export default function ParaQuien() {
   return (
-    <Section eyebrow="Para quién es" title="Tres formas de usar AceCam" align="center">
+    <Section title="Tres formas de usar AceCam" align="center">
       <div className="mt-12 grid gap-4 sm:grid-cols-3">
         {perfiles.map((perfil, index) => (
           <Reveal key={perfil.title} delay={index * 90}>

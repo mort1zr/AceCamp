@@ -23,7 +23,7 @@ function Marca({ activo }) {
 
 export default function Comparacion() {
   return (
-    <Section eyebrow="Comparación" title="Por qué no basta con lo que ya existe">
+    <Section title="Por qué no basta con lo que ya existe">
       <Reveal className="mt-10 overflow-x-auto rounded-card border border-line">
         <table className="w-full min-w-[34rem] border-collapse text-left">
           <caption className="sr-only">

@@ -6,20 +6,24 @@ import ParaQuien from './landing/ParaQuien.jsx'
 import PlanesPreview from './landing/PlanesPreview.jsx'
 import Problema from './landing/Problema.jsx'
 import QueMide from './landing/QueMide.jsx'
+import RallyThread from './landing/RallyThread.jsx'
 import TestimoniosFaq from './landing/TestimoniosFaq.jsx'
 
 export default function Landing() {
   return (
     <>
       <Hero />
-      <Problema />
-      <QueMide />
-      <Modulos />
-      <ParaQuien />
-      <Comparacion />
-      <TestimoniosFaq />
-      <PlanesPreview />
-      <CierreFinal />
+      <div className="relative">
+        <RallyThread />
+        <Problema />
+        <QueMide />
+        <Modulos />
+        <ParaQuien />
+        <Comparacion />
+        <TestimoniosFaq />
+        <PlanesPreview />
+        <CierreFinal />
+      </div>
     </>
   )
 }

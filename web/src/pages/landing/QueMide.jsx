@@ -63,7 +63,6 @@ export default function QueMide() {
   return (
     <Section
       id="que-mide"
-      eyebrow="Qué mide"
       title="Las métricas que un entrenador pide después de cada partido"
       lead="Todo sale del video, sin sensores ni relojes."
     >
