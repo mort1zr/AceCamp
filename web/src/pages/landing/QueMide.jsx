@@ -17,7 +17,7 @@ const metricas = [
     label: 'Primeros saques',
     value: '68',
     unit: '%',
-    tone: 'text-series2',
+    tone: 'text-electric-ink',
     detail: 'Cuántos primeros saques entraron.',
   },
   {

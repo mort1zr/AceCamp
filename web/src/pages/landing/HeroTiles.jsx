@@ -20,7 +20,7 @@ function BallTile() {
 function SpeedTile() {
   return (
     <div className="text-center">
-      <p className="font-display text-4xl leading-none font-bold text-text">184</p>
+      <p className="font-display text-4xl leading-none font-bold text-electric-ink">184</p>
       <p className="mt-1 text-xs text-muted">km/h</p>
     </div>
   )
@@ -40,7 +40,7 @@ function CourtTile() {
     <svg width="60" height="84" viewBox="0 0 60 84" fill="none" aria-hidden="true">
       <path
         d="M4 4h52v76H4zM14 4v76M46 4v76M14 24h32M14 60h32M30 24v36M4 42h52"
-        stroke="var(--line3)"
+        stroke="var(--electric)"
         strokeWidth="1.5"
       />
       <circle cx="21" cy="16" r="3" fill="var(--accent-line)" />

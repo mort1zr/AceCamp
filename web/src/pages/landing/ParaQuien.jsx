@@ -28,7 +28,7 @@ export default function ParaQuien() {
         {perfiles.map((perfil, index) => (
           <Reveal key={perfil.title} delay={index * 90}>
             <Card className="flex h-full flex-col items-center gap-4 p-7 text-center">
-              <span className="inline-flex size-12 items-center justify-center rounded-full bg-chip text-accent-ink">
+              <span className="inline-flex size-12 items-center justify-center rounded-full bg-chip text-electric-ink">
                 <Icon name={perfil.icon} size={24} />
               </span>
               <h3 className="text-xl">{perfil.title}</h3>

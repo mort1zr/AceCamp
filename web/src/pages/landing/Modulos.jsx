@@ -48,7 +48,7 @@ export default function Modulos() {
               <ul className="mt-5 space-y-2">
                 {modulo.bullets.map((bullet) => (
                   <li key={bullet} className="flex items-start gap-2 text-sm text-text2">
-                    <span className="mt-0.5 text-accent-ink">
+                    <span className="mt-0.5 text-electric-ink">
                       <Icon name="check" size={18} />
                     </span>
                     {bullet}

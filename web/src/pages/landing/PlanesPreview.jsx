@@ -67,7 +67,7 @@ export default function PlanesPreview() {
               <ul className="mt-5 flex-1 space-y-2">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2 text-sm text-text2">
-                    <span className="mt-0.5 text-accent-ink">
+                    <span className="mt-0.5 text-electric-ink">
                       <Icon name="check" size={18} />
                     </span>
                     {feature}

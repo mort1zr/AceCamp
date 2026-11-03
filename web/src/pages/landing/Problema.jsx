@@ -38,7 +38,7 @@ export default function Problema() {
             delay={index * 90}
             className="relative flex items-start gap-4 sm:flex-col sm:items-center sm:text-center"
           >
-            <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-line2 bg-chip text-accent-ink">
+            <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full border border-electric bg-bg text-electric-ink">
               <Icon name={paso.icon} />
             </span>
             <div>

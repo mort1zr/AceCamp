@@ -11,11 +11,11 @@ function CourtLines() {
       stroke="currentColor"
       strokeWidth="1.5"
       aria-hidden="true"
-      className="pointer-events-none absolute top-6 left-1/2 w-[1200px] max-w-none -translate-x-1/2 text-line"
+      className="pointer-events-none absolute top-6 left-1/2 w-[1200px] max-w-none -translate-x-1/2 text-electric"
     >
       <rect x="40" y="40" width="1120" height="560" />
       <path d="M40 110h1120M40 530h1120M320 110v420M880 110v420M320 320h560" />
-      <path d="M600 20v600" strokeDasharray="6 8" />
+      <path d="M600 20v600" strokeWidth="3" strokeDasharray="2 8" />
     </svg>
   )
 }
@@ -65,7 +65,7 @@ export default function Hero() {
         </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-48 bg-linear-to-t from-bg to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-10 bg-linear-to-t from-bg to-transparent" />
     </section>
   )
 }
