@@ -36,7 +36,10 @@ export default function Hero() {
           <MetalPill badge="Nuevo">Analiza desde un link de YouTube</MetalPill>
         </div>
 
-        <div data-rally-start className="relative mt-4 flex flex-col justify-center lg:h-[calc(100dvh-19rem)] lg:max-h-[38rem] lg:min-h-[22rem]">
+        <div
+          data-rally-start
+          className="relative mt-4 flex flex-col justify-center lg:h-[calc(100dvh-19rem)] lg:max-h-[38rem] lg:min-h-[22rem]"
+        >
           <CourtLines />
           <HeroTiles />
 
@@ -53,15 +56,20 @@ export default function Hero() {
               Solo sube un video o un link de YouTube. AceCam lo analiza por ti.
             </p>
 
-            <div className="mt-7 flex flex-wrap items-center justify-center gap-4">
-              <Button to="/registro" size="lg">
+            <div className="mt-7 flex flex-col items-center gap-4">
+              <Button to="/registro" size="lg" data-nav-cta>
                 <span className="size-1.5 rounded-full bg-on-accent" />
                 Empieza gratis
               </Button>
-              <Button href="#funciones" variant="secondary" size="lg">
-                <Icon name="play" size={18} />
+              <a
+                href="#funciones"
+                className="group inline-flex items-center gap-2.5 rounded-full py-1 pr-3 pl-1 text-sm font-medium text-text2 transition-colors hover:text-text"
+              >
+                <span className="grid size-8 place-content-center rounded-full border border-line2 bg-surface text-text transition-colors group-hover:border-accent-line group-hover:text-accent-ink">
+                  <Icon name="play" size={13} strokeWidth={2.2} />
+                </span>
                 Ver demo
-              </Button>
+              </a>
             </div>
           </div>
         </div>

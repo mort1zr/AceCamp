@@ -15,6 +15,7 @@ const paths = {
   check: 'm5 12.5 4.5 4.5L19 7.5',
   close: 'M6.5 6.5l11 11M17.5 6.5l-11 11',
   play: 'M8 5.5v13l11-6.5z',
+  arrow: 'M5 12h14m0 0-5.5-5.5M19 12l-5.5 5.5',
 }
 
 export default function Icon({ name, size = 22, strokeWidth = 1.7, className = '' }) {
