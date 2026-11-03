@@ -7,7 +7,6 @@ const anchors = [
   { href: '#como-funciona', label: 'Cómo funciona' },
   { href: '#que-mide', label: 'Qué mide' },
   { href: '#funciones', label: 'Funciones' },
-  { href: '#preguntas', label: 'Preguntas' },
 ]
 
 export default function PublicHeader() {
