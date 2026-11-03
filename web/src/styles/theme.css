@@ -1,0 +1,60 @@
+:root {
+  --bg: #12110F;        --side: #171513;      --surface: #1C1A17;   --surface2: #24211D;
+  --chip: #2A2621;      --line: #2E2A25;      --line2: #3A352E;     --line3: #4A443C;
+  --text: #F2EEE8;      --text3: #E6E0D7;     --text2: #CFC8BE;     --muted: #A89F93;
+  --placeholder: #8C8378;
+  --accent: #D7F25C;    --on-accent: #12110F; --accent-ink: #D7F25C; --accent-line: #D7F25C;
+  --good: #8FD49C;      --bad: #E58A6A;
+  --series1: #D0623A;   --series2: #5A93D8;   --series3: #8E9A1C;   --series4: #9B6FD6;
+  --faint: #5E574E;
+  color-scheme: dark;
+}
+
+[data-theme='light'] {
+  --bg: #F6F4EF;        --side: #EFEBE4;      --surface: #FFFFFF;   --surface2: #F3F0EA;
+  --chip: #ECE7DF;      --line: #E3DDD3;      --line2: #D2CABD;     --line3: #B9B0A2;
+  --text: #1A1815;      --text3: #2F2B26;     --text2: #45403A;     --muted: #6B6358;
+  --placeholder: #8A8175;
+  --accent-ink: #5A6B00; --accent-line: #8FA300;
+  --good: #2F7A3F;      --bad: #B0432A;
+  --faint: #B9B0A2;
+  color-scheme: light;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-side: var(--side);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-chip: var(--chip);
+
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-line3: var(--line3);
+
+  --color-text: var(--text);
+  --color-text2: var(--text2);
+  --color-text3: var(--text3);
+  --color-muted: var(--muted);
+  --color-placeholder: var(--placeholder);
+
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-line: var(--accent-line);
+
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+
+  --color-series1: var(--series1);
+  --color-series2: var(--series2);
+  --color-series3: var(--series3);
+  --color-series4: var(--series4);
+
+  --color-faint: var(--faint);
+
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Barlow Condensed', 'Barlow', ui-sans-serif, sans-serif;
+
+  --radius-card: 14px;
+}
