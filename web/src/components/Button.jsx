@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import LinkDeslizante from './LinkDeslizante.jsx'
 
 const base =
   'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50'
@@ -19,6 +20,7 @@ export default function Button({
   size = 'md',
   to,
   href,
+  desliza = false,
   className = '',
   children,
   ...props
@@ -26,10 +28,11 @@ export default function Button({
   const classes = `${base} ${variants[variant]} ${sizes[size]} ${className}`
 
   if (to) {
+    const Enlace = desliza ? LinkDeslizante : Link
     return (
-      <Link to={to} className={classes} {...props}>
+      <Enlace to={to} className={classes} {...props}>
         {children}
-      </Link>
+      </Enlace>
     )
   }
 

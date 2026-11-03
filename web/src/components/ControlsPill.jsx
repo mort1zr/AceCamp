@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useTheme } from '../hooks/useTheme.js'
 
 const LANG_KEY = 'acecam-lang'
@@ -11,7 +12,7 @@ function readLang() {
   }
 }
 
-export default function ControlsPill({ className = '' }) {
+export default function ControlsPill({ ocultarIngreso = false, className = '' }) {
   const { toggleTheme, isLight } = useTheme()
   const [lang, setLang] = useState(readLang)
 
@@ -92,8 +93,19 @@ export default function ControlsPill({ className = '' }) {
           <circle cx="12" cy="12" r="10" />
           <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
         </svg>
-        <span className="text-xs font-bold tracking-wide">{lang.toUpperCase()}</span>
       </button>
+      <Link
+        to="/login"
+        aria-hidden={ocultarIngreso}
+        tabIndex={ocultarIngreso ? -1 : undefined}
+        className={`inline-flex h-9 items-center overflow-hidden rounded-full text-sm font-semibold whitespace-nowrap text-text2 transition-all duration-500 hover:bg-accent/10 hover:text-accent-ink ${
+          ocultarIngreso
+            ? 'pointer-events-none max-w-0 px-0 opacity-0'
+            : 'max-w-28 px-3.5 opacity-100'
+        }`}
+      >
+        Ingresar
+      </Link>
     </div>
   )
 }

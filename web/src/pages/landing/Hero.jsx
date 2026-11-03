@@ -57,7 +57,7 @@ export default function Hero() {
             </p>
 
             <div className="mt-7 flex flex-col items-center gap-4">
-              <Button to="/registro" size="lg" data-nav-cta>
+              <Button to="/precios" desliza size="lg" data-nav-cta>
                 <span className="size-1.5 rounded-full bg-on-accent" />
                 Empieza gratis
               </Button>

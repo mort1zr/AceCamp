@@ -14,12 +14,16 @@ const enlaces = [
   { to: '/login', label: 'Ingresar' },
 ]
 
-export default function FloatingNav() {
+export default function FloatingNav({ onExpandir }) {
   const [visible, setVisible] = useState(false)
   const [expandido, setExpandido] = useState(false)
   const [anchoMenu, setAnchoMenu] = useState(0)
   const menuRef = useRef(null)
   const activo = useRef(false)
+
+  useEffect(() => {
+    onExpandir?.(expandido)
+  }, [expandido, onExpandir])
 
   useEffect(() => {
     let frame = null
@@ -105,7 +109,7 @@ export default function FloatingNav() {
                 <Enlace
                   to={enlace.to}
                   tabIndex={expandido ? undefined : -1}
-                  className="block rounded-full px-3 py-2 text-sm font-medium whitespace-nowrap text-text2 transition-colors hover:text-text"
+                  className="block rounded-full px-3 py-2 text-[15px] font-medium whitespace-nowrap text-text2 transition-colors hover:text-text"
                 >
                   {enlace.label}
                 </Enlace>
