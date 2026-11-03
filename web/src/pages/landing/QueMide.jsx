@@ -54,17 +54,98 @@ const metricas = [
   },
 ]
 
-const heatCells = [
-  0.1, 0.2, 0.35, 0.5, 0.3, 0.15, 0.25, 0.45, 0.8, 1, 0.6, 0.3, 0.2, 0.5, 0.9, 0.75, 0.4, 0.2, 0.1,
-  0.15, 0.3, 0.35, 0.2, 0.1,
+const LARGO = 237.7
+const ANCHO = 109.7
+const COLUMNAS = 14
+const FILAS = 7
+const SEPARACION = 1.6
+const CELDA = LARGO / COLUMNAS
+const AFUERA = CELDA
+
+const focos = [
+  { x: -0.01, y: 0.5, fuerza: 1, alcance: 0.11 },
+  { x: 0.03, y: 0.22, fuerza: 0.55, alcance: 0.09 },
+  { x: 0.03, y: 0.8, fuerza: 0.5, alcance: 0.09 },
+  { x: 0.3, y: 0.45, fuerza: 0.35, alcance: 0.08 },
 ]
+
+const celdas = Array.from({ length: (COLUMNAS + 2) * FILAS }, (_, indice) => {
+  const columna = (indice % (COLUMNAS + 2)) - 1
+  const fila = Math.floor(indice / (COLUMNAS + 2))
+  const cx = (columna + 0.5) / COLUMNAS
+  const cy = (fila + 0.5) / FILAS
+  const calor = focos.reduce(
+    (total, foco) =>
+      total +
+      foco.fuerza *
+        Math.exp(-(((cx - foco.x) * 2.17) ** 2 + (cy - foco.y) ** 2) / (2 * foco.alcance ** 2 * 4)),
+    0,
+  )
+  return {
+    x: columna * CELDA + SEPARACION / 2,
+    y: (fila * ANCHO) / FILAS + SEPARACION / 2,
+    ancho: CELDA - SEPARACION,
+    alto: ANCHO / FILAS - SEPARACION,
+    opacidad: 0.06 + Math.min(calor, 1) * 0.8,
+  }
+})
+
+function CanchaDeCalor() {
+  const red = LARGO / 2
+  return (
+    <svg
+      viewBox={`${-AFUERA - 4} -4 ${LARGO + AFUERA * 2 + 8} ${ANCHO + 8}`}
+      className="mt-5 w-full"
+      aria-hidden="true"
+    >
+      <rect
+        x={-AFUERA - 4}
+        y="-4"
+        width={LARGO + AFUERA * 2 + 8}
+        height={ANCHO + 8}
+        rx="6"
+        fill="var(--surface2)"
+      />
+      {celdas.map((celda, indice) => (
+        <rect
+          key={indice}
+          x={celda.x}
+          y={celda.y}
+          width={celda.ancho}
+          height={celda.alto}
+          rx="1.2"
+          fill="var(--accent)"
+          opacity={celda.opacidad}
+        />
+      ))}
+      <g fill="none" stroke="var(--electric)" strokeWidth="0.9" opacity="0.85">
+        <rect x="0" y="0" width={LARGO} height={ANCHO} />
+        <path d={`M0 13.7H${LARGO}M0 96H${LARGO}`} />
+        <path d={`M54.85 13.7V96M182.85 13.7V96M54.85 54.85H182.85`} />
+        <path d={`M0 54.85h3M${LARGO} 54.85h-3`} />
+      </g>
+      <path
+        d={`M${red} -3V${ANCHO + 3}`}
+        stroke="var(--text)"
+        strokeWidth="1.4"
+        strokeDasharray="2 1.5"
+        opacity="0.7"
+      />
+    </svg>
+  )
+}
 
 export default function QueMide() {
   return (
     <Section
       id="que-mide"
-      title="Las métricas que un entrenador pide después de cada partido"
-      lead="Todo sale del video, sin sensores ni relojes."
+      title={
+        <>
+          Lo que tu vista no alcanza, <span className="text-accent-ink">AceCam</span> lo hace
+          por ti
+        </>
+      }
+      lead="Cada saque, cada golpe y cada metro recorrido, sacados del video."
     >
       <p className="mt-8 font-display text-xs tracking-[0.2em] text-muted uppercase">
         Ejemplo de un partido
@@ -102,18 +183,7 @@ export default function QueMide() {
             <p className="mt-3 text-sm text-text2">
               Dónde se paró el jugador durante todo el partido.
             </p>
-            <div
-              className="mt-4 grid grid-cols-6 gap-1 overflow-hidden rounded-lg border border-line"
-              aria-hidden="true"
-            >
-              {heatCells.map((intensity, index) => (
-                <span
-                  key={index}
-                  className="aspect-square bg-accent"
-                  style={{ opacity: 0.12 + intensity * 0.7 }}
-                />
-              ))}
-            </div>
+            <CanchaDeCalor />
           </Card>
         </Reveal>
       </div>
