@@ -1,9 +1,9 @@
 import { useRef } from 'react'
-import { Link } from 'react-router'
 import Icon from '../components/Icon.jsx'
 import Logo from '../../compartido/components/Logo.jsx'
 import { useScrollSpring } from '../hooks/useScrollSpring.js'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
+import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
 import {
   BallTile,
   CourtTile,
@@ -83,12 +83,12 @@ function Invitacion() {
       <h2 className="text-4xl sm:text-5xl">{t.titulo}</h2>
       <p className="mt-4 text-text2">{t.lead}</p>
 
-      <Link
+      <LinkDeslizante
         to="/registro"
         className="mt-8 inline-flex items-center justify-center rounded-full bg-accent px-8 py-3 text-lg font-semibold text-on-accent transition-opacity hover:opacity-90"
       >
         {t.boton}
-      </Link>
+      </LinkDeslizante>
 
       <ul className="mt-8 space-y-2.5">
         {t.garantias.map((garantia) => (
@@ -160,7 +160,7 @@ export default function CierreFinal() {
       </div>
 
       <div className="relative mx-auto max-w-xl rounded-[28px] border border-line2 bg-surface px-6 py-12 text-center shadow-tile sm:px-12">
-        <Logo size={68} withWordmark={false} className="justify-center" />
+        <Logo size={68} withWordmark={false} className="justify-center" rebota />
         <div className="mt-6">
           <Invitacion />
         </div>

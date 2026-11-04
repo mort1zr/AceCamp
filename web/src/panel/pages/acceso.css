@@ -1,0 +1,96 @@
+@keyframes acceso-entrar {
+  from {
+    opacity: 0;
+    transform: translateX(var(--acceso-desde));
+    filter: blur(6px);
+  }
+}
+
+@keyframes acceso-campo {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes acceso-estirar {
+  40% {
+    transform: scaleX(1.22) scaleY(0.88);
+  }
+}
+
+@keyframes acceso-texto {
+  from {
+    opacity: 0;
+    transform: translateY(110%);
+    filter: blur(4px);
+  }
+}
+
+@keyframes acceso-latido {
+  45% {
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .acceso-texto {
+    animation: acceso-texto 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .acceso-boton:has(.acceso-texto) {
+    animation: acceso-latido 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .acceso-alto {
+    transition: height 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .acceso-indicador {
+    transition: transform 0.55s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+
+  .acceso-estirar {
+    animation: acceso-estirar 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .acceso-entrar {
+    animation: acceso-entrar 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .acceso-entrar[data-desde='derecha'] {
+    --acceso-desde: 36px;
+  }
+
+  .acceso-entrar[data-desde='izquierda'] {
+    --acceso-desde: -36px;
+  }
+
+  .acceso-entrar form > * {
+    animation: acceso-campo 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .acceso-entrar form > :nth-child(2) {
+    animation-delay: 60ms;
+  }
+
+  .acceso-entrar form > :nth-child(3) {
+    animation-delay: 110ms;
+  }
+
+  .acceso-entrar form > :nth-child(4) {
+    animation-delay: 160ms;
+  }
+
+  .acceso-entrar form > :nth-child(5) {
+    animation-delay: 210ms;
+  }
+
+  .acceso-entrar form > :nth-child(6) {
+    animation-delay: 260ms;
+  }
+
+  .acceso-entrar form > :nth-child(7) {
+    animation-delay: 310ms;
+  }
+}

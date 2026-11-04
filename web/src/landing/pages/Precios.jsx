@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
 import Icon from '../components/Icon.jsx'
+import { useAterrizaje } from '../../compartido/hooks/useAterrizaje.js'
 import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
 import FooterGrande from '../components/FooterGrande.jsx'
 import Logo from '../../compartido/components/Logo.jsx'
@@ -415,9 +415,9 @@ function Comparar({ anual }) {
                     className={`px-6 py-8 ${plan.popular ? `rounded-b-2xl ${columnaPro}` : ''}`}
                   >
                     {plan.accion.to ? (
-                      <Link to={plan.accion.to} className={clases}>
+                      <LinkDeslizante to={plan.accion.to} className={clases}>
                         {plan.accion.label}
-                      </Link>
+                      </LinkDeslizante>
                     ) : (
                       <a href={plan.accion.href} className={clases}>
                         {plan.accion.label}
@@ -738,10 +738,10 @@ function Plan({ plan, anual }) {
 
       <div className="mt-auto">
         {plan.accion.to ? (
-          <Link to={plan.accion.to} className={boton}>
+          <LinkDeslizante to={plan.accion.to} className={boton}>
             {plan.accion.label}
             <Icon name="arrow" size={18} strokeWidth={2.2} />
-          </Link>
+          </LinkDeslizante>
         ) : (
           <a href={plan.accion.href} className={boton}>
             {plan.accion.label}
@@ -754,6 +754,7 @@ function Plan({ plan, anual }) {
 }
 
 export default function Precios() {
+  const aterrizaje = useAterrizaje()
   const t = useTextos(textos)
   const [anual, setAnual] = useState(false)
 
@@ -774,12 +775,13 @@ export default function Precios() {
           to="/"
           sentido="atras"
           aria-label={t.volver}
+          {...aterrizaje}
           className="group inline-flex items-center gap-3 rounded-md"
         >
           <span className="inline-flex size-9 items-center justify-center rounded-full border-2 border-line3 text-text2 ring-text transition-[translate,border-color,color,box-shadow] duration-300 group-hover:-translate-x-1 group-hover:border-text group-hover:text-text group-hover:ring-1">
             <Icon name="arrowBack" size={17} strokeWidth={2.4} />
           </span>
-          <Logo size={56} wordmarkClassName="text-4xl" />
+          <Logo size={56} wordmarkClassName="text-4xl" rebota />
         </LinkDeslizante>
 
         <header className="mt-16 text-center">

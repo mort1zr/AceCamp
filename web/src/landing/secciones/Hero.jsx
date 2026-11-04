@@ -57,7 +57,7 @@ export default function Hero() {
     <section className="relative overflow-hidden px-6 pt-10">
       <div className="relative mx-auto max-w-6xl">
         <div className="flex flex-col items-center gap-4 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-0">
-          <Logo size={52} wordmarkClassName="text-4xl" className="gap-3" />
+          <Logo size={52} wordmarkClassName="text-4xl" className="gap-3" rebota />
           <MetalPill badge={t.nuevo}>{t.pastilla}</MetalPill>
         </div>
 

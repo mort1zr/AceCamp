@@ -7,7 +7,7 @@ const year = new Date().getFullYear()
 
 const links = [
   { to: '/precios', clave: 'precios', desliza: true },
-  { to: '/registro', clave: 'registro' },
+  { to: '/registro', clave: 'registro', desliza: true },
   { to: '/terminos', clave: 'terminos' },
   { to: '/privacidad', clave: 'privacidad' },
 ]
@@ -41,7 +41,7 @@ export default function PublicFooter() {
   return (
     <footer className="border-t border-line px-6 py-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-        <Logo />
+        <Logo rebota />
 
         <nav aria-label={t.pie}>
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-text2">

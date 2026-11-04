@@ -1,0 +1,62 @@
+@keyframes logo-rebote {
+  0% {
+    transform: none;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1);
+  }
+  45% {
+    transform: translateY(-8px) scale(0.95, 1.06);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3);
+  }
+  86% {
+    transform: translateY(0) scale(1.04, 0.97);
+  }
+  93% {
+    transform: translateY(0.6px) scale(1.12, 0.86);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes logo-sombra {
+  0%,
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+  45% {
+    transform: scaleX(0.55);
+    opacity: 0.4;
+  }
+  93% {
+    transform: scaleX(1.15);
+  }
+}
+
+.logo-rebota svg {
+  overflow: visible;
+}
+
+.logo-pelota {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+.logo-sombra {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .logo-rebota:hover .logo-pelota,
+  :is(a, button):hover > .logo-rebota .logo-pelota,
+  [data-aterrizando] .logo-rebota .logo-pelota {
+    animation: logo-rebote 0.7s infinite;
+  }
+
+  .logo-rebota:hover .logo-sombra,
+  :is(a, button):hover > .logo-rebota .logo-sombra,
+  [data-aterrizando] .logo-rebota .logo-sombra {
+    animation: logo-sombra 0.7s infinite;
+  }
+}
