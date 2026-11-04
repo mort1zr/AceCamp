@@ -157,7 +157,17 @@ def run_pipeline(config, render=True):
 
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, len(video_frames))
-    result = {"model_statistics": model_statistics, "shots": stats_shots, "output_video": None}
+    result = {
+        "model_statistics": model_statistics,
+        "shots": stats_shots,
+        "output_video": None,
+        # Datos intermedios: los usa el pre-etiquetado del set de validación (python -m eval.prelabel).
+        "video_info": video_info,
+        "video_hash": video_hash,
+        "ball_detections": ball_detections,
+        "court_keypoints": court_keypoints,
+        "player_detections": player_detections,
+    }
     if not render:
         return result
 
@@ -215,6 +225,7 @@ def main(argv=None):
         stats_path.write_text(json.dumps(result["model_statistics"], indent=2, ensure_ascii=False))
         print(f"Estadísticas guardadas en {stats_path}")
     return result
+
 
 if __name__ == "__main__":
     main()
