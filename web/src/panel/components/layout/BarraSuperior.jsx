@@ -8,6 +8,9 @@ import { useIdioma } from '../../../compartido/lib/idioma.jsx'
 const textos = {
   es: {
     barra: 'Barra superior',
+    menu: 'Abrir menú',
+    abrirBuscador: 'Buscar',
+    cerrarBuscador: 'Cerrar búsqueda',
     buscar: 'Buscar jugador',
     placeholder: 'Buscar jugador, academia o torneo',
     temaOscuro: 'Cambiar a tema oscuro',
@@ -31,6 +34,9 @@ const textos = {
   },
   en: {
     barra: 'Top bar',
+    menu: 'Open menu',
+    abrirBuscador: 'Search',
+    cerrarBuscador: 'Close search',
     buscar: 'Search player',
     placeholder: 'Search player, academy or tournament',
     temaOscuro: 'Switch to dark theme',
@@ -180,7 +186,7 @@ function Cuenta({ t, nombre, correo, organizacion, onSalir }) {
         <div
           role="dialog"
           aria-label={t.cuenta}
-          className="absolute top-full right-0 z-40 mt-2 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-card border border-line2 bg-surface shadow-tile"
+          className="absolute top-full right-0 z-40 mt-2 w-64 max-w-[calc(100vw-2rem)] max-md:fixed max-md:top-[calc(4.25rem+env(safe-area-inset-top))] max-md:right-4 max-md:left-auto overflow-hidden rounded-card border border-line2 bg-surface shadow-tile"
         >
           <div className="flex items-center gap-3 px-4 py-4">
             <span aria-hidden="true" className="shrink-0">
@@ -258,7 +264,7 @@ function Avisos({ t, avisos, onLeer }) {
         <div
           role="dialog"
           aria-label={t.tituloAvisos}
-          className="absolute top-full right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-card border border-line2 bg-surface shadow-tile"
+          className="absolute top-full right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] max-md:fixed max-md:top-[calc(4.25rem+env(safe-area-inset-top))] max-md:right-4 max-md:left-4 max-md:w-auto max-md:max-w-none overflow-hidden rounded-card border border-line2 bg-surface shadow-tile"
         >
           <div className="flex items-center justify-between gap-3 border-b border-chip px-4 py-3">
             <p className="font-display text-lg font-bold">{t.tituloAvisos}</p>
@@ -312,12 +318,14 @@ export default function BarraSuperior({
   avisos = [],
   onLeerAvisos = () => {},
   onSalir = () => {},
+  onMenu = () => {},
 }) {
   const { idioma, cambiarIdioma } = useIdioma()
   const t = textos[idioma]
   const { toggleTheme, isLight } = useTheme()
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
+  const [buscando, setBuscando] = useState(false)
   const nombre = usuario?.nombre || t.usuario
   const organizacion = usuario?.organizacion || t.organizacion
 
@@ -330,12 +338,43 @@ export default function BarraSuperior({
   return (
     <header
       aria-label={t.barra}
-      className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-chip bg-bg/90 px-6 py-3.5 backdrop-blur-md"
+      className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-chip bg-bg/90 px-3 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 backdrop-blur-md md:gap-3 md:px-6 md:py-3.5"
     >
+      <button
+        type="button"
+        onClick={onMenu}
+        aria-label={t.menu}
+        title={t.menu}
+        className={`${botonIcono} md:hidden`}
+      >
+        <Trazo>
+          <path d="M4 7h16M4 12h16M4 17h10" />
+        </Trazo>
+      </button>
+
+      <span className="flex items-center gap-2 md:hidden">
+        <svg width="28" height="28" viewBox="0 0 30 30" aria-hidden="true">
+          <path d="M3 25h24" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" />
+          <ellipse cx="15" cy="24.6" rx="6" ry="1.6" fill="var(--series1)" />
+          <circle cx="15" cy="12" r="7.5" fill="var(--accent)" />
+          <path
+            d="M9.6 7.4c2.9 2.4 2.9 6.8 0 9.2M20.4 7.4c-2.9 2.4-2.9 6.8 0 9.2"
+            stroke="var(--on-accent)"
+            strokeWidth="1.4"
+            fill="none"
+          />
+        </svg>
+        <span className="font-display text-[21px] leading-none font-bold tracking-[0.06em]">
+          AceCam
+        </span>
+      </span>
+
       <form
         role="search"
         onSubmit={buscar}
-        className="relative flex max-w-105 min-w-0 flex-[1_1_240px] items-center"
+        className={`relative min-w-0 items-center md:order-none md:flex md:max-w-105 md:flex-[1_1_240px] md:basis-auto ${
+          buscando ? 'order-last flex basis-full pb-1' : 'hidden'
+        }`}
       >
         <label htmlFor="panel-buscar" className="sr-only">
           {t.buscar}
@@ -360,10 +399,33 @@ export default function BarraSuperior({
 
       <button
         type="button"
+        onClick={() => {
+          setBuscando((actual) => !actual)
+          requestAnimationFrame(() => document.getElementById('panel-buscar')?.focus())
+        }}
+        aria-label={buscando ? t.cerrarBuscador : t.abrirBuscador}
+        aria-expanded={buscando}
+        aria-controls="panel-buscar"
+        className={`${botonIcono} md:hidden ${buscando ? 'bg-surface2 text-text' : ''}`}
+      >
+        <Trazo>
+          {buscando ? (
+            <path d="M6 6l12 12M18 6L6 18" />
+          ) : (
+            <>
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </>
+          )}
+        </Trazo>
+      </button>
+
+      <button
+        type="button"
         onClick={cambiarIdioma}
         aria-label={t.idioma}
         title={t.idioma}
-        className={`${botonIcono} font-display text-[13px] font-bold tracking-[0.06em]`}
+        className={`${botonIcono} font-display text-[13px] font-bold tracking-[0.06em] max-md:hidden`}
       >
         {idioma === 'es' ? 'ES' : 'EN'}
       </button>
@@ -373,7 +435,7 @@ export default function BarraSuperior({
         onClick={toggleTheme}
         aria-label={isLight ? t.temaOscuro : t.temaClaro}
         title={isLight ? t.temaOscuro : t.temaClaro}
-        className={botonIcono}
+        className={`${botonIcono} max-md:hidden`}
       >
         {isLight ? (
           <Trazo>

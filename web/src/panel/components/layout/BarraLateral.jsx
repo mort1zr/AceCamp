@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router'
-import { useTextos } from '../../../compartido/lib/idioma.jsx'
+import { useTheme } from '../../../compartido/hooks/useTheme.js'
+import { useIdioma, useTextos } from '../../../compartido/lib/idioma.jsx'
 import { incluyeSeccion, PLANES_VISTA, usePlanVista } from '../../context/PlanVistaContext.js'
 
 const CLAVE = 'acecam-menu'
@@ -124,6 +125,11 @@ const textos = {
     planReal: 'Usar mi plan real',
     cambiarVista: (plan) => `Ver el panel como plan ${plan}`,
     desdePro: 'Disponible desde el plan Pro',
+    cerrarMenu: 'Cerrar menú',
+    idioma: 'Idioma',
+    tema: 'Tema',
+    claro: 'Claro',
+    oscuro: 'Oscuro',
   },
   en: {
     inicio: 'Home',
@@ -148,6 +154,11 @@ const textos = {
     planReal: 'Use my real plan',
     cambiarVista: (plan) => `View the panel as the ${plan} plan`,
     desdePro: 'Available from the Pro plan',
+    cerrarMenu: 'Close menu',
+    idioma: 'Language',
+    tema: 'Theme',
+    claro: 'Light',
+    oscuro: 'Dark',
   },
 }
 
@@ -178,8 +189,10 @@ function Trazo({ children, className = '', size = 20, strokeWidth = 1.8 }) {
   )
 }
 
-export default function BarraLateral() {
+export default function BarraLateral({ movil = false, onCerrar }) {
   const t = useTextos(textos)
+  const { idioma, cambiarIdioma } = useIdioma()
+  const { toggleTheme, isLight } = useTheme()
   const [colapsado, setColapsado] = useState(leerColapsado)
   const { plan, planVista, setPlanVista, uso } = usePlanVista()
   const usados = uso.usados ?? 0
@@ -197,20 +210,25 @@ export default function BarraLateral() {
   }, [colapsado])
 
   const abierto = !colapsado
-  const texto = abierto ? 'sr-only lg:not-sr-only lg:truncate' : 'sr-only'
+  const texto = movil ? 'truncate' : abierto ? 'sr-only lg:not-sr-only lg:truncate' : 'sr-only'
+  const alElegir = movil ? onCerrar : undefined
 
   return (
     <aside
-      className={`sticky top-0 flex h-dvh shrink-0 flex-col gap-6 overflow-x-hidden overflow-y-auto border-r border-chip bg-side px-3.5 py-5 transition-[width] duration-300 ${
-        abierto ? 'w-19 lg:w-58' : 'w-19'
-      }`}
+      className={
+        movil
+          ? 'flex h-full w-full flex-col gap-6 overflow-x-hidden overflow-y-auto bg-side px-3.5 pt-[max(1rem,env(safe-area-inset-top))] pb-[calc(100lvh-100svh+max(1.25rem,env(safe-area-inset-bottom)))]'
+          : `sticky top-0 hidden h-dvh shrink-0 flex-col gap-6 overflow-x-hidden overflow-y-auto border-r border-chip bg-side px-3.5 py-5 transition-[width] duration-300 md:flex ${
+              abierto ? 'w-19 lg:w-58' : 'w-19'
+            }`
+      }
     >
       <button
         type="button"
-        onClick={() => setColapsado((actual) => !actual)}
-        aria-label={abierto ? t.colapsar : t.expandir}
-        aria-expanded={abierto}
-        title={abierto ? t.colapsar : t.expandir}
+        onClick={movil ? onCerrar : () => setColapsado((actual) => !actual)}
+        aria-label={movil ? t.cerrarMenu : abierto ? t.colapsar : t.expandir}
+        aria-expanded={movil ? undefined : abierto}
+        title={movil ? t.cerrarMenu : abierto ? t.colapsar : t.expandir}
         className="group relative flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-1 text-left text-text transition-colors hover:bg-surface2"
       >
         <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" className="shrink-0">
@@ -222,14 +240,16 @@ export default function BarraLateral() {
             ry="1.6"
             fill="var(--series1)"
             className={`origin-center transition-[scale,opacity] duration-500 [transform-box:fill-box] ${
-              abierto
-                ? 'scale-x-60 opacity-50 lg:scale-x-100 lg:opacity-100'
-                : 'scale-x-60 opacity-50'
+              movil
+                ? ''
+                : abierto
+                  ? 'scale-x-60 opacity-50 lg:scale-x-100 lg:opacity-100'
+                  : 'scale-x-60 opacity-50'
             }`}
           />
           <g
             className={`transition-[translate] duration-500 ease-[cubic-bezier(0.3,1.5,0.5,1)] ${
-              abierto ? '-translate-y-1 lg:translate-y-0' : '-translate-y-1'
+              movil ? '' : abierto ? '-translate-y-1 lg:translate-y-0' : '-translate-y-1'
             }`}
           >
             <circle cx="15" cy="12" r="7.5" fill="var(--accent)" />
@@ -246,15 +266,23 @@ export default function BarraLateral() {
         >
           AceCam
         </span>
-        <span
-          className={`ml-auto text-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${
-            abierto ? 'hidden lg:block' : 'hidden'
-          }`}
-        >
-          <Trazo size={18}>
-            <path d="m14.5 7-5 5 5 5" />
-          </Trazo>
-        </span>
+        {movil ? (
+          <span className="ml-auto grid size-9 place-items-center rounded-full bg-surface2 text-text2">
+            <Trazo size={18}>
+              <path d="M6 6l12 12M18 6L6 18" />
+            </Trazo>
+          </span>
+        ) : (
+          <span
+            className={`ml-auto text-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${
+              abierto ? 'hidden lg:block' : 'hidden'
+            }`}
+          >
+            <Trazo size={18}>
+              <path d="m14.5 7-5 5 5 5" />
+            </Trazo>
+          </span>
+        )}
       </button>
 
       <nav aria-label={t.principal}>
@@ -264,7 +292,8 @@ export default function BarraLateral() {
               <li key={seccion.to}>
                 <NavLink
                   to={seccion.to}
-                  title={abierto ? undefined : t[seccion.clave]}
+                  onClick={alElegir}
+                  title={abierto || movil ? undefined : t[seccion.clave]}
                   className={({ isActive }) =>
                     `flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] whitespace-nowrap transition-colors ${
                       isActive
@@ -281,6 +310,7 @@ export default function BarraLateral() {
               <li key={seccion.to}>
                 <Link
                   to="/configuracion?seccion=plan"
+                  onClick={alElegir}
                   title={`${t[seccion.clave]} · ${t.desdePro}`}
                   aria-label={`${t[seccion.clave]}. ${t.desdePro}`}
                   className="relative flex min-h-11 items-center gap-2.5 rounded-[10px] px-3 text-[15px] font-medium whitespace-nowrap text-muted transition-colors hover:bg-surface2 hover:text-text2"
@@ -290,7 +320,7 @@ export default function BarraLateral() {
                   <span
                     aria-hidden="true"
                     className={`ml-auto shrink-0 items-center rounded-[4px] border border-line2 px-1 py-0.5 font-display text-[9px] leading-none font-bold tracking-[0.06em] text-text2 uppercase ${
-                      abierto ? 'hidden lg:inline-flex' : 'hidden'
+                      movil ? 'inline-flex' : abierto ? 'hidden lg:inline-flex' : 'hidden'
                     }`}
                   >
                     Pro
@@ -298,7 +328,7 @@ export default function BarraLateral() {
                   <span
                     aria-hidden="true"
                     className={`absolute top-2 right-2 grid size-4 place-items-center rounded-full bg-surface2 text-text2 ${
-                      abierto ? 'lg:hidden' : ''
+                      movil ? 'hidden' : abierto ? 'lg:hidden' : ''
                     }`}
                   >
                     <Trazo size={9} strokeWidth={2.6}>
@@ -317,7 +347,7 @@ export default function BarraLateral() {
         role="img"
         aria-label={`${t.plan} ${actual?.nombre ?? ''}. ${textoUso}`}
         title={`${actual?.nombre ?? t.nombrePlan} · ${textoUso}`}
-        className={`mt-auto flex flex-col items-center gap-2 rounded-xl border border-line bg-surface py-3 ${abierto ? 'lg:hidden' : ''}`}
+        className={`mt-auto flex flex-col items-center gap-2 rounded-xl border border-line bg-surface py-3 ${movil ? 'hidden' : abierto ? 'lg:hidden' : ''}`}
       >
         <button
           type="button"
@@ -360,7 +390,7 @@ export default function BarraLateral() {
 
       <div
         className={`mt-auto flex-col gap-1.5 rounded-xl border border-line bg-surface p-3.5 ${
-          abierto ? 'hidden lg:flex' : 'hidden'
+          movil ? 'flex' : abierto ? 'hidden lg:flex' : 'hidden'
         }`}
       >
         <p className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">{t.plan}</p>
@@ -396,6 +426,31 @@ export default function BarraLateral() {
           </div>
         </div>
       </div>
+
+      {movil && (
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={cambiarIdioma}
+            className="flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-xl border border-line bg-surface px-3.5 text-[14px] font-medium text-text2"
+          >
+            {t.idioma}
+            <span className="font-display text-[13px] font-bold tracking-[0.06em] text-text">
+              {idioma === 'es' ? 'ES' : 'EN'}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex min-h-11 cursor-pointer items-center justify-between gap-2 rounded-xl border border-line bg-surface px-3.5 text-[14px] font-medium text-text2"
+          >
+            {t.tema}
+            <span className="text-[13px] font-semibold text-text">
+              {isLight ? t.claro : t.oscuro}
+            </span>
+          </button>
+        </div>
+      )}
     </aside>
   )
 }
