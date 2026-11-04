@@ -5,14 +5,14 @@ import userEvent from '@testing-library/user-event'
 import DashboardEvolution from './DashboardEvolution.jsx'
 
 afterEach(cleanup)
-const point = (id, date, speed) => ({ matchId: id, playerId: 'p1', date, opponent: `Rival ${id}`, averageServeSpeed: speed })
+const point = (id, date, speed) => ({ matchId: id, playerId: 'p1', date, opponent: `Rival ${id}`, averageShotSpeed: speed })
 
 describe('Gráfico Recharts de evolución', () => {
   it('ofrece datos accesibles en orden cronológico, incluidos valores ausentes', async () => {
     const { container } = render(<DashboardEvolution playerId="p1" sample evolution={{ playerId: 'p1', points: [point('c', '2026-01-03', 140), point('a', '2026-01-01', 120), point('b', '2026-01-02', null)] }} />)
     expect(screen.getByText('Gráfico de demostración · valores ficticios')).toBeTruthy()
     await userEvent.setup().click(screen.getByText('Ver datos del gráfico'))
-    const table = screen.getByRole('table', { name: 'Mediciones de saque por partido · ejemplos' })
+    const table = screen.getByRole('table', { name: 'Velocidades de golpe por partido · ejemplos' })
     const rows = within(table).getAllByRole('row').slice(1)
     expect(rows.map(item => item.textContent)).toEqual(['01/01/2026Rival a120 km/h', '02/01/2026Rival bSin datos', '03/01/2026Rival c140 km/h'])
     // The actual SVG path must contain two disjoint segments, not a bridge over null.
@@ -33,7 +33,7 @@ describe('Gráfico Recharts de evolución', () => {
     rerender(<DashboardEvolution playerId="p1" evolution={{ playerId: 'p1', points: [point('invalid', '2026-02-30', 120)] }} />)
     expect(screen.getByText('Aún no hay partidos con fecha válida')).toBeTruthy()
     rerender(<DashboardEvolution playerId="p1" evolution={{ playerId: 'p1', points: [point('missing', '2026-01-01', null)] }} />)
-    expect(screen.getByText('Todavía no hay velocidades de saque disponibles')).toBeTruthy()
+    expect(screen.getByText('Todavía no hay velocidades de golpe disponibles')).toBeTruthy()
     expect(screen.queryByRole('application')).toBeNull()
   })
 

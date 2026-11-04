@@ -24,12 +24,12 @@ export function buildDashboardEvolution(matches, { orgId, playerId, decodeStatis
     const decoded = decodeStatistics(match, { playerId })
     if (decoded && typeof decoded.then === 'function') throw new TypeError('Statistics decoder must be synchronous.')
     const statistics = normalizeDashboardStatistics(decoded, playerId)
-    const speed = statistics?.serveSpeed
+    const speed = statistics?.shots
     const value = speed?.sampleCount > 0 ? speed.sumKmh / speed.sampleCount : null
     points.push({
       matchId: match.id, playerId, date: match.matchDate,
       opponent: typeof match.opponent === 'string' ? match.opponent : '',
-      averageServeSpeed: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
+      averageShotSpeed: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
     })
   }
   return { playerId, points: points.sort(chronological) }
@@ -42,11 +42,11 @@ export function selectEvolutionPoints(evolution, playerId) {
   return evolution.points.flatMap(point => {
     if (!point || point.playerId !== playerId || typeof point.matchId !== 'string' || !point.matchId || seen.has(point.matchId) || !isValidMatchDate(point.date)) return []
     seen.add(point.matchId)
-    const value = point.averageServeSpeed
+    const value = point.averageShotSpeed
     return [{
       matchId: point.matchId, playerId, date: point.date,
       opponent: typeof point.opponent === 'string' ? point.opponent : '',
-      averageServeSpeed: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
+      averageShotSpeed: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
     }]
   }).sort(chronological)
 }

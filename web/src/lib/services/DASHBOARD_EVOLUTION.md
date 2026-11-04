@@ -2,26 +2,25 @@
 
 ## Alcance implementado
 
-Gráfico de velocidad media de saque por partido, con Recharts 3.10.1, tabla
+Gráfico de velocidad media de golpe por partido (PCIT-145), con Recharts 3.10.1, tabla
 alternativa de datos, fechas ordenadas y huecos en mediciones ausentes. Se conecta
 al Dashboard mediante `overview.data.evolution`, sin crear otra suscripción a
 Firestore ni otro servicio Firebase.
 
-La integración con Aaron continúa diferida por instrucción del usuario. La tarea
-permanece En curso hasta contrastar una salida real, verificar reglas/sesión y el
-recorrido de PCIT-35 a Dashboard. No se presenta la demostración como ese recorrido.
+El Sprint 1 usa las mediciones del worker de PCIT-35. La evolución de saque queda
+para un sprint posterior, cuando el worker mida ese indicador. La validación con
+la sesión y las reglas definitivas corresponde a PCIT-28 y PCIT-137.
 
 ## Contrato y flujo
 
-`buildDashboardEvolution(matches, context)` utiliza el mismo contexto y decoder
-explícito de PCIT-139. La forma normalizada del JSON sigue siendo una propuesta;
-no se infiere velocidad de saque desde velocidades de golpes del modelo.
+`buildDashboardEvolution(matches, context)` usa el decoder compartido con los KPIs.
+Para `acecam.match-stats.v1`, lee `statistics.player.shots` del jugador registrado.
 
 ```js
 {
   playerId: 'jugador-actual',
   points: [
-    { matchId, playerId, date: 'YYYY-MM-DD', opponent, averageServeSpeed }
+    { matchId, playerId, date: 'YYYY-MM-DD', opponent, averageShotSpeed }
   ]
 }
 ```
@@ -70,22 +69,16 @@ Referencias primarias: [LineChart](https://recharts.github.io/api/LineChart/),
 [accesibilidad de Recharts](https://github.com/recharts/recharts/blob/main/storybook/stories/API/Accessibility.mdx)
 y [ejemplo de huecos](https://recharts.github.io/en-US/examples/LineChartConnectNulls/).
 
-## Demostración y validación pendiente
+## Demostración y pruebas
 
-En `/dashboard.html`, Valeria muestra seis mediciones ficticias; Mateo tiene un
-hueco intermedio y su KPI agregado queda Sin datos conforme a la política de
-PCIT-139. Camila no tiene una serie. Los ejemplos siguen aislados de producción.
+En `/dashboard.html`, Valeria muestra seis mediciones ficticias. Mateo tiene un
+hueco intermedio. Camila no tiene una serie. Los ejemplos están identificados
+en la vista de demostración.
 
 Las pruebas usan casos controlados, SDK simulado y el SVG real de Recharts.
 Comprueban la separación de segmentos en un hueco, los estados, la tabla, la
 selección y los cálculos por partido. No acreditan una descarga de videos, una
 salida JSON real ni las reglas de Firestore.
 
-El último avance revisado de ModeloAI (d5904cb, PCIT-34) incorpora configuración
-por CLI, controles de calidad, FPS reales y correcciones de detección de golpes.
-Su caché JSON guarda detecciones, no el contrato de estadísticas del worker que
-falta para conectar datos reales: main.py sigue produciendo un video anotado.
-
-Antes de Listo: conectar el decoder acordado, verificar matches reales o de
-emulador con reglas de acceso y contrastar el recorrido del worker. Los gráficos
-y filtros avanzados de PCIT-43 permanecen fuera del alcance de Sprint 1.
+La prueba de Dashboard comprueba que una medición con el formato del worker
+aparezca en el gráfico y la tabla, mientras la tarjeta de saque muestra «Sin datos».

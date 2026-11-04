@@ -12,7 +12,7 @@ const series = {
 }
 
 function exampleEvolution(playerId, empty = false) {
-  return { playerId, points: (empty ? [] : series[playerId] ?? []).map(([date, averageServeSpeed], index) => ({ matchId: `demo-${playerId}-${index}`, playerId, date, opponent: `Rival de ejemplo ${index + 1}`, averageServeSpeed })) }
+  return { playerId, points: (empty ? [] : series[playerId] ?? []).map(([date, averageShotSpeed], index) => ({ matchId: `demo-${playerId}-${index}`, playerId, date, opponent: `Rival de ejemplo ${index + 1}`, averageShotSpeed })) }
 }
 
 /** Display fixtures only: no Firestore, aggregation or real statistics. */
