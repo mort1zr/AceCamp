@@ -4,7 +4,21 @@ Contrato único entre la **web** (`web/`) y el **worker del modelo** (`model/`, 
 Las constantes de este documento están en [`web/src/lib/schema.js`](../web/src/lib/schema.js).
 Si cambias un campo, actualiza los dos archivos y avisa en Jira.
 
-**Versión:** 1 · **Responsable:** Axel (PCIT-22) · **Reglas de acceso:** PCIT-23
+**Versión:** 1 · **Responsable:** Axel (PCIT-22) · **Reglas de acceso:** [`firestore.rules`](../firestore.rules) (PCIT-23)
+
+## Qué permiten las reglas (PCIT-23)
+
+| Colección | Leer | Crear | Modificar | Borrar |
+| --- | --- | --- | --- | --- |
+| `users` | La propia y las de su organización | Solo la propia, en el registro, con rol `coach` y en una organización que crea él mismo | Solo nombre y cargo | No |
+| `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó | No |
+| `players` | De su organización | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Datos del jugador; nunca `orgId`, `createdBy` ni `consent` | De su organización |
+| `matches` | De su organización | En `'en cola'`, sin estadísticas, con un jugador de su organización y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola` (Reintentar) | De su organización, salvo si está `procesando` |
+| `applications` | De su organización | Por ahora solo con sesión (el formulario público llega en PCIT-54) | Estado y notas | De su organización |
+
+El worker usa el Admin SDK, que no pasa por las reglas: es el único que escribe
+`procesando`, `listo`, `error` y `statistics`. Las consultas de la web **siempre**
+deben filtrar por `orgId`; sin ese filtro, Firestore las rechaza.
 
 ## Decisiones
 

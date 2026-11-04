@@ -34,6 +34,7 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 | `npm test` | Pruebas de los componentes compartidos |
 | `npm run emulators` | Emuladores locales de Auth, Firestore y Storage |
 | `npm run seed` | Carga datos de ejemplo en los emuladores (con los emuladores ya encendidos) |
+| `npm run test:rules` | Pruebas de las reglas de Firestore; enciende y apaga el emulador solo (PCIT-23) |
 
 ## Firebase (PCIT-20)
 
@@ -82,6 +83,16 @@ npm run dev
 Con los emuladores encendidos, `npm run seed` carga dos organizaciones con
 jugadores, partidos y postulaciones de ejemplo. Puedes iniciar sesión con
 `coach@acecam.test` / `acecam123`.
+
+### Reglas de seguridad (PCIT-23)
+
+[`firestore.rules`](../firestore.rules) deja leer y escribir solo a usuarios con
+sesión y solo los documentos de su organización (`orgId`). Antes de subir un
+cambio en las reglas, corre `npm run test:rules` (no hace falta tener los
+emuladores encendidos; si lo están, apágalos primero porque usan el mismo puerto).
+
+Las reglas se publican en el proyecto real con
+`npx firebase deploy --only firestore:rules` (requiere `npx firebase login`).
 
 ### Esquema de datos (PCIT-22)
 
