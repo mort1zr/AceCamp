@@ -8,7 +8,7 @@ píxeles de la mini-pista para dibujarlas.
 import cv2
 import numpy as np
 
-from court import COURT_KEYPOINTS_M, COURT_LENGTH, COURT_LINES, DOUBLES_WIDTH, NET_Y
+from court import COURT_KEYPOINTS_M, COURT_LENGTH, COURT_LINES, DOUBLES_WIDTH, NET_Y, per_frame
 from utils import get_center_of_bbox, get_foot_position
 
 # Espacio alrededor de la pista que también se dibuja (los jugadores suelen estar detrás del fondo).
@@ -61,10 +61,12 @@ class MiniCourt:
         - Jugadores: el punto medio inferior de su caja (los pies), que está en el suelo.
         - Pelota: el centro de su caja. Es aproximado mientras vuela; exacto solo en el bote.
 
+        homography puede ser una sola para todo el vídeo o una lista con una por fotograma.
         Devuelve (jugadores, pelota): listas por fotograma de {id: (x_m, y_m)}.
         """
         players_m, ball_m = [], []
-        for frame_players, frame_ball in zip(player_boxes, ball_boxes):
+        homographies = per_frame(homography, len(player_boxes))
+        for frame_players, frame_ball, homography in zip(player_boxes, ball_boxes, homographies):
             players_m.append(
                 {pid: tuple(homography.image_to_court(get_foot_position(bbox))) for pid, bbox in frame_players.items()}
             )

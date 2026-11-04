@@ -5,7 +5,7 @@ import cv2
 import pandas as pd
 
 from config import config_from_args, resolve_path
-from court import CourtHomography
+from court import track_court
 from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
 from stats import build_model_statistics, renumber_far_near
@@ -67,13 +67,18 @@ def run_pipeline(config, render=True):
 
     # Court Line Detector model
     court_model_path = str(resolve_path(models["court_keypoints"]))
-    court_line_detector = CourtLineDetector(court_model_path)
-    court_keypoints = court_line_detector.predict(video_frames[0])
+    court_line_detector = CourtLineDetector(court_model_path, refine=config["court"]["refine_keypoints"])
 
-    # Homografía imagen → pista (metros) a partir de los 14 puntos clave
-    homography = CourtHomography.from_keypoints(court_keypoints)
-    print(f"Homografía: error de reproyección medio {homography.mean_reprojection_error(court_keypoints):.1f} px, "
-          f"{int(homography.inliers.sum())}/{len(homography.inliers)} puntos clave coherentes")
+    # Puntos clave y homografía imagen → pista (metros), re-detectados cada N fotogramas y suavizados
+    court_keypoints, homography = track_court(video_frames, court_line_detector.predict,
+                                              redetect_every=config["court"]["redetect_every_frames"],
+                                              smoothing=config["court"]["smoothing"])
+    first = homography[0]
+    print(f"Homografía: error de reproyección medio {first.mean_reprojection_error(court_keypoints[0]):.1f} px, "
+          f"{int(first.inliers.sum())}/{len(first.inliers)} puntos clave coherentes")
+    discarded = [i for i, ok in enumerate(first.inliers) if not ok]
+    if discarded:
+        print(f"  Puntos clave descartados por RANSAC (ver numeración en court/court_model.py): {discarded}")
 
     # Elegir a los dos jugadores: 1 = lado lejano, 2 = lado cercano
     player_detections = player_tracker.choose_and_filter_players(homography, player_detections)

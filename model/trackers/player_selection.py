@@ -19,7 +19,7 @@ from collections import Counter
 
 import numpy as np
 
-from court import COURT_LENGTH, DOUBLES_WIDTH, NET_Y
+from court import COURT_LENGTH, DOUBLES_WIDTH, NET_Y, per_frame
 from utils import get_foot_position
 
 FAR_PLAYER, NEAR_PLAYER = 1, 2
@@ -140,9 +140,11 @@ def _fill_gaps(boxes):
 def select_players(player_detections, homography):
     """Devuelve, por fotograma, {1: caja del jugador lejano, 2: caja del jugador cercano}.
 
+    homography puede ser una sola para todo el vídeo o una lista con una por fotograma.
     Lanza ValueError si en todo el vídeo no aparece nadie en alguno de los dos lados.
     """
-    candidates_per_frame = [_candidates(frame, homography) for frame in player_detections]
+    homographies = per_frame(homography, len(player_detections))
+    candidates_per_frame = [_candidates(frame, h) for frame, h in zip(player_detections, homographies)]
     tracks = {}
     for side in (FAR_PLAYER, NEAR_PLAYER):
         boxes = _fill_gaps(_follow_side(candidates_per_frame, side))

@@ -18,6 +18,14 @@ detection:
   # Huecos sin pelota de hasta estos fotogramas se interpolan; los más largos no.
   ball_max_interpolation_gap: 5
 
+court:
+  # Volver a detectar los puntos clave de la pista cada N fotogramas.
+  redetect_every_frames: 30
+  # Peso de cada nueva detección en la media móvil (0 = no cambia, 1 = sin suavizar).
+  smoothing: 0.3
+  # Ajustar cada punto clave al cruce de líneas blancas más cercano.
+  refine_keypoints: true
+
 shots:
   # Fotogramas seguidos con la misma dirección vertical para contar un golpe.
   min_change_frames_for_hit: 25

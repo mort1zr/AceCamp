@@ -1,17 +1,22 @@
 import cv2
 
+from court.refinement import refine_keypoints
+
 
 class CourtLineDetector:
-    def __init__(self, model_path):
+    def __init__(self, model_path, refine=True):
         # torch se importa aquí para que el resto del paquete (CLI, tests) no lo necesite.
         import torch
         import torchvision.transforms as transforms
         from torchvision import models
 
         self._torch = torch
-        self.model = models.resnet50(pretrained=True)
-        self.model.fc = torch.nn.Linear(self.model.fc.in_features, 14*2) 
-        self.model.load_state_dict(torch.load(model_path, map_location='cpu'))
+        self.refine = refine
+        # weights=None: los pesos de ImageNet no hacen falta, se sobrescriben con los entrenados.
+        self.model = models.resnet50(weights=None)
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, 14*2)
+        self.model.load_state_dict(torch.load(model_path, map_location='cpu', weights_only=True))
+        self.model.eval()  # sin dropout ni actualización de batch norm al predecir
         self.transform = transforms.Compose([
             transforms.ToPILImage(),
             transforms.Resize((224, 224)),
@@ -20,8 +25,7 @@ class CourtLineDetector:
         ])
 
     def predict(self, image):
-
-    
+        """14 puntos clave [x0, y0, ..., x13, y13] en píxeles del fotograma."""
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image_tensor = self.transform(image_rgb).unsqueeze(0)
         with self._torch.no_grad():
@@ -31,6 +35,8 @@ class CourtLineDetector:
         keypoints[::2] *= original_w / 224.0
         keypoints[1::2] *= original_h / 224.0
 
+        if self.refine:
+            keypoints = refine_keypoints(image, keypoints)
         return keypoints
 
     def draw_keypoints(self, image, keypoints):
@@ -42,9 +48,6 @@ class CourtLineDetector:
             cv2.circle(image, (x, y), 5, (0, 0, 255), -1)
         return image
     
-    def draw_keypoints_on_video(self, video_frames, keypoints):
-        output_video_frames = []
-        for frame in video_frames:
-            frame = self.draw_keypoints(frame, keypoints)
-            output_video_frames.append(frame)
-        return output_video_frames
+    def draw_keypoints_on_video(self, video_frames, keypoints_per_frame):
+        """Dibuja en cada fotograma sus puntos clave (una lista de puntos clave por fotograma)."""
+        return [self.draw_keypoints(frame, keypoints) for frame, keypoints in zip(video_frames, keypoints_per_frame)]

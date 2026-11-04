@@ -50,7 +50,7 @@ class FakeBallTracker(main.BallTracker):
 
 
 class FakeCourtLineDetector:
-    def __init__(self, model_path):
+    def __init__(self, model_path, refine=True):
         self.model_path = model_path
 
     def predict(self, image):

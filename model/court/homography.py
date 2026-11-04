@@ -78,3 +78,13 @@ class CourtHomography:
 
     def mean_reprojection_error(self, image_keypoints) -> float:
         return float(self.reprojection_errors(image_keypoints).mean())
+
+
+def per_frame(homography, num_frames):
+    """Acepta una homografía para todo el vídeo o una lista con una por fotograma."""
+    if isinstance(homography, CourtHomography):
+        return [homography] * num_frames
+    homographies = list(homography)
+    if len(homographies) != num_frames:
+        raise ValueError(f"se esperaban {num_frames} homografías, llegaron {len(homographies)}")
+    return homographies
