@@ -1,0 +1,23 @@
+# Configuración del pipeline. Las rutas son relativas a la carpeta model/.
+# Cualquier valor se puede sobrescribir por línea de comandos (python main.py --help).
+
+paths:
+  input: input_videos/input_video.mp4
+  output: output_videos/output_video.avi
+  cache_dir: cache
+
+models:
+  players: models/yolov8x.pt
+  ball: models/yolo5_last.pt
+  court_keypoints: models/keypoints_model.pth
+
+detection:
+  # Dispositivo para la inferencia: null (automático), cpu, cuda:0, mps...
+  device: null
+  ball_confidence: 0.15
+
+shots:
+  # Fotogramas seguidos con la misma dirección vertical para contar un golpe.
+  min_change_frames_for_hit: 25
+  # Ventana de la media móvil sobre la altura de la pelota.
+  rolling_window: 5

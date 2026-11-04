@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Secretos y entorno local
+.env
+.env.*
+!.env.example
+
+# Pesos de modelos (se descargan con model/scripts/download_models.py)
+*.pt
+*.pth
+*.onnx
+
+# Datos y resultados (no se versionan)
+model/input_videos/*
+model/output_videos/*
+model/cache/*
+model/runs/
+runs/
+model/training/tennis-ball-detection-*/
+model/training/data/
+*.zip
+*.pkl
+!model/**/.gitkeep
+
+# Sistema y editores
+.DS_Store
+.idea/
+.vscode/
