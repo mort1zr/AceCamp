@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import RequireAuth from '../components/RequireAuth.jsx'
 import { AuthContext } from '../context/AuthContext.js'
+import Acceso from './Acceso.jsx'
 import Login from './Login.jsx'
 import Registro from './Registro.jsx'
 
@@ -22,8 +23,10 @@ function renderApp(path, value) {
     <AuthContext.Provider value={value}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/registro" element={<Registro />} />
+          <Route element={<Acceso />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/registro" element={<Registro />} />
+          </Route>
           <Route element={<RequireAuth />}>
             <Route path="/inicio" element={<p>Pantalla de inicio</p>} />
             <Route path="/jugadores" element={<p>Pantalla de jugadores</p>} />
@@ -114,5 +117,19 @@ describe('Registro', () => {
     await user.type(screen.getByLabelText('Repite la contraseña'), 'acecam123')
     await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
     expect((await screen.findByRole('alert')).textContent).toContain('Ya existe una cuenta')
+  })
+})
+
+describe('Acceso', () => {
+  it('el switch alterna entre iniciar sesión y crear cuenta', async () => {
+    renderApp('/login', session())
+    const user = userEvent.setup()
+    expect(screen.getByRole('tab', { name: 'Iniciar sesión' }).getAttribute('aria-selected')).toBe('true')
+    await user.click(screen.getByRole('tab', { name: 'Crear cuenta' }))
+    expect(screen.getByRole('heading', { name: 'Crear cuenta' })).toBeTruthy()
+    expect(screen.getByLabelText('Nombre y apellido')).toBeTruthy()
+    await user.click(screen.getByRole('tab', { name: 'Iniciar sesión' }))
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeTruthy()
+    expect(screen.queryByLabelText('Nombre y apellido')).toBeNull()
   })
 })

@@ -1,21 +1,26 @@
+import './logo.css'
+
 export default function Logo({
   size = 30,
   withWordmark = true,
   className = '',
   wordmarkClassName = 'text-2xl',
+  rebota = false,
 }) {
   return (
-    <span className={`inline-flex items-center gap-2 ${className}`}>
+    <span className={`inline-flex items-center gap-2 ${rebota ? 'logo-rebota' : ''} ${className}`}>
       <svg width={size} height={size} viewBox="0 0 30 30" aria-hidden="true">
         <path d="M3 25h24" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" />
-        <ellipse cx="15" cy="24.6" rx="6" ry="1.6" fill="var(--series1)" />
-        <circle cx="15" cy="12" r="7.5" fill="var(--accent)" />
-        <path
-          d="M9.6 7.4c2.9 2.4 2.9 6.8 0 9.2M20.4 7.4c-2.9 2.4-2.9 6.8 0 9.2"
-          stroke="var(--on-accent)"
-          strokeWidth="1.4"
-          fill="none"
-        />
+        <ellipse cx="15" cy="24.6" rx="6" ry="1.6" fill="var(--series1)" className="logo-sombra" />
+        <g className="logo-pelota">
+          <circle cx="15" cy="12" r="7.5" fill="var(--accent)" />
+          <path
+            d="M9.6 7.4c2.9 2.4 2.9 6.8 0 9.2M20.4 7.4c-2.9 2.4-2.9 6.8 0 9.2"
+            stroke="var(--on-accent)"
+            strokeWidth="1.4"
+            fill="none"
+          />
+        </g>
       </svg>
       {withWordmark ? (
         <span

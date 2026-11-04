@@ -13,7 +13,7 @@ const CERRAR_MS = 220
 const enlaces = [
   { to: '/', clave: 'inicio', className: 'hidden sm:block', alInicio: true },
   { to: '/precios', clave: 'precios', desliza: true },
-  { to: '/login', clave: 'ingresar' },
+  { to: '/login', clave: 'ingresar', desliza: true },
 ]
 
 const textos = {
@@ -148,7 +148,7 @@ export default function FloatingNav({ onExpandir }) {
         </ul>
       </div>
 
-      <Link
+      <LinkDeslizante
         to="/registro"
         tabIndex={visible ? undefined : -1}
         className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-6 py-3 font-semibold whitespace-nowrap text-on-accent transition-opacity hover:opacity-90"
@@ -173,7 +173,7 @@ export default function FloatingNav({ onExpandir }) {
         >
           <Icon name="arrow" size={18} strokeWidth={2.2} />
         </span>
-      </Link>
+      </LinkDeslizante>
     </nav>
   )
 }

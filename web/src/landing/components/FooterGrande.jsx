@@ -7,9 +7,9 @@ const year = new Date().getFullYear()
 
 const columnas = [
   [
-    { to: '/', clave: 'inicio', desliza: true },
+    { to: '/', clave: 'inicio', desliza: true, sentido: 'atras' },
     { to: '/precios', clave: 'precios', actual: true },
-    { to: '/registro', clave: 'registro' },
+    { to: '/registro', clave: 'registro', desliza: true },
   ],
   [
     { to: '/terminos', clave: 'terminos' },
@@ -61,7 +61,7 @@ function Enlace({ enlace, texto }) {
   }
   if (enlace.desliza) {
     return (
-      <LinkDeslizante to={enlace.to} sentido="atras" className={clases}>
+      <LinkDeslizante to={enlace.to} sentido={enlace.sentido} className={clases}>
         {texto}
       </LinkDeslizante>
     )

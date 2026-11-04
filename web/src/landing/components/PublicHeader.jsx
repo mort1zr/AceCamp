@@ -2,6 +2,8 @@ import { Link } from 'react-router'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
 import Logo from '../../compartido/components/Logo.jsx'
 import ThemeToggle from '../../compartido/components/ThemeToggle.jsx'
+import { useAterrizaje } from '../../compartido/hooks/useAterrizaje.js'
+import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
 
 const textos = {
   es: {
@@ -32,14 +34,15 @@ const textos = {
 
 export default function PublicHeader() {
   const t = useTextos(textos)
+  const aterrizaje = useAterrizaje()
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-bg/85 backdrop-blur">
       <nav
         aria-label={t.navegacion}
         className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3"
       >
-        <Link to="/" className="rounded-md" aria-label={t.inicio}>
-          <Logo />
+        <Link to="/" {...aterrizaje} className="rounded-md" aria-label={t.inicio}>
+          <Logo rebota />
         </Link>
 
         <ul className="ml-4 hidden items-center gap-6 lg:flex">
@@ -59,9 +62,9 @@ export default function PublicHeader() {
           >
             {t.precios}
           </Link>
-          <Link to="/login" className="text-sm font-medium text-text2 hover:text-text">
+          <LinkDeslizante to="/login" className="text-sm font-medium text-text2 hover:text-text">
             {t.sesion}
-          </Link>
+          </LinkDeslizante>
           <ThemeToggle />
         </div>
       </nav>
