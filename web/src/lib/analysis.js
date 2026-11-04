@@ -1,4 +1,6 @@
 import { isValidBirthDate } from './players.js'
+import { VIDEO_IMPORT_MESSAGES } from './videoImportProtocol.js'
+import { parseVideoSource, parseYouTubeUrl } from './videoSources.js'
 
 export const VIDEO_EXTENSIONS = ['mp4', 'mov']
 
@@ -13,22 +15,17 @@ export function validateVideoFile(file, maxBytes) {
   return null
 }
 
-export function validateVideoUrl(value) {
-  try {
-    const url = new URL(value)
-    const extension = decodeURIComponent(url.pathname).split('.').pop().toLowerCase()
-    if (url.protocol !== 'https:' || url.username || url.password || url.hash || !VIDEO_EXTENSIONS.includes(extension)) throw new Error('invalid')
-    return null
-  } catch {
-    return 'Usa un enlace HTTPS directo a un video MP4 o MOV, sin usuario ni contraseña.'
-  }
+export function validateVideoUrl(value, { supportsYouTube = false } = {}) {
+  if (parseVideoSource(value, { supportsYouTube })) return null
+  if (!supportsYouTube && parseYouTubeUrl(value)) return 'La importación de YouTube aún no está disponible. Usa un archivo o un enlace directo MP4/MOV.'
+  return supportsYouTube ? 'Usa un enlace HTTPS a un video de YouTube o directo a MP4/MOV, sin credenciales.' : 'Usa un enlace HTTPS directo a un video MP4 o MOV, sin usuario ni contraseña.'
 }
 
 export function formatBytes(bytes) {
   return `${Number((bytes / (1024 * 1024)).toFixed(1))} MB`
 }
 
-export function validateAnalysis(input, { maxBytes, supportsLinks = false } = {}) {
+export function validateAnalysis(input, { maxBytes, supportsLinks = false, supportsYouTube = false } = {}) {
   const errors = {}
   if (typeof input.playerId !== 'string' || !input.playerId || input.playerId.includes('/')) errors.playerId = 'Selecciona un jugador.'
   if (!['arriba', 'abajo'].includes(input.playerPosition)) errors.playerPosition = 'Indica dónde está el jugador al inicio del video.'
@@ -41,7 +38,7 @@ export function validateAnalysis(input, { maxBytes, supportsLinks = false } = {}
     const error = validateVideoFile(input.file, maxBytes)
     if (error) errors.file = error
   } else if (input.sourceType === 'link') {
-    const error = validateVideoUrl(input.url)
+    const error = validateVideoUrl(input.url, { supportsYouTube })
     if (!supportsLinks) errors.url = 'La importación por enlace aún no está disponible. Usa un archivo.'
     else if (error) errors.url = error
   } else errors.sourceType = 'Elige un archivo o un enlace.'
@@ -74,6 +71,7 @@ export function throwIfAborted(signal) {
 
 export function analysisErrorMessage(error) {
   if (error?.name === 'AbortError') return 'Carga cancelada antes de crear el partido. Puedes volver a intentarlo.'
+  if (Object.hasOwn(VIDEO_IMPORT_MESSAGES, error?.code)) return VIDEO_IMPORT_MESSAGES[error.code]
   if (error?.code === 'analysis/player') return 'El jugador ya no está disponible en tu organización. Actualiza la lista.'
   if (error?.code === 'analysis/validation') return 'Revisa los datos y el video antes de continuar.'
   if (error?.code === 'permission-denied' || error?.code === 'unauthenticated') return 'Tu sesión no permite realizar esta operación. Vuelve a iniciar sesión o consulta con el administrador.'

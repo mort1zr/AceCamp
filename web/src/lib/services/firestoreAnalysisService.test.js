@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { createFirestoreAnalysisService } from './firestoreAnalysisService.js'
+import { createHttpVideoImporter } from './httpVideoImportService.js'
+import { createVideoImportHttpHandler } from '../../../server/video-import/http.js'
 
 vi.mock('firebase/firestore', () => ({ collection: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), onSnapshot: vi.fn(), query: vi.fn(), runTransaction: vi.fn(), serverTimestamp: vi.fn(), where: vi.fn() }))
 const absent = { exists: () => false }
@@ -23,6 +25,56 @@ beforeEach(() => {
 const make = options => createFirestoreAnalysisService({ db, orgId: 'org-a', actorId: 'coach-a', uploadVideo: upload, maxBytes: 100, ...options })
 
 describe('Cola Firestore (SDK y transferencias simulados)', () => {
+  it('exige capacidad explícita del adaptador antes de aceptar YouTube y no guarda su URL', async () => {
+    const importer = vi.fn(async () => 'org-a/videos/youtube-match/video.mp4')
+    const link = { ...input, sourceType: 'link', url: 'https://youtu.be/abcdefghijk?si=example' }
+    expect(make({ importVideo: importer }).supportsYouTube).toBe(false)
+    await expect(make({ importVideo: importer }).enqueue(link, { requestId: 'youtube-match' })).rejects.toMatchObject({ code: 'analysis/validation' })
+    expect(importer).not.toHaveBeenCalled()
+    importer.supportsYouTube = true
+    const service = make({ importVideo: importer })
+    expect(service.supportsYouTube).toBe(true)
+    await service.enqueue(link, { requestId: 'youtube-match' })
+    expect(tx.set.mock.calls[0][1]).toMatchObject({ videoPath: 'org-a/videos/youtube-match/video.mp4', status: 'en cola' })
+    expect(JSON.stringify(tx.set.mock.calls[0][1])).not.toContain('youtu.be')
+  })
+
+  it('espera la respuesta del contrato HTTP antes de encolar un enlace y omite sus tokens', async () => {
+    const origin = 'https://acecam.example'
+    let finish
+    const backend = vi.fn(() => new Promise(resolve => { finish = resolve }))
+    const handler = createVideoImportHttpHandler({ origin, importVideo: backend })
+    const importVideo = createHttpVideoImporter({
+      enabled: true, origin, endpoint: '/api/video-import',
+      getSession: async () => ({ orgId: 'org-a', actorId: 'coach-a', token: 'test-verified-token' }),
+      fetcher: (url, options) => handler(new Request(url, options)),
+    })
+    const operation = make({ importVideo }).enqueue({ ...input, sourceType: 'link', url: 'https://media.example/video.mp4?signature=secret' }, { requestId: 'http-match' })
+    await vi.waitFor(() => expect(backend).toHaveBeenCalledOnce())
+    expect(tx.set).not.toHaveBeenCalled()
+    expect(backend.mock.calls[0][0]).toMatchObject({ matchId: 'http-match', requestContext: { bearerToken: 'test-verified-token' } })
+    finish('org-a/videos/http-match/video.mp4')
+    await operation
+    expect(tx.set.mock.calls[0][1]).toMatchObject({ videoPath: 'org-a/videos/http-match/video.mp4', status: 'en cola', orgId: 'org-a' })
+    expect(JSON.stringify(tx.set.mock.calls[0][1])).not.toMatch(/signature=secret|test-verified-token/)
+  })
+
+  it('no encola si la API rechaza la sesión o devuelve una ruta no válida', async () => {
+    const origin = 'https://acecam.example'
+    const backend = vi.fn().mockRejectedValueOnce({ code: 'import/permission' }).mockResolvedValueOnce('https://public.example/video.mp4')
+    const handler = createVideoImportHttpHandler({ origin, importVideo: backend })
+    const importVideo = createHttpVideoImporter({
+      enabled: true, origin, endpoint: '/api/video-import',
+      getSession: async () => ({ orgId: 'org-a', actorId: 'coach-a', token: 'test-verified-token' }),
+      fetcher: (url, options) => handler(new Request(url, options)),
+    })
+    const service = make({ importVideo })
+    const link = { ...input, sourceType: 'link', url: 'https://media.example/video.mp4' }
+    await expect(service.enqueue(link, { requestId: 'http-match' })).rejects.toMatchObject({ code: 'import/permission' })
+    await expect(service.enqueue(link, { requestId: 'http-match' })).rejects.toMatchObject({ code: 'import/failed' })
+    expect(tx.set).not.toHaveBeenCalled()
+  })
+
   it('encola solo después de subir y usa la identidad de sesión', async () => {
     let finish
     upload.mockImplementation(() => new Promise(resolve => { finish = resolve }))

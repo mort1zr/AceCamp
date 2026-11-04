@@ -1,13 +1,13 @@
 import { analysisErrorMessage, normalizedMatch, throwIfAborted, validateAnalysis } from '../lib/analysis.js'
 
 /** No uploads, downloads, worker, Firebase, or persistent data in this preview. */
-export function createDemoAnalysisService({ playersService, maxBytes = 500 * 1024 * 1024, transferDelay = 250 } = {}) {
+export function createDemoAnalysisService({ playersService, maxBytes = 500 * 1024 * 1024, transferDelay = 250, supportsYouTube = true } = {}) {
   let rows = []
   const listeners = new Set()
   const emit = () => listeners.forEach(listener => listener(rows.map(row => ({ ...row }))))
   return {
     scopeKey: playersService.scopeKey,
-    mode: 'demo', maxBytes, supportsLinks: true,
+    mode: 'demo', maxBytes, supportsLinks: true, supportsYouTube,
     createRequestId: () => crypto.randomUUID(),
     subscribe(onRows) {
       listeners.add(onRows)
@@ -15,7 +15,7 @@ export function createDemoAnalysisService({ playersService, maxBytes = 500 * 102
       return () => listeners.delete(onRows)
     },
     async enqueue(input, { requestId, signal, onProgress } = {}) {
-      if (Object.keys(validateAnalysis(input, { maxBytes, supportsLinks: true })).length) throw Object.assign(new Error(analysisErrorMessage()), { code: 'analysis/validation' })
+      if (Object.keys(validateAnalysis(input, { maxBytes, supportsLinks: true, supportsYouTube })).length) throw Object.assign(new Error(analysisErrorMessage()), { code: 'analysis/validation' })
       const existing = rows.find(row => row.id === requestId)
       if (existing) return existing
       throwIfAborted(signal)

@@ -60,8 +60,11 @@ La integración pendiente con Storage, Firestore y el worker se detalla en
 
 PCIT-134 prepara el núcleo de importación HTTPS y validación del archivo en
 [server/video-import](server/video-import/README.md), con pruebas locales.
-Todavía no hay API ni conexión real con Auth/Storage o YouTube; los enlaces de
-la aplicación no se habilitan por este avance.
+PCIT-141 prepara el contrato de API y su adaptador de navegador, descritos en
+[VIDEO_IMPORT_HTTP.md](src/lib/services/VIDEO_IMPORT_HTTP.md). Aún no se despliegan
+ni conectan a Auth/Storage o YouTube; los enlaces reales siguen deshabilitados.
+El [proveedor YouTube](server/video-import/YOUTUBE.md) está preparado con pruebas
+locales. La demostración acepta sus enlaces de ejemplo sin descargar videos.
 
 ## Interfaz de Dashboard (PCIT-138)
 

@@ -22,6 +22,36 @@ async function fillMatch(user) {
 }
 
 describe('Analizar video v1', () => {
+  it('admite YouTube en la demostración dejando explícito que no descarga videos', async () => {
+    const props = setup()
+    const user = userEvent.setup()
+    render(<Analizar {...props} />)
+    await screen.findByText('El próximo análisis empieza aquí')
+    await fillMatch(user)
+    await user.click(screen.getByText('Usar enlace', { exact: true }))
+    expect(screen.getByText(/En esta demostración solo se valida el enlace/)).toBeTruthy()
+    await user.type(screen.getByLabelText('Enlace del video *'), 'https://youtu.be/abcdefghijk?si=example')
+    await user.click(screen.getByRole('button', { name: /Añadir a la cola/ }))
+    expect(await screen.findByText('Partido añadido a la cola de demostración. No se subió ni procesó ningún video.')).toBeTruthy()
+    expect(props.send.mock.calls[0][0].url).toContain('youtu.be/abcdefghijk')
+  })
+
+  it('conserva el enlace y los datos si YouTube no ofrece un video público', async () => {
+    const props = setup()
+    props.send.mockRejectedValueOnce({ code: 'import/youtube-unavailable' })
+    const user = userEvent.setup()
+    render(<Analizar {...props} />)
+    await screen.findByText('El próximo análisis empieza aquí')
+    await fillMatch(user)
+    await user.click(screen.getByText('Usar enlace', { exact: true }))
+    await user.type(screen.getByLabelText('Enlace del video *'), 'https://youtu.be/abcdefghijk')
+    await user.click(screen.getByRole('button', { name: /Añadir a la cola/ }))
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', expect.stringContaining('público'))
+    expect(screen.getByLabelText('Enlace del video *').value).toBe('https://youtu.be/abcdefghijk')
+    expect(screen.getByLabelText('Rival *').value).toBe('Rival de ejemplo')
+    expect(screen.queryByRole('table')).toBeNull()
+  })
+
   it('valida el formulario y encola un archivo sin recargar', async () => {
     const props = setup()
     const user = userEvent.setup()

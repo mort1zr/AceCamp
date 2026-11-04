@@ -7,7 +7,7 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
   const matches = collection(db, 'matches')
   const uploaded = new Map()
   const pending = new Map()
-  const capabilities = { maxBytes, supportsLinks: typeof importVideo === 'function' }
+  const capabilities = { maxBytes, supportsLinks: typeof importVideo === 'function', supportsYouTube: typeof importVideo === 'function' && importVideo.supportsYouTube === true }
 
   async function enqueue(input, { requestId, onProgress, signal } = {}) {
     const errors = validateAnalysis(input, capabilities)

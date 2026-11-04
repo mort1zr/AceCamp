@@ -14,10 +14,11 @@ export function isPublicAddress(address) {
   try { return ipaddr.process(address).range() === 'unicast' } catch { return false }
 }
 
-function parseSource(value, allowedHosts) {
+function parseSource(value, allowedHosts, allowedHostSuffixes) {
   let url
   try { url = new URL(value) } catch { throw invalidSource() }
-  if (typeof value !== 'string' || value.length > 4096 || url.protocol !== 'https:' || (url.port && url.port !== '443') || url.username || url.password || url.hash || !allowedHosts.has(url.hostname) || isIP(url.hostname.replace(/^\[|\]$/g, ''))) throw invalidSource()
+  const admitted = allowedHosts.has(url.hostname) || allowedHostSuffixes.some(suffix => url.hostname.endsWith(`.${suffix}`))
+  if (typeof value !== 'string' || value.length > 4096 || url.protocol !== 'https:' || (url.port && url.port !== '443') || url.username || url.password || url.hash || !admitted || isIP(url.hostname.replace(/^\[|\]$/g, ''))) throw invalidSource()
   return url
 }
 
@@ -45,20 +46,22 @@ function resolveWithAbort(resolve, hostname, signal) {
 }
 
 /** Server-only. DNS and HTTP are injectable for offline tests, never from request data. */
-export function createPublicVideoDownloader({ allowedHosts, resolve = lookup, request = httpsRequest, timeoutMs = 60_000, maxRedirects = 3 }) {
-  if (!Array.isArray(allowedHosts) || !allowedHosts.length || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || !Number.isSafeInteger(maxRedirects) || maxRedirects < 0 || maxRedirects > 5) throw new TypeError('Explicit hosts and bounded download limits are required.')
-  const hosts = new Set(allowedHosts.map(host => {
+export function createPublicVideoDownloader({ allowedHosts = [], allowedHostSuffixes = [], requireVideoExtension = true, resolve = lookup, request = httpsRequest, timeoutMs = 60_000, maxRedirects = 3 }) {
+  if (!Array.isArray(allowedHosts) || !Array.isArray(allowedHostSuffixes) || !(allowedHosts.length + allowedHostSuffixes.length) || typeof requireVideoExtension !== 'boolean' || !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || !Number.isSafeInteger(maxRedirects) || maxRedirects < 0 || maxRedirects > 5) throw new TypeError('Explicit hosts and bounded download limits are required.')
+  const checkedHost = host => {
     if (typeof host !== 'string' || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) || !host.includes('.') || isIP(host) || host.includes('..')) throw new TypeError('Use exact DNS hostnames, without wildcards or IP addresses.')
     return host
-  }))
+  }
+  const hosts = new Set(allowedHosts.map(checkedHost))
+  const suffixes = allowedHostSuffixes.map(checkedHost)
 
   return async function download({ url: value, destination, maxBytes, signal, onProgress }) {
     validateLimit(maxBytes)
     const bounded = AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(timeoutMs)])
     let response
     try {
-      let url = parseSource(value, hosts)
-      if (!/\.(mp4|mov)$/i.test(decodeURIComponent(url.pathname))) throw invalidSource()
+      let url = parseSource(value, hosts, suffixes)
+      if (requireVideoExtension && !/\.(mp4|mov)$/i.test(decodeURIComponent(url.pathname))) throw invalidSource()
       for (let count = 0; ; count++) {
         bounded.throwIfAborted()
         const addresses = await resolveWithAbort(resolve, url.hostname, bounded)
@@ -69,7 +72,7 @@ export function createPublicVideoDownloader({ allowedHosts, resolve = lookup, re
         const location = response.headers.location
         response.destroy()
         if (!location || count >= maxRedirects) throw new VideoImportError('redirect', 'El enlace tiene demasiadas redirecciones o no es válido.')
-        url = parseSource(new URL(location, url).href, hosts)
+        url = parseSource(new URL(location, url).href, hosts, suffixes)
       }
       if (response.statusCode !== 200) throw new VideoImportError('unavailable', 'El video no está disponible públicamente. Usa otro enlace o un archivo.')
       const encoding = response.headers['content-encoding']

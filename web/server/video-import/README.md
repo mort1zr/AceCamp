@@ -4,10 +4,17 @@ Código exclusivo de **servidor Node.js**. No se importa desde React, no abre un
 puerto y no está habilitado en producción. Permite avanzar la descarga y
 validación sin sustituir Firebase/Auth/Storage de Axel ni el worker de Aaron.
 
+La continuación PCIT-141 agrega `http.js`, manejador Web Request → Response,
+y el adaptador de navegador. Su contrato, activación y pendientes se describen
+en [VIDEO_IMPORT_HTTP.md](../../src/lib/services/VIDEO_IMPORT_HTTP.md).
+Todavía no se monta ni despliega una API real.
+El proveedor de YouTube preparado en la misma tarea se detalla en
+[YOUTUBE.md](YOUTUBE.md), con sus requisitos de ejecución y verificación pendiente.
+
 ## Alcance disponible
 
 - `download.js`: descarga en streaming de HTTPS directo a MP4/MOV, con lista
-  explícita de hosts exactos del servidor. Cada redirección comprueba de nuevo
+  explícita de hosts del servidor. Cada redirección comprueba de nuevo
   host, protocolo, puerto y DNS. Rechaza direcciones no públicas, incluso respuestas
   DNS mixtas y direcciones IPv4 privadas dentro de IPv6. Conecta a una IP ya
   validada, sin otra resolución ni reutilización de sockets; mantiene la validación
@@ -55,7 +62,10 @@ const videoPath = await importVideo({
 
 Usar Node 22 o posterior; pruebas locales ejecutadas en Node 24.16.0. No hay
 hosts de producción ni tamaño máximo predeterminados. La configuración no
-admite comodines. Incluir de forma explícita los hosts de redirección admitidos.
+admite comodines en hosts exactos. Para las URL efímeras del proveedor YouTube,
+su transporte interno admite únicamente subdominios de googlevideo.com mediante
+una política de sufijo con límite de etiqueta, además de comprobar DNS/IP en cada
+conexión. La entrada directa mantiene hosts exactos y exige extensión MP4/MOV.
 
 `authorize(requestContext)` debe verificar el token de Firebase y la pertenencia
 actual a una organización en servidor y devolver `{orgId, actorId}`. No basta con
@@ -84,11 +94,12 @@ reintento y **no reemplaza** el checksum del archivo. Cambiar una URL firmada ex
 un intento nuevo. El bloqueo en memoria solo evita trabajo concurrente dentro
 del proceso: la garantía duradera corresponde al adaptador atómico de Storage.
 
-La capa HTTP pendiente debe extraer el token al contexto de servidor, propagar
-desconexión/cancelación, limitar peticiones por usuario y organización y mapear
-los errores `import/*` a respuestas aptas para el navegador. Nunca registrar URL
-firmadas, tokens o errores brutos de red/ffprobe. La aplicación cliente requiere
-un adaptador HTTP a este servicio; no debe importar ningún módulo de `server/`.
+La capa HTTP preparada en PCIT-141 extrae el token al contexto de servidor,
+propaga cancelación y mapea errores `import/*`. El alojamiento pendiente debe
+conectar la desconexión y limitar peticiones por usuario y organización. Nunca
+registrar URL firmadas, tokens o errores brutos de red/ffprobe. El adaptador del
+navegador sigue deshabilitado hasta verificar la integración; no importa módulos
+de `server/`.
 
 ## Pruebas y límites
 
@@ -106,11 +117,13 @@ entrega no lo descarga ni ejecuta binarios de terceros.
 
 1. Acordar con Axel el alojamiento, Auth, adaptador atómico de Storage, rutas,
    límites, hosts, cuotas y configuración de ffprobe (PCIT-20/21/22/23/24).
-2. Implementar y probar API + adaptador de navegador, errores y progreso. Mantener
-   enlaces deshabilitados en producción hasta verificar ese recorrido.
-3. Añadir el proveedor de videos públicos de **YouTube**, incluyendo videos
-   privados/no disponibles y límites reales. El descargador actual rechaza páginas
-   YouTube; no se presenta como soporte de ese proveedor.
+2. Montar y verificar API + adaptador de navegador preparados por PCIT-141,
+   errores y progreso. Mantener enlaces deshabilitados en producción hasta
+   verificar ese recorrido.
+3. Instalar/configurar y verificar el proveedor de **YouTube** preparado por
+   PCIT-141, incluyendo errores de disponibilidad y límites reales. El transporte
+   directo rechaza páginas YouTube; el selector de origen usa el resolver dedicado.
+   No se presenta una prueba con metadatos simulados como una importación real.
 4. Verificar con un MP4 y un MOV reales, Firebase/emulador y el worker de PCIT-35,
    hasta `matches` y Dashboard. Los ejemplos de `/analizar.html` siguen sin
    transferir archivos ni enlaces.
