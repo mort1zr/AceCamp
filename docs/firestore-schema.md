@@ -1,10 +1,10 @@
 # Esquema de Firestore · PCIT-22
 
 Contrato único entre la **web** (`web/`) y el **worker del modelo** (`model/`, PCIT-35).
-Las constantes de este documento están en [`web/src/lib/schema.js`](../web/src/lib/schema.js).
+Las constantes de este documento están en [`web/src/panel/lib/schema.js`](../web/src/panel/lib/schema.js).
 Si cambias un campo, actualiza los dos archivos y avisa en Jira.
 
-**Versión:** 1 · **Responsable:** Axel (PCIT-22) · **Reglas de acceso:** [`firestore.rules`](../firestore.rules) (PCIT-23)
+**Versión:** 1 · **Responsable:** Axel (PCIT-22) · **Reglas de acceso:** [`firestore.rules`](../firebase/firestore.rules) (PCIT-23)
 
 ## Qué permiten las reglas (PCIT-23)
 

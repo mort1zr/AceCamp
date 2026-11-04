@@ -5,7 +5,7 @@ import { deleteApp, initializeApp } from 'firebase/app'
 import { connectAuthEmulator, getAuth } from 'firebase/auth'
 import { connectFirestoreEmulator, doc, getDoc, getFirestore } from 'firebase/firestore'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createAuthService } from '../../src/lib/auth.js'
+import { createAuthService } from '../../src/panel/lib/auth.js'
 
 const PROJECT = 'demo-acecam'
 const HOST = '127.0.0.1'

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { access } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../src/lib/firebaseConfig.js'
+import { EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../src/panel/lib/firebaseConfig.js'
 
 const [directory, option] = process.argv.slice(2)
 if (!directory || (option && option !== '--once') || process.argv.length > 4) {

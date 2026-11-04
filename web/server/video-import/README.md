@@ -6,7 +6,7 @@ validación sin sustituir Firebase/Auth/Storage de Axel ni el worker de Aaron.
 
 La continuación PCIT-141 agrega `http.js`, manejador Web Request → Response,
 y el adaptador de navegador. Su contrato, activación y pendientes se describen
-en [VIDEO_IMPORT_HTTP.md](../../src/lib/services/VIDEO_IMPORT_HTTP.md).
+en [VIDEO_IMPORT_HTTP.md](../../src/panel/lib/services/VIDEO_IMPORT_HTTP.md).
 Todavía no se monta ni despliega una API real.
 El proveedor de YouTube preparado en la misma tarea se detalla en
 [YOUTUBE.md](YOUTUBE.md), con sus requisitos de ejecución y verificación pendiente.

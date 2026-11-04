@@ -1,4 +1,4 @@
-import { awaitWithAbort, isStorageVideoPath, readLimitedJson, VIDEO_IMPORT_MESSAGES } from '../../src/lib/videoImportProtocol.js'
+import { awaitWithAbort, isStorageVideoPath, readLimitedJson, VIDEO_IMPORT_MESSAGES } from '../../src/panel/lib/videoImportProtocol.js'
 
 const statuses = {
   'import/source': 400, 'import/input': 400, 'import/destination': 400, 'import/redirect': 400,

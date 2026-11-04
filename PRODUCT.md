@@ -29,7 +29,7 @@ Proyecto de carrera de un equipo de 4 personas, gestionado en Jira (proyecto PCI
 - Los precios de los planes siguen como `[PRECIO]`.
 
 ## Brand Commitments
-Nombre AceCam, en español. Paleta y tipografías definidas en `web/src/styles/theme.css`. Look deportivo y de métricas, con referencia a las tarjetas de jugador de FIFA.
+Nombre AceCam, en español. Paleta y tipografías definidas en `web/src/compartido/styles/theme.css`. Look deportivo y de métricas, con referencia a las tarjetas de jugador de FIFA.
 
 ## Evidence on Hand
 Todavía no hay testimonios, clientes ni métricas reales. Los testimonios quedan como espacios para el piloto; no se inventan.
