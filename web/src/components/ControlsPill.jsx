@@ -1,31 +1,32 @@
-import { useState } from 'react'
 import { Link } from 'react-router'
 import { useTheme } from '../hooks/useTheme.js'
+import { useIdioma } from '../lib/idioma.jsx'
 
-const LANG_KEY = 'acecam-lang'
-
-function readLang() {
-  try {
-    return localStorage.getItem(LANG_KEY) === 'en' ? 'en' : 'es'
-  } catch {
-    return 'es'
-  }
+const textos = {
+  es: {
+    temaOscuro: 'Activar tema oscuro',
+    temaClaro: 'Activar tema claro',
+    tituloOscuro: 'Tema oscuro',
+    tituloClaro: 'Tema claro',
+    idioma: 'Cambiar idioma a inglés',
+    tituloIdioma: 'Idioma',
+    ingresar: 'Ingresar',
+  },
+  en: {
+    temaOscuro: 'Switch to dark theme',
+    temaClaro: 'Switch to light theme',
+    tituloOscuro: 'Dark theme',
+    tituloClaro: 'Light theme',
+    idioma: 'Cambiar idioma a español',
+    tituloIdioma: 'Language',
+    ingresar: 'Log in',
+  },
 }
 
 export default function ControlsPill({ ocultarIngreso = false, className = '' }) {
   const { toggleTheme, isLight } = useTheme()
-  const [lang, setLang] = useState(readLang)
-
-  const toggleLang = () => {
-    const next = lang === 'es' ? 'en' : 'es'
-    setLang(next)
-    document.documentElement.lang = next
-    try {
-      localStorage.setItem(LANG_KEY, next)
-    } catch {
-      return
-    }
-  }
+  const { idioma, cambiarIdioma } = useIdioma()
+  const t = textos[idioma]
 
   const control =
     'inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-muted transition-colors hover:bg-accent/10 hover:text-accent-ink'
@@ -37,8 +38,8 @@ export default function ControlsPill({ ocultarIngreso = false, className = '' })
       <button
         type="button"
         onClick={toggleTheme}
-        aria-label={isLight ? 'Activar tema oscuro' : 'Activar tema claro'}
-        title={isLight ? 'Tema oscuro' : 'Tema claro'}
+        aria-label={isLight ? t.temaOscuro : t.temaClaro}
+        title={isLight ? t.tituloOscuro : t.tituloClaro}
         className={control}
       >
         {isLight ? (
@@ -74,9 +75,9 @@ export default function ControlsPill({ ocultarIngreso = false, className = '' })
       </button>
       <button
         type="button"
-        onClick={toggleLang}
-        aria-label={lang === 'es' ? 'Cambiar idioma a inglés' : 'Switch language to Spanish'}
-        title={lang === 'es' ? 'Idioma' : 'Language'}
+        onClick={cambiarIdioma}
+        aria-label={t.idioma}
+        title={t.tituloIdioma}
         className={control}
       >
         <svg
@@ -104,7 +105,7 @@ export default function ControlsPill({ ocultarIngreso = false, className = '' })
             : 'max-w-28 px-3.5 opacity-100'
         }`}
       >
-        Ingresar
+        {t.ingresar}
       </Link>
     </div>
   )

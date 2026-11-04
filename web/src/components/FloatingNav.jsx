@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router'
+import { useTextos } from '../lib/idioma.jsx'
 import { irAlInicio } from '../lib/smoothScroll.js'
 import Icon from './Icon.jsx'
 import LinkDeslizante from './LinkDeslizante.jsx'
@@ -10,13 +11,31 @@ const EXPANDIR_MS = 500
 const CERRAR_MS = 220
 
 const enlaces = [
-  { to: '/', label: 'Inicio', className: 'hidden sm:block', alInicio: true },
-  { to: '/precios', label: 'Precios', desliza: true },
-  { to: '/login', label: 'Ingresar' },
+  { to: '/', clave: 'inicio', className: 'hidden sm:block', alInicio: true },
+  { to: '/precios', clave: 'precios', desliza: true },
+  { to: '/login', clave: 'ingresar' },
 ]
+
+const textos = {
+  es: {
+    inicio: 'Inicio',
+    precios: 'Precios',
+    ingresar: 'Ingresar',
+    navegacion: 'Navegación principal',
+    empezar: 'Empieza gratis',
+  },
+  en: {
+    inicio: 'Home',
+    precios: 'Pricing',
+    ingresar: 'Log in',
+    navegacion: 'Main navigation',
+    empezar: 'Start free',
+  },
+}
 
 export default function FloatingNav({ onExpandir }) {
   const { pathname } = useLocation()
+  const t = useTextos(textos)
   const [visible, setVisible] = useState(false)
   const [expandido, setExpandido] = useState(false)
   const [anchoMenu, setAnchoMenu] = useState(0)
@@ -79,7 +98,7 @@ export default function FloatingNav({ onExpandir }) {
 
   return (
     <nav
-      aria-label="Navegación principal"
+      aria-label={t.navegacion}
       aria-hidden={!visible}
       className={`fixed z-40 flex items-center rounded-full border transition-[background-color,border-color,box-shadow] duration-300 ${
         expandido
@@ -103,7 +122,7 @@ export default function FloatingNav({ onExpandir }) {
             const Enlace = desliza ? LinkDeslizante : Link
             return (
               <li
-                key={enlace.label}
+                key={enlace.clave}
                 className={`transition-opacity ${enlace.className ?? ''} ${
                   expandido ? 'opacity-100 duration-1000' : 'opacity-0 duration-150'
                 }`}
@@ -121,7 +140,7 @@ export default function FloatingNav({ onExpandir }) {
                   tabIndex={expandido ? undefined : -1}
                   className="block rounded-full px-3 py-2 text-[15px] font-medium whitespace-nowrap text-text2 transition-colors hover:text-text"
                 >
-                  {enlace.label}
+                  {t[enlace.clave]}
                 </Enlace>
               </li>
             )
@@ -143,7 +162,7 @@ export default function FloatingNav({ onExpandir }) {
             transition: `width ${EXPANDIR_MS}ms ease, margin ${EXPANDIR_MS}ms ease, opacity 200ms ease`,
           }}
         />
-        Empieza gratis
+        {t.empezar}
         <span
           className="inline-flex overflow-hidden"
           style={{

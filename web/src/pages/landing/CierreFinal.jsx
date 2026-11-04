@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import Icon from '../../components/Icon.jsx'
 import Logo from '../../components/Logo.jsx'
 import { useScrollSpring } from '../../hooks/useScrollSpring.js'
+import { useTextos } from '../../lib/idioma.jsx'
 import {
   BallTile,
   CourtTile,
@@ -53,32 +54,44 @@ const flotantes = [
   },
 ]
 
-const garantias = [
-  { icon: 'shield', texto: 'Tu primer mes es', destacado: 'gratis' },
-  {
-    icon: 'noCamera',
-    texto: 'Sin cámaras especiales',
-    destacado: 'ni hardware específico',
+const textos = {
+  es: {
+    titulo: 'El próximo partido recibe datos y deja las dudas',
+    lead: 'Solo sube un video y recibe un reporte de AceCam para tu equipo.',
+    boton: 'Empieza ahora',
+    garantias: [
+      { icon: 'shield', texto: 'Tu primer mes es', destacado: 'gratis' },
+      { icon: 'noCamera', texto: 'Sin cámaras especiales', destacado: 'ni hardware específico' },
+    ],
   },
-]
+  en: {
+    titulo: 'Your next match brings data and leaves the doubts behind',
+    lead: 'Just upload a video and get an AceCam report for your team.',
+    boton: 'Start now',
+    garantias: [
+      { icon: 'shield', texto: 'Your first month is', destacado: 'free' },
+      { icon: 'noCamera', texto: 'No special cameras', destacado: 'or specific hardware' },
+    ],
+  },
+}
 
 function Invitacion() {
+  const t = useTextos(textos)
+
   return (
     <div>
-      <h2 className="text-4xl sm:text-5xl">El próximo partido recibe datos y deja las dudas</h2>
-      <p className="mt-4 text-text2">
-        Solo sube un video y recibe un reporte de AceCam para tu equipo.
-      </p>
+      <h2 className="text-4xl sm:text-5xl">{t.titulo}</h2>
+      <p className="mt-4 text-text2">{t.lead}</p>
 
       <Link
         to="/registro"
         className="mt-8 inline-flex items-center justify-center rounded-full bg-accent px-8 py-3 text-lg font-semibold text-on-accent transition-opacity hover:opacity-90"
       >
-        Empieza ahora
+        {t.boton}
       </Link>
 
       <ul className="mt-8 space-y-2.5">
-        {garantias.map((garantia) => (
+        {t.garantias.map((garantia) => (
           <li
             key={garantia.icon}
             className="flex items-center justify-center gap-2.5 text-base text-muted"

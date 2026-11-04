@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App.jsx'
 import './index.css'
+import { IdiomaProvider } from './lib/idioma.jsx'
 import { startSmoothScroll } from './lib/smoothScroll.js'
 import { applyTheme, resolveInitialTheme } from './lib/theme.js'
 
@@ -13,8 +14,10 @@ startSmoothScroll()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <IdiomaProvider>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </IdiomaProvider>
   </StrictMode>,
 )

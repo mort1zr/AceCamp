@@ -2,6 +2,7 @@ import Button from '../../components/Button.jsx'
 import Icon from '../../components/Icon.jsx'
 import Logo from '../../components/Logo.jsx'
 import MetalPill from '../../components/MetalPill.jsx'
+import { useTextos } from '../../lib/idioma.jsx'
 import HeroMock from './HeroMock.jsx'
 import HeroTiles from './HeroTiles.jsx'
 
@@ -27,13 +28,37 @@ function CourtLines() {
   )
 }
 
+const textos = {
+  es: {
+    nuevo: 'Nuevo',
+    pastilla: 'Analiza desde un link de YouTube',
+    antes: 'Convierte cualquier partido en',
+    resaltado: 'estadísticas',
+    despues: 'a nivel profesional',
+    lead: 'Solo sube un video o un link de YouTube. AceCam lo analiza por ti.',
+    empezar: 'Empieza gratis',
+    demo: 'Ver demo',
+  },
+  en: {
+    nuevo: 'New',
+    pastilla: 'Analyze from a YouTube link',
+    antes: 'Turn any match into pro-level',
+    resaltado: 'stats',
+    despues: '',
+    lead: 'Just upload a video or a YouTube link. AceCam analyzes it for you.',
+    empezar: 'Start free',
+    demo: 'Watch demo',
+  },
+}
+
 export default function Hero() {
+  const t = useTextos(textos)
   return (
     <section className="relative overflow-hidden px-6 pt-10">
       <div className="relative mx-auto max-w-6xl">
         <div className="flex flex-col items-center gap-4 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-0">
           <Logo size={52} wordmarkClassName="text-4xl" className="gap-3" />
-          <MetalPill badge="Nuevo">Analiza desde un link de YouTube</MetalPill>
+          <MetalPill badge={t.nuevo}>{t.pastilla}</MetalPill>
         </div>
 
         <div
@@ -45,21 +70,21 @@ export default function Hero() {
 
           <div className="relative z-20 mx-auto max-w-3xl py-6 text-center">
             <h1 className="text-5xl leading-[1.14] sm:text-6xl lg:text-[clamp(3.5rem,8vh,4.5rem)]">
-              Convierte cualquier partido en{' '}
+              {t.antes}{' '}
               <span className="rounded-2xl bg-accent px-2.5 whitespace-nowrap text-on-accent">
-                estadísticas
+                {t.resaltado}
               </span>{' '}
-              a nivel profesional
+              {t.despues}
             </h1>
 
             <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-text2 sm:text-xl">
-              Solo sube un video o un link de YouTube. AceCam lo analiza por ti.
+              {t.lead}
             </p>
 
             <div className="mt-7 flex flex-col items-center gap-4">
               <Button to="/precios" desliza size="lg" data-nav-cta>
                 <span className="size-1.5 rounded-full bg-on-accent" />
-                Empieza gratis
+                {t.empezar}
               </Button>
               <a
                 href="#video-demo"
@@ -68,7 +93,7 @@ export default function Hero() {
                 <span className="grid size-8 place-content-center rounded-full border border-line2 bg-surface text-text transition-colors group-hover:border-accent-line group-hover:text-accent-ink">
                   <Icon name="play" size={13} strokeWidth={2.2} />
                 </span>
-                Ver demo
+                {t.demo}
               </a>
             </div>
           </div>

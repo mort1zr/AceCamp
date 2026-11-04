@@ -1,61 +1,92 @@
 import { Fragment, memo, useEffect, useRef, useState } from 'react'
 import Icon from '../../components/Icon.jsx'
 import { rallyLocal } from '../../lib/rallyLocal.js'
+import { useIdioma } from '../../lib/idioma.jsx'
 import { createTrack } from '../../lib/track.js'
 
-const titulo = 'Cada partido tiene datos. Nadie los está *midiendo*.'
+const textos = {
+  es: {
+    titulo: 'Cada partido tiene datos. Nadie los está *midiendo*.',
+    problemas: [
+      'Revisar un partido toma *horas*.',
+      'Los apuntes manuales dejan la *mitad* del partido fuera.',
+      'Sin datos, cada decisión es una *apuesta*.',
+    ],
+    subtitulo: 'Con *AceCam*, solo necesitas tres pasos:',
+    pasos: [
+      { icon: 'upload', title: 'Sube el video', text: 'Un archivo o un link de YouTube.' },
+      {
+        icon: 'ai',
+        title: '*AceCam* lo analiza por ti',
+        text: 'Detecta recorrido, saques y golpes.',
+      },
+      { icon: 'report', title: 'Tú recibes el reporte', text: 'Estadísticas, clips y PDF.' },
+    ],
+  },
+  en: {
+    titulo: 'Every match has data. Nobody is *measuring* it.',
+    problemas: [
+      'Reviewing a match takes *hours*.',
+      'Handwritten notes leave *half* the match out.',
+      'Without data, every decision is a *gamble*.',
+    ],
+    subtitulo: 'With *AceCam*, you only need three steps:',
+    pasos: [
+      { icon: 'upload', title: 'Upload the video', text: 'A file or a YouTube link.' },
+      {
+        icon: 'ai',
+        title: '*AceCam* analyzes it for you',
+        text: 'Detects movement, serves and shots.',
+      },
+      { icon: 'report', title: 'You get the report', text: 'Stats, clips and PDF.' },
+    ],
+  },
+}
 
-const problemas = [
-  'Revisar un partido toma *horas*.',
-  'Los apuntes manuales dejan la *mitad* del partido fuera.',
-  'Sin datos, cada decisión es una *apuesta*.',
-]
+function preparar({ titulo, problemas, subtitulo, pasos }) {
+  const crudas = [
+    titulo,
+    ...problemas,
+    subtitulo,
+    ...pasos.flatMap((paso) => [paso.title, paso.text]),
+  ]
 
-const subtitulo = 'Con *AceCam*, solo necesitas tres pasos:'
+  const piezas = crudas.map((pieza) => pieza.replaceAll('*', ''))
 
-const pasos = [
-  { icon: 'upload', title: 'Sube el video', text: 'Un archivo o un link de YouTube.' },
-  { icon: 'ai', title: '*AceCam* lo analiza por ti', text: 'Detecta recorrido, saques y golpes.' },
-  { icon: 'report', title: 'Tú recibes el reporte', text: 'Estadísticas, clips y PDF.' },
-]
+  const enfasis = crudas.map(
+    (pieza) =>
+      new Set(
+        pieza
+          .split(' ')
+          .map((palabra, posicion) => (palabra.includes('*') ? posicion : -1))
+          .filter((posicion) => posicion >= 0),
+      ),
+  )
 
-const crudas = [
-  titulo,
-  ...problemas,
-  subtitulo,
-  ...pasos.flatMap((paso) => [paso.title, paso.text]),
-]
+  const inicios = piezas.reduce((acumulado, pieza, indice) => {
+    acumulado.push(indice === 0 ? 0 : acumulado[indice - 1] + piezas[indice - 1].length)
+    return acumulado
+  }, [])
 
-const piezas = crudas.map((pieza) => pieza.replaceAll('*', ''))
-
-const enfasis = crudas.map(
-  (pieza) =>
-    new Set(
-      pieza
-        .split(' ')
-        .map((palabra, posicion) => (palabra.includes('*') ? posicion : -1))
-        .filter((posicion) => posicion >= 0),
-    ),
-)
-
-const inicios = piezas.reduce((acumulado, pieza, indice) => {
-  acumulado.push(indice === 0 ? 0 : acumulado[indice - 1] + piezas[indice - 1].length)
-  return acumulado
-}, [])
-
-const palabras = piezas.flatMap((pieza, indice) => {
-  let desde = inicios[indice]
-  return pieza.split(' ').map((palabra) => {
-    const inicio = desde
-    desde += palabra.length + 1
-    return { inicio, largo: palabra.length }
+  const palabras = piezas.flatMap((pieza, indice) => {
+    let desde = inicios[indice]
+    return pieza.split(' ').map((palabra) => {
+      const inicio = desde
+      desde += palabra.length + 1
+      return { inicio, largo: palabra.length }
+    })
   })
-})
 
-const TOTAL = inicios.at(-1) + piezas.at(-1).length
+  const total = inicios.at(-1) + piezas.at(-1).length
+
+  return { problemas, pasos, piezas, enfasis, inicios, palabras, total }
+}
+
+const datos = { es: preparar(textos.es), en: preparar(textos.en) }
+
 const CARET_EN_PANTALLA = 0.6
 const SCROLL_POR_PX = 0.8
-const RECORRIDO_INICIAL = TOTAL * 9
+const RECORRIDO_INICIAL = 9
 const FIJAR = '(min-width: 1024px) and (min-height: 640px)'
 const TOPE_FIJO = 64
 const ARCO = 34
@@ -129,7 +160,7 @@ function useAvance(seccionRef, contenidoRef) {
   return { avance, fijo }
 }
 
-function useRecorridoLocal(fijoRef, activo) {
+function useRecorridoLocal(fijoRef, activo, d) {
   const [recorrido, setRecorrido] = useState(null)
 
   useEffect(() => {
@@ -182,17 +213,17 @@ function useRecorridoLocal(fijoRef, activo) {
     observador.observe(caja)
     document.fonts?.ready.then(construir)
     return () => observador.disconnect()
-  }, [fijoRef, activo])
+  }, [fijoRef, activo, d])
 
   return recorrido
 }
 
-function escritosEn(recorrido, largo) {
+function escritosEn(d, recorrido, largo) {
   const { largos } = recorrido
   const indice = largos.findIndex((hasta) => largo < hasta)
-  if (indice === -1 || indice >= palabras.length) return TOTAL
+  if (indice === -1 || indice >= d.palabras.length) return d.total
   const desde = Math.max(indice === 0 ? 0 : largos[indice - 1], largos[indice] - TIPEO_PX)
-  const palabra = palabras[indice]
+  const palabra = d.palabras[indice]
   const tramo = limitar((largo - desde) / (largos[indice] - desde))
   return palabra.inicio + Math.round(tramo * palabra.largo)
 }
@@ -205,22 +236,22 @@ function Pelota() {
   )
 }
 
-const Pieza = memo(function Pieza({ indice, escritos }) {
-  const texto = piezas[indice]
-  let desde = inicios[indice]
+const Pieza = memo(function Pieza({ d, indice, escritos }) {
+  const texto = d.piezas[indice]
+  let desde = d.inicios[indice]
 
   return texto.split(' ').map((palabra, posicion) => {
     const inicio = desde
     desde += palabra.length + 1
     const visibles = Math.min(Math.max(escritos - inicio, 0), palabra.length)
-    const conCaret = escritos > 0 && escritos < TOTAL && escritos >= inicio && escritos < desde
+    const conCaret = escritos > 0 && escritos < d.total && escritos >= inicio && escritos < desde
 
     return (
       <Fragment key={inicio}>
         {posicion > 0 ? ' ' : null}
         <span
           data-word={inicio}
-          className={enfasis[indice].has(posicion) ? 'text-accent-ink' : undefined}
+          className={d.enfasis[indice].has(posicion) ? 'text-accent-ink' : undefined}
         >
           {palabra.slice(0, visibles)}
           <span className="opacity-0">{palabra.slice(visibles)}</span>
@@ -231,26 +262,27 @@ const Pieza = memo(function Pieza({ indice, escritos }) {
   })
 })
 
-function Escrito({ indice, escritos }) {
-  const inicio = inicios[indice]
-  const fin = inicio + piezas[indice].length
+function Escrito({ d, indice, escritos }) {
+  const inicio = d.inicios[indice]
+  const fin = inicio + d.piezas[indice].length
   const local = escritos < inicio ? inicio - 1 : escritos > fin ? fin + 1 : escritos
-  return <Pieza indice={indice} escritos={local} />
+  return <Pieza d={d} indice={indice} escritos={local} />
 }
 
 export default function Problema() {
   const seccionRef = useRef(null)
   const contenidoRef = useRef(null)
   const fijoRef = useRef(null)
+  const d = datos[useIdioma().idioma]
   const { avance, fijo } = useAvance(seccionRef, contenidoRef)
-  const recorrido = useRecorridoLocal(fijoRef, fijo)
+  const recorrido = useRecorridoLocal(fijoRef, fijo, d)
   const largo = fijo && recorrido ? avance * recorrido.total : 0
   const escritos = fijo
     ? recorrido
-      ? escritosEn(recorrido, largo)
+      ? escritosEn(d, recorrido, largo)
       : 0
-    : Math.round(avance * TOTAL)
-  const recorridoPx = recorrido ? recorrido.total * SCROLL_POR_PX : RECORRIDO_INICIAL
+    : Math.round(avance * d.total)
+  const recorridoPx = recorrido ? recorrido.total * SCROLL_POR_PX : d.total * RECORRIDO_INICIAL
 
   useEffect(() => {
     window.dispatchEvent(new Event('rally:local'))
@@ -288,34 +320,34 @@ export default function Problema() {
 
         <div ref={contenidoRef} className="relative mx-auto w-full max-w-6xl text-center">
           <h2 className="mx-auto max-w-3xl text-4xl sm:text-5xl">
-            <Escrito indice={siguiente()} escritos={escritos} />
+            <Escrito d={d} indice={siguiente()} escritos={escritos} />
           </h2>
 
           <ul className="mx-auto mt-6 max-w-3xl space-y-2">
-            {problemas.map((problema) => (
+            {d.problemas.map((problema) => (
               <li
                 key={problema}
                 className="font-display text-2xl leading-snug font-semibold text-text2 sm:text-3xl"
               >
-                <Escrito indice={siguiente()} escritos={escritos} />
+                <Escrito d={d} indice={siguiente()} escritos={escritos} />
               </li>
             ))}
           </ul>
 
           <h3 id="la-solucion" className="mt-12 text-3xl sm:text-4xl">
-            <Escrito indice={siguiente()} escritos={escritos} />
+            <Escrito d={d} indice={siguiente()} escritos={escritos} />
           </h3>
 
           <ol className="relative mt-8 grid gap-8 text-left sm:grid-cols-3 sm:text-center">
             <span className="absolute top-6 right-1/6 left-1/6 hidden h-px bg-line2 sm:block" />
-            {pasos.map((paso) => {
+            {d.pasos.map((paso) => {
               const tituloIndice = siguiente()
               const textoIndice = siguiente()
-              const activo = escritos > inicios[tituloIndice]
+              const activo = escritos > d.inicios[tituloIndice]
 
               return (
                 <li
-                  key={paso.title}
+                  key={paso.icon}
                   className="relative flex items-start gap-4 sm:flex-col sm:items-center"
                 >
                   <span
@@ -327,10 +359,10 @@ export default function Problema() {
                   </span>
                   <div>
                     <p className="font-display text-xl font-semibold">
-                      <Escrito indice={tituloIndice} escritos={escritos} />
+                      <Escrito d={d} indice={tituloIndice} escritos={escritos} />
                     </p>
                     <p className="mt-1 text-sm text-text2">
-                      <Escrito indice={textoIndice} escritos={escritos} />
+                      <Escrito d={d} indice={textoIndice} escritos={escritos} />
                     </p>
                   </div>
                 </li>

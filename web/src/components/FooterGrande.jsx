@@ -1,4 +1,5 @@
 import { Link } from 'react-router'
+import { useTextos } from '../lib/idioma.jsx'
 import Icon from './Icon.jsx'
 import LinkDeslizante from './LinkDeslizante.jsx'
 
@@ -6,54 +7,82 @@ const year = new Date().getFullYear()
 
 const columnas = [
   [
-    { to: '/', label: 'Inicio', desliza: true },
-    { to: '/precios', label: 'Precios', actual: true },
-    { to: '/registro', label: 'Crear cuenta' },
+    { to: '/', clave: 'inicio', desliza: true },
+    { to: '/precios', clave: 'precios', actual: true },
+    { to: '/registro', clave: 'registro' },
   ],
   [
-    { to: '/terminos', label: 'Términos' },
-    { to: '/privacidad', label: 'Privacidad' },
-    { href: 'mailto:consultas@acecam.com', label: 'Contacto' },
+    { to: '/terminos', clave: 'terminos' },
+    { to: '/privacidad', clave: 'privacidad' },
+    { href: 'mailto:consultas@acecam.com', clave: 'contacto' },
   ],
 ]
+
+const textos = {
+  es: {
+    inicio: 'Inicio',
+    precios: 'Precios',
+    registro: 'Crear cuenta',
+    terminos: 'Términos',
+    privacidad: 'Privacidad',
+    contacto: 'Contacto',
+    sigue: 'Sigue a AceCam',
+    novedades: 'con todas sus novedades',
+    pie: 'Pie de página',
+    lugar: 'Lima, Perú',
+  },
+  en: {
+    inicio: 'Home',
+    precios: 'Pricing',
+    registro: 'Sign up',
+    terminos: 'Terms',
+    privacidad: 'Privacy',
+    contacto: 'Contact',
+    sigue: 'Follow AceCam',
+    novedades: 'and all its updates',
+    pie: 'Footer',
+    lugar: 'Lima, Peru',
+  },
+}
 
 const redes = [
   { href: 'https://instagram.com/acecam', label: 'Instagram', icon: 'instagram' },
   { href: 'https://tiktok.com/@acecam', label: 'TikTok', icon: 'tiktok' },
 ]
 
-function Enlace({ enlace }) {
+function Enlace({ enlace, texto }) {
   const clases = `transition-colors ${enlace.actual ? 'text-accent-ink' : 'text-text hover:text-accent-ink'}`
   if (enlace.href) {
     return (
       <a href={enlace.href} className={clases}>
-        {enlace.label}
+        {texto}
       </a>
     )
   }
   if (enlace.desliza) {
     return (
       <LinkDeslizante to={enlace.to} sentido="atras" className={clases}>
-        {enlace.label}
+        {texto}
       </LinkDeslizante>
     )
   }
   return (
     <Link to={enlace.to} aria-current={enlace.actual ? 'page' : undefined} className={clases}>
-      {enlace.label}
+      {texto}
     </Link>
   )
 }
 
 export default function FooterGrande() {
+  const t = useTextos(textos)
   return (
     <footer className="relative overflow-hidden">
       <div className="relative z-10 mx-auto flex max-w-4xl flex-col gap-12 px-6 pt-24 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="font-display text-4xl leading-tight sm:text-5xl">
-            Sigue a AceCam
+            {t.sigue}
             <br />
-            con todas sus novedades
+            {t.novedades}
           </p>
           <ul className="mt-6 flex gap-3">
             {redes.map((red) => (
@@ -73,14 +102,14 @@ export default function FooterGrande() {
         </div>
 
         <nav
-          aria-label="Pie de página"
+          aria-label={t.pie}
           className="flex gap-16 border-l border-line3 pl-8 text-base font-medium"
         >
           {columnas.map((columna, indice) => (
             <ul key={indice} className="space-y-3">
               {columna.map((enlace) => (
-                <li key={enlace.label}>
-                  <Enlace enlace={enlace} />
+                <li key={enlace.clave}>
+                  <Enlace enlace={enlace} texto={t[enlace.clave]} />
                 </li>
               ))}
             </ul>
@@ -108,7 +137,9 @@ export default function FooterGrande() {
         </span>
       </div>
 
-      <p className="py-6 text-center text-xs text-muted">© {year} AceCam · Lima, Perú</p>
+      <p className="py-6 text-center text-xs text-muted">
+        © {year} AceCam · {t.lugar}
+      </p>
     </footer>
   )
 }

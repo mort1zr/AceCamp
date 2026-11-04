@@ -2,10 +2,28 @@ import { useRef, useState } from 'react'
 import Icon from '../../components/Icon.jsx'
 import Reveal from '../../components/Reveal.jsx'
 import Section from '../../components/Section.jsx'
+import { useTextos } from '../../lib/idioma.jsx'
 
 const VIDEO = '/demo.mp4'
 
+const textos = {
+  es: {
+    titulo: 'Así funciona',
+    lead: 'Sube tu partido, AceCam se encarga por ti.',
+    reproducir: 'Reproducir video',
+    pronto: 'Video muy pronto',
+  },
+  en: {
+    titulo: 'How',
+    tituloFin: 'works',
+    lead: 'Upload your match, AceCam takes care of the rest.',
+    reproducir: 'Play video',
+    pronto: 'Video coming soon',
+  },
+}
+
 export default function Demo() {
+  const t = useTextos(textos)
   const videoRef = useRef(null)
   const [reproduciendo, setReproduciendo] = useState(false)
 
@@ -19,10 +37,11 @@ export default function Demo() {
       id="como-funciona"
       title={
         <>
-          Así funciona <span className="text-accent-ink">AceCam</span>
+          {t.titulo} <span className="text-accent-ink">AceCam</span>
+          {t.tituloFin ? ` ${t.tituloFin}` : null}
         </>
       }
-      lead="Sube tu partido, AceCam se encarga por ti."
+      lead={t.lead}
       align="center"
     >
       <Reveal className="relative mx-auto mt-12 max-w-5xl">
@@ -44,7 +63,7 @@ export default function Demo() {
                   <button
                     type="button"
                     onClick={reproducir}
-                    aria-label="Reproducir video"
+                    aria-label={t.reproducir}
                     className="group absolute inset-0 grid place-content-center"
                   >
                     <span className="grid size-20 place-content-center rounded-full bg-accent text-on-accent shadow-tile transition-transform group-hover:scale-110">
@@ -65,7 +84,7 @@ export default function Demo() {
                   <Icon name="play" size={30} strokeWidth={2.2} />
                 </span>
                 <p className="font-display text-sm tracking-[0.18em] text-muted uppercase">
-                  Video muy pronto
+                  {t.pronto}
                 </p>
               </div>
             )}

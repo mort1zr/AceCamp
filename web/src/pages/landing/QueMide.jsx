@@ -2,57 +2,53 @@ import Card from '../../components/Card.jsx'
 import Icon from '../../components/Icon.jsx'
 import Reveal from '../../components/Reveal.jsx'
 import Section from '../../components/Section.jsx'
+import { useTextos } from '../../lib/idioma.jsx'
 
 const metricas = [
-  {
-    icon: 'serve',
-    label: 'Saque más rápido',
-    value: '184',
-    unit: 'km/h',
-    tone: 'text-series1',
-    detail: 'Velocidad estimada del saque más fuerte del partido.',
-  },
-  {
-    icon: 'percent',
-    label: 'Primeros saques',
-    value: '68',
-    unit: '%',
-    tone: 'text-electric-ink',
-    detail: 'Cuántos primeros saques entraron.',
-  },
-  {
-    icon: 'fault',
-    label: 'Dobles faltas',
-    value: '4',
-    unit: '',
-    tone: 'text-bad',
-    detail: 'Puntos regalados en el servicio.',
-  },
-  {
-    icon: 'racket',
-    label: 'Derecha vs. revés',
-    value: '62/38',
-    unit: '',
-    tone: 'text-series3',
-    detail: 'Reparto de golpes por lado.',
-  },
-  {
-    icon: 'rally',
-    label: 'Peloteos',
-    value: '9.4',
-    unit: 'golpes',
-    tone: 'text-series4',
-    detail: 'Promedio de golpes por punto.',
-  },
-  {
-    icon: 'distance',
-    label: 'Distancia recorrida',
-    value: '3.2',
-    unit: 'km',
-    tone: 'text-good',
-    detail: 'Cuánto corrió el jugador en la pista.',
-  },
+  { icon: 'serve', value: '184', unit: 'km/h', tone: 'text-series1' },
+  { icon: 'percent', value: '68', unit: '%', tone: 'text-electric-ink' },
+  { icon: 'fault', value: '4', unit: '', tone: 'text-bad' },
+  { icon: 'racket', value: '62/38', unit: '', tone: 'text-series3' },
+  { icon: 'rally', value: '9.4', unit: 'golpes', tone: 'text-series4' },
+  { icon: 'distance', value: '3.2', unit: 'km', tone: 'text-good' },
 ]
+
+const textos = {
+  es: {
+    titulo: 'Lo que tu vista no alcanza,',
+    tituloFin: 'lo hace por ti',
+    lead: 'Cada saque, cada golpe y cada metro recorrido, sacados del video.',
+    ejemplo: 'Ejemplo de un partido',
+    golpes: 'golpes',
+    metricas: [
+      ['Saque más rápido', 'Velocidad estimada del saque más fuerte del partido.'],
+      ['Primeros saques', 'Cuántos primeros saques entraron.'],
+      ['Dobles faltas', 'Puntos regalados en el servicio.'],
+      ['Derecha vs. revés', 'Reparto de golpes por lado.'],
+      ['Peloteos', 'Promedio de golpes por punto.'],
+      ['Distancia recorrida', 'Cuánto corrió el jugador en la pista.'],
+    ],
+    calor: 'Mapa de calor',
+    calorDetalle: 'Dónde estuvo el jugador durante todo el partido.',
+  },
+  en: {
+    titulo: 'What your eyes can’t catch,',
+    tituloFin: 'catches for you',
+    lead: 'Every serve, every shot and every meter covered, pulled from the video.',
+    ejemplo: 'Sample match',
+    golpes: 'shots',
+    metricas: [
+      ['Fastest serve', 'Estimated speed of the hardest serve of the match.'],
+      ['First serves', 'How many first serves went in.'],
+      ['Double faults', 'Points given away on serve.'],
+      ['Forehand vs. backhand', 'Share of shots on each side.'],
+      ['Rallies', 'Average shots per point.'],
+      ['Distance covered', 'How far the player ran on court.'],
+    ],
+    calor: 'Heat map',
+    calorDetalle: 'Where the player was throughout the match.',
+  },
+}
 
 const LARGO = 237.7
 const ANCHO = 109.7
@@ -136,38 +132,39 @@ function CanchaDeCalor() {
 }
 
 export default function QueMide() {
+  const t = useTextos(textos)
+
   return (
     <Section
       id="que-mide"
       title={
         <>
-          Lo que tu vista no alcanza, <span className="text-accent-ink">AceCam</span> lo hace
-          por ti
+          {t.titulo} <span className="text-accent-ink">AceCam</span> {t.tituloFin}
         </>
       }
-      lead="Cada saque, cada golpe y cada metro recorrido, sacados del video."
+      lead={t.lead}
     >
-      <p className="mt-8 font-display text-xs tracking-[0.2em] text-muted uppercase">
-        Ejemplo de un partido
-      </p>
+      <p className="mt-8 font-display text-xs tracking-[0.2em] text-muted uppercase">{t.ejemplo}</p>
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {metricas.map((metrica, index) => (
-          <Reveal key={metrica.label} delay={index * 60}>
+          <Reveal key={metrica.icon} delay={index * 60}>
             <Card className="flex h-full flex-col p-5">
               <span className="text-muted">
                 <Icon name={metrica.icon} />
               </span>
               <p className="mt-4 text-xs font-medium tracking-wide text-muted uppercase">
-                {metrica.label}
+                {t.metricas[index][0]}
               </p>
               <p className={`mt-1 font-display text-4xl leading-none font-bold ${metrica.tone}`}>
                 {metrica.value}
                 {metrica.unit ? (
-                  <span className="ml-1 text-lg font-semibold text-muted">{metrica.unit}</span>
+                  <span className="ml-1 text-lg font-semibold text-muted">
+                    {metrica.unit === 'golpes' ? t.golpes : metrica.unit}
+                  </span>
                 ) : null}
               </p>
-              <p className="mt-3 text-sm text-text2">{metrica.detail}</p>
+              <p className="mt-3 text-sm text-text2">{t.metricas[index][1]}</p>
             </Card>
           </Reveal>
         ))}
@@ -177,12 +174,8 @@ export default function QueMide() {
             <span className="text-muted">
               <Icon name="heatmap" />
             </span>
-            <p className="mt-4 text-xs font-medium tracking-wide text-muted uppercase">
-              Mapa de calor
-            </p>
-            <p className="mt-3 text-sm text-text2">
-              Dónde estuvo el jugador durante todo el partido.
-            </p>
+            <p className="mt-4 text-xs font-medium tracking-wide text-muted uppercase">{t.calor}</p>
+            <p className="mt-3 text-sm text-text2">{t.calorDetalle}</p>
             <CanchaDeCalor />
           </Card>
         </Reveal>

@@ -1,15 +1,35 @@
 import { Link } from 'react-router'
+import { useTextos } from '../lib/idioma.jsx'
 import LinkDeslizante from './LinkDeslizante.jsx'
 import Logo from './Logo.jsx'
 
 const year = new Date().getFullYear()
 
 const links = [
-  { to: '/precios', label: 'Precios', desliza: true },
-  { to: '/registro', label: 'Crear cuenta' },
-  { to: '/terminos', label: 'Términos' },
-  { to: '/privacidad', label: 'Privacidad' },
+  { to: '/precios', clave: 'precios', desliza: true },
+  { to: '/registro', clave: 'registro' },
+  { to: '/terminos', clave: 'terminos' },
+  { to: '/privacidad', clave: 'privacidad' },
 ]
+
+const textos = {
+  es: {
+    precios: 'Precios',
+    registro: 'Crear cuenta',
+    terminos: 'Términos',
+    privacidad: 'Privacidad',
+    pie: 'Pie de página',
+    lugar: 'Lima, Perú',
+  },
+  en: {
+    precios: 'Pricing',
+    registro: 'Sign up',
+    terminos: 'Terms',
+    privacidad: 'Privacy',
+    pie: 'Footer',
+    lugar: 'Lima, Peru',
+  },
+}
 
 const redes = [
   { href: 'https://instagram.com/acecam', label: 'Instagram' },
@@ -17,19 +37,20 @@ const redes = [
 ]
 
 export default function PublicFooter() {
+  const t = useTextos(textos)
   return (
     <footer className="border-t border-line px-6 py-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <Logo />
 
-        <nav aria-label="Pie de página">
+        <nav aria-label={t.pie}>
           <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-text2">
             {links.map(({ desliza, ...link }) => {
               const Enlace = desliza ? LinkDeslizante : Link
               return (
                 <li key={link.to}>
                   <Enlace to={link.to} className="hover:text-text">
-                    {link.label}
+                    {t[link.clave]}
                   </Enlace>
                 </li>
               )
@@ -39,7 +60,9 @@ export default function PublicFooter() {
       </div>
 
       <div className="mx-auto mt-6 flex max-w-6xl flex-col gap-3 border-t border-line pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-        <p>© {year} AceCam · Lima, Perú</p>
+        <p>
+          © {year} AceCam · {t.lugar}
+        </p>
         <ul className="flex flex-wrap gap-x-5 gap-y-2">
           <li>
             <a href="mailto:consultas@acecam.com" className="hover:text-text">

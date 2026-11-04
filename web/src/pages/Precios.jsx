@@ -4,6 +4,7 @@ import Icon from '../components/Icon.jsx'
 import LinkDeslizante from '../components/LinkDeslizante.jsx'
 import FooterGrande from '../components/FooterGrande.jsx'
 import Logo from '../components/Logo.jsx'
+import { useTextos } from '../lib/idioma.jsx'
 
 const INCLINACION = 8
 
@@ -28,92 +29,260 @@ const tonos = {
   },
 }
 
-const planes = [
-  {
-    nombre: 'Básico',
-    para: 'Para jugadores y padres',
-    precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
-    detalle: 'por mes',
-    prueba: {
-      titulo: '1 mes de prueba gratis',
-      limites: ['Hasta 2 jugadores', '15 análisis en el mes', 'Solo videos de YouTube'],
-    },
-    base: 'Con el plan completo:',
-    incluye: [
-      'Hasta 2 jugadores',
-      '30 análisis al mes',
-      'Dashboard completo por jugador',
-      'Videos propios o de YouTube',
-      'Reporte en PDF',
+const textos = {
+  es: {
+    planes: [
+      {
+        nombre: 'Básico',
+        para: 'Para jugadores y padres',
+        precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
+        detalle: 'por mes',
+        prueba: {
+          titulo: '1 mes de prueba gratis',
+          limites: ['Hasta 2 jugadores', '15 análisis en el mes', 'Solo videos de YouTube'],
+        },
+        base: 'Con el plan completo:',
+        incluye: [
+          'Hasta 2 jugadores',
+          '30 análisis al mes',
+          'Dashboard completo por jugador',
+          'Videos propios o de YouTube',
+          'Reporte en PDF',
+        ],
+        accion: { label: 'Prueba gratis', to: '/registro' },
+      },
+      {
+        nombre: 'Pro',
+        para: 'Para entrenadores y reclutadores',
+        precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
+        detalle: 'por mes',
+        popular: true,
+        tono: 'pro',
+        base: 'Todo lo del Básico, más:',
+        incluye: [
+          '150 análisis al mes',
+          'Hasta 24 jugadores',
+          'Comparador de hasta 4 jugadores',
+          'Panel de todo tu equipo',
+          'Bandeja de reclutamiento',
+          'Soporte prioritario',
+        ],
+        accion: { label: 'Empieza ahora', to: '/registro' },
+      },
+      {
+        nombre: 'Ultra',
+        para: 'Para academias, clubes y universidades',
+        precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
+        detalle: 'por mes',
+        tono: 'ultra',
+        base: 'Todo lo de Pro, más:',
+        incluye: ['Muchos más jugadores', 'Muchos más análisis', 'Soporte dedicado'],
+        accion: { label: 'Contáctanos', href: 'mailto:consultas@acecam.com' },
+      },
     ],
-    accion: { label: 'Prueba gratis', to: '/registro' },
-  },
-  {
-    nombre: 'Pro',
-    para: 'Para entrenadores y reclutadores',
-    precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
-    detalle: 'por mes',
-    popular: true,
-    tono: 'pro',
-    base: 'Todo lo del Básico, más:',
-    incluye: [
-      '150 análisis al mes',
-      'Hasta 24 jugadores',
-      'Comparador de hasta 4 jugadores',
-      'Panel de todo tu equipo',
-      'Bandeja de reclutamiento',
-      'Soporte prioritario',
+    comparacion: [
+      {
+        grupo: 'Uso',
+        filas: [
+          { label: 'Prueba gratis de 1 mes', valores: [true, false] },
+          { label: 'Jugadores', valores: ['Hasta 2', 'Hasta 24'] },
+          { label: 'Análisis al mes', valores: ['30', '150'] },
+        ],
+      },
+      {
+        grupo: 'Análisis',
+        filas: [
+          { label: 'Videos propios', valores: [true, true] },
+          { label: 'Videos de YouTube', valores: [true, true] },
+          { label: 'Dashboard por jugador', valores: [true, true] },
+          { label: 'Reporte en PDF', valores: [true, true] },
+        ],
+      },
+      {
+        grupo: 'Equipo y reclutamiento',
+        filas: [
+          { label: 'Comparador de hasta 4 jugadores', valores: [false, true] },
+          { label: 'Panel de todo tu equipo', valores: [false, true] },
+          { label: 'Bandeja de reclutamiento', valores: [false, true] },
+          { label: 'Soporte prioritario', valores: [false, true] },
+        ],
+      },
     ],
-    accion: { label: 'Empieza ahora', to: '/registro' },
-  },
-  {
-    nombre: 'Ultra',
-    para: 'Para academias, clubes y universidades',
-    precio: { mensual: '[PRECIO]', anual: '[PRECIO]' },
-    detalle: 'por mes',
-    tono: 'ultra',
-    base: 'Todo lo de Pro, más:',
-    incluye: ['Muchos más jugadores', 'Muchos más análisis', 'Soporte dedicado'],
-    accion: { label: 'Contáctanos', href: 'mailto:consultas@acecam.com' },
-  },
-]
-
-const comparados = planes.slice(0, 2)
-
-const comparacion = [
-  {
-    grupo: 'Uso',
-    filas: [
-      { label: 'Prueba gratis de 1 mes', valores: [true, false] },
-      { label: 'Jugadores', valores: ['Hasta 2', 'Hasta 24'] },
-      { label: 'Análisis al mes', valores: ['30', '150'] },
+    preguntas: [
+      {
+        pregunta: '¿Qué tipo de video sirve?',
+        respuesta:
+          'Un video del partido grabado desde el fondo de la pista, con la cancha completa en cuadro. Sirve un celular en un trípode, y acepta archivos subidos o un link de YouTube.',
+      },
+      {
+        pregunta: '¿Cuánto tarda el análisis?',
+        respuesta:
+          'Depende de la duración y la resolución del video. Verás el avance en la cola de procesamiento y recibirás un aviso cuando el reporte esté listo.',
+      },
+      {
+        pregunta: '¿Qué tan precisas son las velocidades?',
+        respuesta:
+          'Son estimaciones calculadas a partir del video, no mediciones de radar. Sirven para comparar saques entre sí y seguir la evolución de un jugador, no como dato oficial.',
+      },
+      {
+        pregunta: '¿Puedo analizar a los dos jugadores del partido?',
+        respuesta:
+          'Sí. Cada análisis saca las estadísticas de ambos jugadores del mismo video, sin tener que subirlo dos veces.',
+      },
+      {
+        pregunta: '¿Puedo cancelar cuando quiera?',
+        respuesta:
+          'Sí. El plan se cancela desde Configuración y sigue activo hasta el final del periodo ya pagado, sin penalidad.',
+      },
     ],
+    volver: 'AceCam, volver al inicio',
+    titulo: 'Tú eliges cómo',
+    tituloFin: 'medir tu juego',
+    pruebaAntes: 'Prueba',
+    pruebaDespues: 'gratis durante un mes con el plan Básico.',
+    mensual: 'Mensual',
+    anual: 'Anual',
+    pagoAnual: 'Pago anual',
+    popular: 'Más popular',
+    facturado: ', facturado al año',
+    comparar: 'Compara nuestros planes',
+    resumen: 'Comparación de los planes Básico y Pro',
+    funciones: 'Funciones',
+    porMes: '/ mes',
+    si: 'Sí',
+    no: 'No',
+    faq: 'Preguntas frecuentes',
   },
-  {
-    grupo: 'Análisis',
-    filas: [
-      { label: 'Videos propios', valores: [true, true] },
-      { label: 'Videos de YouTube', valores: [true, true] },
-      { label: 'Dashboard por jugador', valores: [true, true] },
-      { label: 'Reporte en PDF', valores: [true, true] },
+  en: {
+    planes: [
+      {
+        nombre: 'Basic',
+        para: 'For players and parents',
+        precio: { mensual: '[PRICE]', anual: '[PRICE]' },
+        detalle: 'per month',
+        prueba: {
+          titulo: '1-month free trial',
+          limites: ['Up to 2 players', '15 analyses that month', 'YouTube videos only'],
+        },
+        base: 'With the full plan:',
+        incluye: [
+          'Up to 2 players',
+          '30 analyses per month',
+          'Full dashboard per player',
+          'Your own videos or YouTube',
+          'PDF report',
+        ],
+        accion: { label: 'Free trial', to: '/registro' },
+      },
+      {
+        nombre: 'Pro',
+        para: 'For coaches and recruiters',
+        precio: { mensual: '[PRICE]', anual: '[PRICE]' },
+        detalle: 'per month',
+        popular: true,
+        tono: 'pro',
+        base: 'Everything in Basic, plus:',
+        incluye: [
+          '150 analyses per month',
+          'Up to 24 players',
+          'Compare up to 4 players',
+          'Panel for your whole team',
+          'Recruiting inbox',
+          'Priority support',
+        ],
+        accion: { label: 'Start now', to: '/registro' },
+      },
+      {
+        nombre: 'Ultra',
+        para: 'For academies, clubs and universities',
+        precio: { mensual: '[PRICE]', anual: '[PRICE]' },
+        detalle: 'per month',
+        tono: 'ultra',
+        base: 'Everything in Pro, plus:',
+        incluye: ['Many more players', 'Many more analyses', 'Dedicated support'],
+        accion: { label: 'Contact us', href: 'mailto:consultas@acecam.com' },
+      },
     ],
-  },
-  {
-    grupo: 'Equipo y reclutamiento',
-    filas: [
-      { label: 'Comparador de hasta 4 jugadores', valores: [false, true] },
-      { label: 'Panel de todo tu equipo', valores: [false, true] },
-      { label: 'Bandeja de reclutamiento', valores: [false, true] },
-      { label: 'Soporte prioritario', valores: [false, true] },
+    comparacion: [
+      {
+        grupo: 'Usage',
+        filas: [
+          { label: '1-month free trial', valores: [true, false] },
+          { label: 'Players', valores: ['Up to 2', 'Up to 24'] },
+          { label: 'Analyses per month', valores: ['30', '150'] },
+        ],
+      },
+      {
+        grupo: 'Analysis',
+        filas: [
+          { label: 'Your own videos', valores: [true, true] },
+          { label: 'YouTube videos', valores: [true, true] },
+          { label: 'Dashboard per player', valores: [true, true] },
+          { label: 'PDF report', valores: [true, true] },
+        ],
+      },
+      {
+        grupo: 'Team and recruiting',
+        filas: [
+          { label: 'Compare up to 4 players', valores: [false, true] },
+          { label: 'Panel for your whole team', valores: [false, true] },
+          { label: 'Recruiting inbox', valores: [false, true] },
+          { label: 'Priority support', valores: [false, true] },
+        ],
+      },
     ],
+    preguntas: [
+      {
+        pregunta: 'What kind of video works?',
+        respuesta:
+          'A match video recorded from behind the baseline, with the whole court in frame. A phone on a tripod works, and you can upload files or paste a YouTube link.',
+      },
+      {
+        pregunta: 'How long does the analysis take?',
+        respuesta:
+          'It depends on the length and resolution of the video. You’ll see the progress in the processing queue and get a notice when the report is ready.',
+      },
+      {
+        pregunta: 'How accurate are the speeds?',
+        respuesta:
+          'They are estimates calculated from the video, not radar measurements. They’re useful to compare serves with each other and track a player’s progress, not as official data.',
+      },
+      {
+        pregunta: 'Can I analyze both players in the match?',
+        respuesta:
+          'Yes. Each analysis pulls the stats for both players from the same video, without uploading it twice.',
+      },
+      {
+        pregunta: 'Can I cancel anytime?',
+        respuesta:
+          'Yes. You can cancel the plan from Settings and it stays active until the end of the period you already paid for, with no penalty.',
+      },
+    ],
+    volver: 'AceCam, back to home',
+    titulo: 'You choose how',
+    tituloFin: 'to measure your game',
+    pruebaAntes: 'Try',
+    pruebaDespues: 'free for a month with the Basic plan.',
+    mensual: 'Monthly',
+    anual: 'Yearly',
+    pagoAnual: 'Yearly billing',
+    popular: 'Most popular',
+    facturado: ', billed yearly',
+    comparar: 'Compare our plans',
+    resumen: 'Comparison of the Basic and Pro plans',
+    funciones: 'Features',
+    porMes: '/ month',
+    si: 'Yes',
+    no: 'No',
+    faq: 'Frequently asked questions',
   },
-]
+}
 
 const columnaPro = 'bg-accent/8'
 const encabezado = 'sticky top-0 z-10 shadow-[0_1px_0_var(--line3)]'
 const fondoPro = 'bg-linear-to-b from-accent/8 to-accent/8'
 
-function Valor({ valor, destacado }) {
+function Valor({ valor, destacado, t }) {
   if (typeof valor === 'string') {
     return (
       <span
@@ -131,18 +300,20 @@ function Valor({ valor, destacado }) {
         }`}
       >
         <Icon name="check" size={14} strokeWidth={2.8} />
-        <span className="sr-only">Sí</span>
+        <span className="sr-only">{t.si}</span>
       </span>
     )
   }
   return (
     <span className="inline-block h-px w-3 bg-line3 align-middle">
-      <span className="sr-only">No</span>
+      <span className="sr-only">{t.no}</span>
     </span>
   )
 }
 
 function Comparar({ anual }) {
+  const t = useTextos(textos)
+  const comparados = t.planes.slice(0, 2)
   const marcaRef = useRef(null)
   const [fijo, setFijo] = useState(false)
 
@@ -158,16 +329,16 @@ function Comparar({ anual }) {
 
   return (
     <section className="mx-auto mt-44 max-w-5xl">
-      <h2 className="text-center text-4xl sm:text-5xl">Compara nuestros planes</h2>
+      <h2 className="text-center text-4xl sm:text-5xl">{t.comparar}</h2>
 
       <div ref={marcaRef} aria-hidden="true" className="mt-12 h-px" />
       <div className="max-sm:overflow-x-auto">
         <table className="w-full min-w-[34rem] border-collapse text-left">
-          <caption className="sr-only">Comparación de los planes Básico y Pro</caption>
+          <caption className="sr-only">{t.resumen}</caption>
           <thead>
             <tr>
               <th scope="col" className={`w-1/3 pt-6 pr-4 pb-4 align-top ${encabezado} ${fondo}`}>
-                <span className="font-display text-3xl">Funciones</span>
+                <span className="font-display text-3xl">{t.funciones}</span>
               </th>
               {comparados.map((plan) => (
                 <th
@@ -184,19 +355,19 @@ function Comparar({ anual }) {
                     {plan.popular ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 font-display text-sm font-semibold whitespace-nowrap text-on-accent">
                         <Icon name="check" size={15} strokeWidth={2.6} />
-                        Más popular
+                        {t.popular}
                       </span>
                     ) : null}
                   </span>
                   <span className="mt-1 block font-display text-lg font-semibold text-text">
                     {anual ? plan.precio.anual : plan.precio.mensual}
-                    <span className="text-sm font-normal text-muted"> / mes</span>
+                    <span className="text-sm font-normal text-muted"> {t.porMes}</span>
                   </span>
                 </th>
               ))}
             </tr>
           </thead>
-          {comparacion.map(({ grupo, filas }) => (
+          {t.comparacion.map(({ grupo, filas }) => (
             <tbody key={grupo}>
               <tr>
                 <th
@@ -221,7 +392,7 @@ function Comparar({ anual }) {
                       key={comparados[indice].nombre}
                       className={`px-6 py-5 ${comparados[indice].popular ? columnaPro : ''}`}
                     >
-                      <Valor valor={valor} destacado={comparados[indice].popular} />
+                      <Valor valor={valor} destacado={comparados[indice].popular} t={t} />
                     </td>
                   ))}
                 </tr>
@@ -259,35 +430,8 @@ function Comparar({ anual }) {
   )
 }
 
-const preguntas = [
-  {
-    pregunta: '¿Qué tipo de video sirve?',
-    respuesta:
-      'Un video del partido grabado desde el fondo de la pista, con la cancha completa en cuadro. Sirve un celular en un trípode, y acepta archivos subidos o un link de YouTube.',
-  },
-  {
-    pregunta: '¿Cuánto tarda el análisis?',
-    respuesta:
-      'Depende de la duración y la resolución del video. Verás el avance en la cola de procesamiento y recibirás un aviso cuando el reporte esté listo.',
-  },
-  {
-    pregunta: '¿Qué tan precisas son las velocidades?',
-    respuesta:
-      'Son estimaciones calculadas a partir del video, no mediciones de radar. Sirven para comparar saques entre sí y seguir la evolución de un jugador, no como dato oficial.',
-  },
-  {
-    pregunta: '¿Puedo analizar a los dos jugadores del partido?',
-    respuesta:
-      'Sí. Cada análisis saca las estadísticas de ambos jugadores del mismo video, sin tener que subirlo dos veces.',
-  },
-  {
-    pregunta: '¿Puedo cancelar cuando quiera?',
-    respuesta:
-      'Sí. El plan se cancela desde Configuración y sigue activo hasta el final del periodo ya pagado, sin penalidad.',
-  },
-]
-
 function Preguntas() {
+  const t = useTextos(textos)
   const [abierta, setAbierta] = useState(0)
 
   return (
@@ -306,9 +450,9 @@ function Preguntas() {
         className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] max-w-full -translate-x-1/2 rounded-full bg-accent/5 blur-3xl"
       />
       <div className="relative mx-auto max-w-3xl px-6">
-        <h2 className="text-center text-4xl sm:text-5xl">Preguntas frecuentes</h2>
+        <h2 className="text-center text-4xl sm:text-5xl">{t.faq}</h2>
         <ul className="mt-14 divide-y divide-line2 border-y border-line2">
-          {preguntas.map(({ pregunta, respuesta }, indice) => {
+          {t.preguntas.map(({ pregunta, respuesta }, indice) => {
             const abiertaAhora = abierta === indice
             return (
               <li key={pregunta}>
@@ -351,14 +495,16 @@ function Preguntas() {
 }
 
 function Periodo({ anual, onCambiar }) {
+  const t = useTextos(textos)
+
   return (
     <div className="mx-auto mt-10 inline-flex items-center gap-3 rounded-full border border-line2 bg-surface px-4 py-2 text-sm">
-      <span className={anual ? 'text-muted' : 'text-text'}>Mensual</span>
+      <span className={anual ? 'text-muted' : 'text-text'}>{t.mensual}</span>
       <button
         type="button"
         role="switch"
         aria-checked={anual}
-        aria-label="Pago anual"
+        aria-label={t.pagoAnual}
         onClick={onCambiar}
         className="relative h-6 w-11 rounded-full border border-line3 bg-surface2 transition-colors"
       >
@@ -368,12 +514,13 @@ function Periodo({ anual, onCambiar }) {
           }`}
         />
       </button>
-      <span className={anual ? 'text-text' : 'text-muted'}>Anual</span>
+      <span className={anual ? 'text-text' : 'text-muted'}>{t.anual}</span>
     </div>
   )
 }
 
 function Plan({ plan, anual }) {
+  const t = useTextos(textos)
   const tono = tonos[plan.tono ?? 'basico']
   const boton = `mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 font-semibold transition ${tono.boton}`
   const tarjetaRef = useRef(null)
@@ -413,7 +560,7 @@ function Plan({ plan, anual }) {
       {plan.popular ? (
         <span className="absolute -top-4 right-6 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 font-display text-sm font-semibold text-on-accent">
           <Icon name="check" size={17} strokeWidth={2.4} />
-          Más popular
+          {t.popular}
         </span>
       ) : null}
 
@@ -425,7 +572,7 @@ function Plan({ plan, anual }) {
       </p>
       <p className="mt-1 text-sm text-muted">
         {plan.detalle}
-        {anual ? ', facturado al año' : ''}
+        {anual ? t.facturado : ''}
       </p>
 
       {plan.prueba ? (
@@ -472,6 +619,7 @@ function Plan({ plan, anual }) {
 }
 
 export default function Precios() {
+  const t = useTextos(textos)
   const [anual, setAnual] = useState(false)
 
   return (
@@ -490,7 +638,7 @@ export default function Precios() {
         <LinkDeslizante
           to="/"
           sentido="atras"
-          aria-label="AceCam, volver al inicio"
+          aria-label={t.volver}
           className="group inline-flex items-center gap-3 rounded-md"
         >
           <span className="inline-flex size-9 items-center justify-center rounded-full border-2 border-line3 text-text2 ring-text transition-[translate,border-color,color,box-shadow] duration-300 group-hover:-translate-x-1 group-hover:border-text group-hover:text-text group-hover:ring-1">
@@ -501,20 +649,19 @@ export default function Precios() {
 
         <header className="mt-16 text-center">
           <h1 className="mx-auto max-w-2xl text-4xl sm:text-6xl">
-            Tú eliges cómo
+            {t.titulo}
             <br />
-            medir tu juego
+            {t.tituloFin}
           </h1>
           <p className="mx-auto mt-4 max-w-md text-lg text-text2">
-            Prueba <span className="text-accent-ink">AceCam</span> gratis durante un mes con el plan
-            Básico.
+            {t.pruebaAntes} <span className="text-accent-ink">AceCam</span> {t.pruebaDespues}
           </p>
           <Periodo anual={anual} onCambiar={() => setAnual((valor) => !valor)} />
         </header>
 
         <div className="mx-auto mt-14 grid max-w-5xl gap-5 md:grid-cols-3">
-          {planes.map((plan) => (
-            <Plan key={plan.nombre} plan={plan} anual={anual} />
+          {t.planes.map((plan, indice) => (
+            <Plan key={indice} plan={plan} anual={anual} />
           ))}
         </div>
 
