@@ -7,6 +7,11 @@ export function subirAlInicio() {
   else window.scrollTo(0, 0)
 }
 
+export function irAlInicio() {
+  if (actual) actual.scrollTo(0)
+  else window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 export function startSmoothScroll() {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null
 

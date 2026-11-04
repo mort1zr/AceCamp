@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
+import { irAlInicio } from '../lib/smoothScroll.js'
 import Icon from './Icon.jsx'
 import LinkDeslizante from './LinkDeslizante.jsx'
 
@@ -9,12 +10,13 @@ const EXPANDIR_MS = 500
 const CERRAR_MS = 220
 
 const enlaces = [
-  { to: '/#como-funciona', label: 'Producto', className: 'hidden sm:block' },
+  { to: '/', label: 'Inicio', className: 'hidden sm:block', alInicio: true },
   { to: '/precios', label: 'Precios', desliza: true },
   { to: '/login', label: 'Ingresar' },
 ]
 
 export default function FloatingNav({ onExpandir }) {
+  const { pathname } = useLocation()
   const [visible, setVisible] = useState(false)
   const [expandido, setExpandido] = useState(false)
   const [anchoMenu, setAnchoMenu] = useState(0)
@@ -97,7 +99,7 @@ export default function FloatingNav({ onExpandir }) {
           <li className="px-2">
             <span className="block size-2 rounded-full bg-accent" />
           </li>
-          {enlaces.map(({ desliza, ...enlace }) => {
+          {enlaces.map(({ desliza, alInicio, ...enlace }) => {
             const Enlace = desliza ? LinkDeslizante : Link
             return (
               <li
@@ -108,6 +110,14 @@ export default function FloatingNav({ onExpandir }) {
               >
                 <Enlace
                   to={enlace.to}
+                  onClick={
+                    alInicio && pathname === '/'
+                      ? (evento) => {
+                          evento.preventDefault()
+                          irAlInicio()
+                        }
+                      : undefined
+                  }
                   tabIndex={expandido ? undefined : -1}
                   className="block rounded-full px-3 py-2 text-[15px] font-medium whitespace-nowrap text-text2 transition-colors hover:text-text"
                 >
