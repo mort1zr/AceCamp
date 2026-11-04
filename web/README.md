@@ -32,6 +32,78 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 | `npm run preview` | Sirve el build de producción |
 | `npm run lint` | Revisa el código con oxlint |
 | `npm test` | Pruebas de los componentes compartidos |
+| `npm run emulators` | Emuladores locales de Auth, Firestore y Storage |
+| `npm run seed` | Carga datos de ejemplo en los emuladores (con los emuladores ya encendidos) |
+| `npm run test:rules` | Pruebas de las reglas de Firestore (PCIT-23) y Storage (PCIT-24) y del registro (PCIT-21); enciende y apaga los emuladores |
+
+## Firebase (PCIT-20)
+
+La web usa un solo proyecto de Firebase con **Auth** (correo y contraseña),
+**Firestore** y **Storage**. Todo se inicializa una vez en
+[src/lib/firebase.js](src/lib/firebase.js); el resto de la app importa de ahí:
+
+```js
+import { auth, db, storage } from '../lib/firebase.js'
+```
+
+Ningún otro archivo debe llamar a `initializeApp`.
+
+### Configurar el `.env`
+
+```bash
+cp .env.example .env
+```
+
+Completa los valores `VITE_FIREBASE_*` (Configuración del proyecto → General →
+Tus apps → app web, o pídeselos a Axel). `.env` está en `.gitignore`: **nunca se sube**.
+Si falta un valor, la app falla al arrancar con un mensaje que dice cuál.
+
+### Trabajar con los emuladores (recomendado para desarrollar)
+
+Los emuladores corren en tu máquina con el proyecto `demo-acecam`: no tocan
+datos reales y no necesitan credenciales ni el `.env` completo.
+
+Requisitos: Java 11 o superior (los emuladores de Firestore y Storage lo usan).
+
+```bash
+# Terminal 1
+npm run emulators            # UI en http://127.0.0.1:4000
+
+# Terminal 2, con VITE_USE_FIREBASE_EMULATORS=true en .env
+npm run dev
+```
+
+| Servicio | Puerto |
+| --- | --- |
+| Auth | 9099 |
+| Firestore | 8080 |
+| Storage | 9199 |
+| Interfaz de los emuladores | 4000 |
+
+Con los emuladores encendidos, `npm run seed` carga dos organizaciones con
+jugadores, partidos y postulaciones de ejemplo. Puedes iniciar sesión con
+`coach@acecam.test` / `acecam123`.
+
+### Reglas de seguridad (PCIT-23)
+
+[`firestore.rules`](../firestore.rules) deja leer y escribir solo a usuarios con
+sesión y solo los documentos de su organización (`orgId`). Antes de subir un
+cambio en las reglas, corre `npm run test:rules` (no hace falta tener los
+emuladores encendidos; si lo están, apágalos primero porque usan el mismo puerto).
+
+Las reglas se publican en el proyecto real con
+`npx firebase deploy --only firestore:rules` (requiere `npx firebase login`).
+
+### Esquema de datos (PCIT-22)
+
+Colecciones, campos y estados: [docs/firestore-schema.md](../docs/firestore-schema.md).
+Los nombres de colecciones y estados se importan desde
+[src/lib/schema.js](src/lib/schema.js); no los escribas a mano.
+
+La configuración vive en la raíz del repositorio (`firebase.json`, `.firebaserc`,
+`firestore.rules`, `storage.rules`), porque la web y el modelo comparten el mismo
+proyecto. Por ahora las reglas niegan todo; las reglas por organización llegan
+en PCIT-23 (Firestore) y PCIT-24 (Storage).
 
 ## Componentes compartidos (PCIT-25)
 
@@ -99,11 +171,11 @@ web/
     ├── assets/        Imágenes, íconos y capturas
     ├── components/    Componentes reutilizables
     ├── hooks/         Hooks propios
-    ├── lib/           Utilidades y clientes de servicios
+    ├── lib/           Utilidades y clientes de servicios (firebase.js)
     ├── pages/         Una carpeta o archivo por pantalla
     └── styles/        Variables de tema y estilos globales
 ```
 
 ## Stack
 
-React 19 · Vite · React Router · Tailwind CSS v4
+React 19 · Vite · React Router · Tailwind CSS v4 · Firebase (Auth, Firestore, Storage)
