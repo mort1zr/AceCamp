@@ -4,17 +4,22 @@ export const DASHBOARD_STATISTICS_SCHEMA = 'acecam.player-match.v1'
 const isCount = value => Number.isSafeInteger(value) && value >= 0
 const isNonnegative = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
 
+function normalizeSpeedCounters(value) {
+  if (!value || !isCount(value.sampleCount) || !isNonnegative(value.sumKmh)) return null
+  if (value.sampleCount === 0 && value.sumKmh !== 0) return null
+  return { sampleCount: value.sampleCount, sumKmh: value.sumKmh }
+}
+
 export function normalizeDashboardStatistics(value, playerId) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || value.schemaVersion !== DASHBOARD_STATISTICS_SCHEMA || value.playerId !== playerId) return null
-  const rawSpeed = value.serveSpeed
-  const serveSpeed = rawSpeed && isCount(rawSpeed.sampleCount) && isNonnegative(rawSpeed.sumKmh) && (rawSpeed.sampleCount !== 0 || rawSpeed.sumKmh === 0)
-    ? { sampleCount: rawSpeed.sampleCount, sumKmh: rawSpeed.sumKmh } : null
+  const serveSpeed = normalizeSpeedCounters(value.serveSpeed)
+  const shots = normalizeSpeedCounters(value.shots)
   const rawFirst = value.firstServe
   const firstServe = rawFirst && isCount(rawFirst.attempts) && isCount(rawFirst.in) && rawFirst.in <= rawFirst.attempts
     ? { attempts: rawFirst.attempts, in: rawFirst.in } : null
   const doubleFaults = isCount(value.doubleFaults) ? value.doubleFaults : null
-  if (!serveSpeed && !firstServe && doubleFaults == null) return null
-  return { serveSpeed, firstServe, doubleFaults }
+  if (!serveSpeed && !shots && !firstServe && doubleFaults == null) return null
+  return { serveSpeed, shots, firstServe, doubleFaults }
 }
 
 function safeCountSum(values) {
@@ -50,10 +55,18 @@ export function buildDashboardOverview(matches, { orgId, playerId, decodeStatist
   const attempts = firstComplete ? safeCountSum(valid.map(item => item.firstServe.attempts)) : null
   const firstIn = firstComplete ? safeCountSum(valid.map(item => item.firstServe.in)) : null
   const faults = faultsComplete ? safeCountSum(valid.map(item => item.doubleFaults)) : null
+  const shotsAvailable = valid.some(item => item.shots != null)
+  const shotsComplete = shotsAvailable && valid.every(item => item.shots != null)
+  const measuredShots = shotsComplete ? safeCountSum(valid.map(item => item.shots.sampleCount)) : null
+  const shotSpeedSum = shotsComplete ? valid.reduce((sum, item) => sum + item.shots.sumKmh, 0) : null
 
   return {
     metrics: {
       analyzedMatches: valid.length,
+      ...(shotsAvailable && {
+        measuredShots,
+        averageShotSpeed: measuredShots > 0 && Number.isFinite(shotSpeedSum) ? shotSpeedSum / measuredShots : null,
+      }),
       averageServeSpeed: sampleCount > 0 && Number.isFinite(sumKmh) ? sumKmh / sampleCount : null,
       firstServeInRate: attempts > 0 && firstIn != null ? firstIn / attempts * 100 : null,
       doubleFaults: faults,

@@ -1,9 +1,10 @@
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
 import { buildDashboardOverview } from '../dashboardOverview.js'
 import { buildDashboardEvolution } from '../dashboardEvolution.js'
+import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
 /** No Firebase initialization and no guessed statistics path or player mapping. */
-export function createFirestoreDashboardService({ db, orgId, actorId, decodeStatistics }) {
+export function createFirestoreDashboardService({ db, orgId, actorId, decodeStatistics = decodeWorkerDashboardStatistics }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof decodeStatistics !== 'function') throw new TypeError('Dashboard requires database, organization, user and an agreed statistics decoder.')
 
   return {

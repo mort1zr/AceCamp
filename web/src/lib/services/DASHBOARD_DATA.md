@@ -2,10 +2,9 @@
 
 ## Estado y acuerdo de alcance
 
-El usuario indicó que la conexión con el JSON de Aaron se añadirá después y
-autorizó dejar preparada la estructura. No se dispone aún de ese contrato ni de
-una salida JSON del worker. PCIT-139 permanece En curso hasta comprobar la
-integración real. No se declara terminada la historia PCIT-28.
+PCIT-139 preparó la estructura de consulta. PCIT-144 conecta el formato
+`acecam.match-stats.v1` que publica el worker de PCIT-35. Falta comprobar el
+recorrido de punta a punta con los servicios del equipo.
 
 Se implementan consulta por organización/jugador, validación de un contrato de
 adaptación explícito y funciones puras de agregación. No se inicializa otro
@@ -14,30 +13,29 @@ simulado; no prueban las reglas desplegadas ni el modelo.
 
 ## Evidencia revisada en GitHub
 
-Se revisó `origin/ModeloAI` en 53bdd56, incluyendo `model/main.py` y
-`model/utils/player_stats_drawer_utils.py`. Esa versión calcula velocidades de
-golpes y de desplazamiento, con variables por player_1/player_2 y cuadros de
-video; no se encontró un exportador JSON del worker ni métricas de saque.
-No se transforman esas velocidades en velocidad de saque ni se supone que
-player_1 sea el jugador registrado. La asignación la debe resolver el adaptador
-acordado con Aaron y Axel.
+En `ModeloAI` revisión `6c17537`, `model/stats/match_stats.py` asigna la
+posición registrada a `statistics.player` y la otra posición a `opponent`.
+El Dashboard lee `player.shots.count` y `player.shots.sumSpeedKmh`. El worker
+también mide desplazamiento. Los indicadores de saque y su evolución quedan
+como «Sin datos» hasta que el modelo mida el saque.
 
 La rama Landing_Rolando incorpora layout, rutas y tokens compartidos; no se ha
 fusionado dentro de interfaces_Fabian durante PCIT-139.
 
-## Contrato de adaptación propuesto (pendiente de confirmar)
+## Contrato de adaptación
 
 `buildDashboardOverview(rows, { orgId, playerId, decodeStatistics })` requiere
-un decoder síncrono explícito. Lo llama con `(match, { playerId })`. No se asume
-la ruta del JSON real ni se incluye un decoder por defecto en producción.
+un decoder síncrono explícito. Lo llama con `(match, { playerId })`.
+El servicio Firestore usa por defecto el decoder de PCIT-35.
 
 El decoder debe devolver este modelo normalizado, **solo cuando la fuente real
 permita construirlo sin inferencias**, o `null` cuando no sea compatible:
 
 ```js
 {
-  schemaVersion: 'acecam.player-match.v1', // Versión propuesta de adaptación
+  schemaVersion: 'acecam.player-match.v1', // Versión interna de adaptación
   playerId: 'id-del-jugador-registrado',
+  shots: { sumKmh: 175, sampleCount: 2 },
   serveSpeed: { sumKmh: 1900, sampleCount: 10 },
   firstServe: { in: 2, attempts: 10 },
   doubleFaults: 2
@@ -49,9 +47,8 @@ reales. Las métricas son opcionales: un campo ausente o inválido es desconocid
 no cero. Se admiten contadores cero cuando están realmente presentes. Los tipos
 deben ser numéricos; no se convierten cadenas automáticamente.
 
-Antes de conectar la fuente, confirmar el significado de cada contador, el
-jugador que representa, las unidades y la versión del esquema. La versión
-propuesta no obliga a Aaron a cambiar su formato: puede mapearse en el adaptador.
+La versión interna permite conservar el contrato de la interfaz. El decoder
+de PCIT-35 mapea únicamente los contadores de golpe de la versión publicada.
 
 ## Reglas de cálculo
 
@@ -61,6 +58,9 @@ menos una métrica reconocida. Se deduplican por ID físico de documento.
 - **Partidos analizados:** número de documentos compatibles con resultados
   válidos para el jugador. Los terminados sin resultados compatibles se cuentan
   por separado en `coverage.incompatibleMatches`.
+- **Golpes medidos:** suma de los contadores de golpe.
+- **Velocidad media de golpe:** suma de velocidades en km/h dividida entre la
+  cantidad total de golpes medidos.
 - **Velocidad media de saque:** suma de velocidades en km/h dividida entre
   total de muestras. No es la media simple de los promedios por partido.
 - **Primer saque dentro:** suma de primeros saques dentro / suma de intentos
@@ -78,17 +78,12 @@ resultados terminados no compatibles y no los trata como estadísticas de saque.
 
 ## Servicio Firestore
 
-```js
-const overviewService = createFirestoreDashboardService({
-  db,
-  orgId: profile.orgId,
-  actorId: user.uid,
-  decodeStatistics: agreedWorkerMapper, // Pendiente: no inventar este mapeo
-})
+```jsx
+<Route path="/dashboard" element={<Dashboard db={db} session={session} />} />
 ```
 
-La instancia debe permanecer estable por sesión. Se pasa a Dashboard junto con
-playersService, compartiendo scopeKey y mode `live` según DASHBOARD_UI.md.
+La página recibe `{ uid, orgId }` de la sesión verificada y mantiene ambos
+servicios estables para ese usuario y organización.
 
 `subscribePlayer` valida primero el documento players del jugador. Después abre
 matches con dos filtros de igualdad: orgId y playerId. Vuelve a comprobar esas
@@ -102,14 +97,11 @@ El filtrado del cliente no reemplaza las reglas de Firestore de PCIT-23.
 
 ## Pendientes para validar la conexión real
 
-1. PCIT-20/21: Firebase y sesión compartida; PCIT-22/35: JSON y mapeo acordados.
-2. Contrastar las fórmulas y unidades con una salida real del worker.
-3. Probar consulta y aislamiento con Firestore real/emulador y reglas de PCIT-23.
-4. Integrar el servicio estable en /dashboard dentro de la aplicación.
+1. Conectar la sesión compartida de PCIT-21 a la ruta de la aplicación.
+2. Probar consulta y aislamiento con las reglas de PCIT-23.
+3. Verificar el recorrido completo con el worker en PCIT-137.
 
-El gráfico de evolución pertenece a PCIT-140. No se añadieron cálculos ni
-componentes de ese gráfico a este commit.
-
-La tarea PCIT-139 ya conserva estos pendientes: por ahora no se creó otra
-actividad duplicada. Un cambio adicional que requiera código después de su
-único commit deberá registrarse con otra PCIT según la convención del usuario.
+PCIT-144 se contrastó con datos sintéticos procesados por el generador de
+estadísticas publicado en `6c17537`. Dos partidos dieron tres golpes y
+79,17 km/h de promedio ponderado. La prueba ejercitó el mapeo y la agregación.
+La evolución de saque de PCIT-140 conservó valores ausentes.

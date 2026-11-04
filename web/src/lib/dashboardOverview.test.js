@@ -1,11 +1,39 @@
 import { describe, expect, it, vi } from 'vitest'
 import { buildDashboardOverview, DASHBOARD_STATISTICS_SCHEMA, normalizeDashboardStatistics } from './dashboardOverview.js'
+import { decodeWorkerDashboardStatistics } from './workerDashboardStatistics.js'
 
 const statistics = fields => ({ schemaVersion: DASHBOARD_STATISTICS_SCHEMA, playerId: 'p1', ...fields })
 const match = (id, fields = {}) => ({ id, orgId: 'org-a', playerId: 'p1', status: 'listo', ...fields })
 const context = { orgId: 'org-a', playerId: 'p1', decodeStatistics: row => row.statistics }
 
 describe('KPIs de Dashboard · contrato de adaptación explícito', () => {
+  it('lee el jugador registrado del worker y pondera velocidades de golpe por muestras', () => {
+    const output = (count, sumSpeedKmh) => ({
+      schemaVersion: 'acecam.match-stats.v1',
+      player: { shots: { count, sumSpeedKmh } },
+      opponent: { shots: { count: 20, sumSpeedKmh: 2000 } },
+    })
+    const result = buildDashboardOverview([
+      match('a', { statistics: output(1, 62.5) }),
+      match('b', { statistics: output(2, 175) }),
+    ], { ...context, decodeStatistics: decodeWorkerDashboardStatistics })
+    expect(result.metrics).toMatchObject({
+      analyzedMatches: 2, measuredShots: 3, averageShotSpeed: 237.5 / 3,
+      averageServeSpeed: null, firstServeInRate: null, doubleFaults: null,
+    })
+  })
+
+  it('conserva cero golpes medidos y excluye datos inválidos o de otra versión', () => {
+    const output = { schemaVersion: 'acecam.match-stats.v1', player: { shots: { count: 0, sumSpeedKmh: 0 } } }
+    const result = buildDashboardOverview([
+      match('zero', { statistics: output }),
+      match('invalid', { statistics: { ...output, player: { shots: { count: '2', sumSpeedKmh: 110 } } } }),
+      match('future', { statistics: { ...output, schemaVersion: 'acecam.match-stats.v2' } }),
+    ], { ...context, decodeStatistics: decodeWorkerDashboardStatistics })
+    expect(result.metrics).toMatchObject({ analyzedMatches: 1, measuredShots: 0, averageShotSpeed: null })
+    expect(result.coverage.incompatibleMatches).toBe(2)
+  })
+
   it('pondera por muestras y suma numeradores/denominadores, sin promediar promedios', () => {
     const result = buildDashboardOverview([
       match('m1', { statistics: statistics({ serveSpeed: { sumKmh: 100, sampleCount: 1 }, firstServe: { in: 1, attempts: 1 }, doubleFaults: 0 }) }),

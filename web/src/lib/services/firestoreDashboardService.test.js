@@ -25,7 +25,7 @@ function snapshot(id = 'actual-id', overrides = {}) {
 
 describe('Consulta Dashboard (SDK simulado)', () => {
   it('exige identidad y contrato de estadísticas antes de consultar', () => {
-    expect(() => make({ decodeStatistics: undefined })).toThrow('decoder')
+    expect(() => make({ decodeStatistics: null })).toThrow('decoder')
     expect(() => make({ orgId: '' })).toThrow()
     expect(() => make({ actorId: '' })).toThrow()
     expect(getDoc).not.toHaveBeenCalled()

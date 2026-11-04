@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { EmptyState, ErrorState, LoadingState } from '../components/ui'
 import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
 import EvolutionPanel from '../components/dashboard/EvolutionPanel.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { useDashboardOverview } from '../hooks/useDashboardOverview.js'
 import { playerAge } from '../lib/players.js'
+import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
+import { createFirestoreDashboardService } from '../lib/services/firestoreDashboardService.js'
 import './jugadores.css'
 import './dashboard.css'
 
@@ -42,8 +44,22 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
   )
 }
 
-export default function Dashboard({ playersService, overviewService, renderEvolution }) {
-  const mixedScopes = overviewService && (overviewService.scopeKey !== playersService?.scopeKey || overviewService.mode !== playersService?.mode)
-  if (!playersService || mixedScopes) return <section className="players-page"><h1>Dashboard</h1><ErrorState title="El Dashboard aún no está disponible" description="Cuando tu sesión de equipo esté disponible, podrás consultar el resumen de tus jugadores." /></section>
-  return <DashboardWorkspace key={playersService.scopeKey} playersService={playersService} overviewService={overviewService} renderEvolution={renderEvolution} />
+export default function Dashboard({ playersService, overviewService, renderEvolution, db, session }) {
+  const uid = session?.uid
+  const orgId = session?.orgId
+  const hasInjectedServices = playersService != null || overviewService != null
+  const liveServices = useMemo(() => {
+    if (hasInjectedServices || !db || typeof uid !== 'string' || !uid.trim() ||
+      typeof orgId !== 'string' || !orgId.trim()) return null
+    const identity = { db, orgId, actorId: uid }
+    return {
+      players: createFirestorePlayersService(identity),
+      overview: createFirestoreDashboardService(identity),
+    }
+  }, [hasInjectedServices, db, uid, orgId])
+  const players = playersService ?? liveServices?.players
+  const overview = overviewService ?? liveServices?.overview
+  const mixedScopes = overview && (overview.scopeKey !== players?.scopeKey || overview.mode !== players?.mode)
+  if (!players || mixedScopes) return <section className="players-page"><h1>Dashboard</h1><ErrorState title="El Dashboard aún no está disponible" description="Cuando tu sesión de equipo esté disponible, podrás consultar el resumen de tus jugadores." /></section>
+  return <DashboardWorkspace key={players.scopeKey} playersService={players} overviewService={overview} renderEvolution={renderEvolution} />
 }
