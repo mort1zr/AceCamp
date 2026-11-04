@@ -8,6 +8,7 @@ from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
+from events import detect_bounce_events
 from mini_court import MiniCourt
 from stats import build_frame_states, build_model_statistics, measure_shots, renumber_far_near
 from trackers import BallTracker, PlayerTracker
@@ -158,6 +159,10 @@ def run_pipeline(config, render=True):
                                                                              ball_detections,
                                                                              homography)
 
+    # Botes (TA-22a): fotograma y posición de la pelota en la imagen en ese momento.
+    bounces = detect_bounce_events(ball_detections, player_detections, homography, video_info.fps,
+                                   main_camera=main_camera)
+
     shots = measure_shots(ball_shot_frames, ball_detections, player_detections, player_court_positions,
                           video_info.fps, main_camera=main_camera)
 
@@ -174,6 +179,7 @@ def run_pipeline(config, render=True):
         "court_keypoints": court_keypoints,
         "player_detections": player_detections,
         "cuts": detections.cuts,
+        "bounces": bounces,
         "main_camera_segments": main_segments,
     }
     if not render:
@@ -186,6 +192,7 @@ def run_pipeline(config, render=True):
     output_video_path = resolve_path(paths["output"])
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     mini_court = stats_box = None
+    bounce_marker_frames = max(1, int(round(0.5 * video_info.fps)))
     with VideoWriter(output_video_path, fps=video_info.fps) as out:
         for i, frame in enumerate(iter_frames(input_video_path)):
             if i >= num_frames:
@@ -202,6 +209,12 @@ def run_pipeline(config, render=True):
                 cv2.putText(frame, "Otra camara: no se analiza", (int(10 * text_scale), int(70 * text_scale)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 165, 255), max(1, int(round(2 * text_scale))))
             frame = mini_court.draw_frame(frame, player_court_positions[i], ball_court_positions[i])
+            for bounce in bounces:  # marca cada bote durante medio segundo
+                if 0 <= i - bounce["frame"] < bounce_marker_frames:
+                    center = (int(bounce["x_px"]), int(bounce["y_px"]))
+                    cv2.circle(frame, center, int(18 * text_scale), (255, 0, 255), max(1, int(round(3 * text_scale))))
+                    cv2.putText(frame, "BOTE", (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7 * text_scale, (255, 0, 255), max(1, int(round(2 * text_scale))))
             frame = stats_box.draw(frame, frame_states[i])
             cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
                         text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))
