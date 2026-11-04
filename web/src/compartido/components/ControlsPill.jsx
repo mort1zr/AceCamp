@@ -1,6 +1,6 @@
-import { Link } from 'react-router'
-import { useTheme } from '../../compartido/hooks/useTheme.js'
-import { useIdioma } from '../../compartido/lib/idioma.jsx'
+import LinkDeslizante from './LinkDeslizante.jsx'
+import { useTheme } from '../hooks/useTheme.js'
+import { useIdioma } from '../lib/idioma.jsx'
 
 const textos = {
   es: {
@@ -95,7 +95,7 @@ export default function ControlsPill({ ocultarIngreso = false, className = '' })
           <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
         </svg>
       </button>
-      <Link
+      <LinkDeslizante
         to="/login"
         aria-hidden={ocultarIngreso}
         tabIndex={ocultarIngreso ? -1 : undefined}
@@ -106,7 +106,7 @@ export default function ControlsPill({ ocultarIngreso = false, className = '' })
         }`}
       >
         {t.ingresar}
-      </Link>
+      </LinkDeslizante>
     </div>
   )
 }

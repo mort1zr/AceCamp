@@ -7,6 +7,7 @@ import { useAuth } from './panel/context/AuthContext.js'
 import { db, storage } from './panel/lib/firebase.js'
 import { createHttpVideoImporter } from './panel/lib/services/httpVideoImportService.js'
 import { createVideoUploadService, MAX_VIDEO_BYTES } from './panel/lib/videoUpload.js'
+import Acceso from './panel/pages/Acceso.jsx'
 import Analizar from './panel/pages/Analizar.jsx'
 import Comparador from './panel/pages/Comparador.jsx'
 import Configuracion from './panel/pages/Configuracion.jsx'
@@ -44,8 +45,10 @@ export default function App() {
         <Route path="/privacidad" element={<Privacidad />} />
       </Route>
 
-      <Route path="/login" element={<Login />} />
-      <Route path="/registro" element={<Registro />} />
+      <Route element={<Acceso />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/registro" element={<Registro />} />
+      </Route>
 
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>

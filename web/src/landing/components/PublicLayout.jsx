@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router'
-import ControlsPill from './ControlsPill.jsx'
+import ControlsPill from '../../compartido/components/ControlsPill.jsx'
 import FloatingNav from './FloatingNav.jsx'
 import PublicFooter from './PublicFooter.jsx'
 import PublicHeader from './PublicHeader.jsx'
