@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import Icon from '../components/Icon.jsx'
 import LinkDeslizante from '../components/LinkDeslizante.jsx'
@@ -35,11 +35,12 @@ const planes = [
     detalle: 'por mes',
     prueba: {
       titulo: '1 mes de prueba gratis',
-      limites: ['Hasta 2 jugadores', '2 análisis por día', 'Solo videos de YouTube'],
+      limites: ['Hasta 2 jugadores', '15 análisis en el mes', 'Solo videos de YouTube'],
     },
     base: 'Con el plan completo:',
     incluye: [
-      'Hasta 4 jugadores',
+      'Hasta 2 jugadores',
+      '30 análisis al mes',
       'Dashboard completo por jugador',
       'Videos propios o de YouTube',
       'Reporte en PDF',
@@ -54,7 +55,14 @@ const planes = [
     popular: true,
     tono: 'pro',
     base: 'Todo lo del Básico, más:',
-    incluye: ['Más análisis al mes', 'Más jugadores', 'Bandeja de reclutamiento'],
+    incluye: [
+      '150 análisis al mes',
+      'Hasta 24 jugadores',
+      'Comparador de hasta 4 jugadores',
+      'Panel de todo tu equipo',
+      'Bandeja de reclutamiento',
+      'Soporte prioritario',
+    ],
     accion: { label: 'Empieza ahora', to: '/registro' },
   },
   {
@@ -68,6 +76,187 @@ const planes = [
     accion: { label: 'Contáctanos', href: 'mailto:consultas@acecam.com' },
   },
 ]
+
+const comparados = planes.slice(0, 2)
+
+const comparacion = [
+  {
+    grupo: 'Uso',
+    filas: [
+      { label: 'Prueba gratis de 1 mes', valores: [true, false] },
+      { label: 'Jugadores', valores: ['Hasta 2', 'Hasta 24'] },
+      { label: 'Análisis al mes', valores: ['30', '150'] },
+    ],
+  },
+  {
+    grupo: 'Análisis',
+    filas: [
+      { label: 'Videos propios', valores: [true, true] },
+      { label: 'Videos de YouTube', valores: [true, true] },
+      { label: 'Dashboard por jugador', valores: [true, true] },
+      { label: 'Reporte en PDF', valores: [true, true] },
+    ],
+  },
+  {
+    grupo: 'Equipo y reclutamiento',
+    filas: [
+      { label: 'Comparador de hasta 4 jugadores', valores: [false, true] },
+      { label: 'Panel de todo tu equipo', valores: [false, true] },
+      { label: 'Bandeja de reclutamiento', valores: [false, true] },
+      { label: 'Soporte prioritario', valores: [false, true] },
+    ],
+  },
+]
+
+const columnaPro = 'bg-accent/8'
+const encabezado = 'sticky top-0 z-10 shadow-[0_1px_0_var(--line3)]'
+const fondoPro = 'bg-linear-to-b from-accent/8 to-accent/8'
+
+function Valor({ valor, destacado }) {
+  if (typeof valor === 'string') {
+    return (
+      <span
+        className={`font-display text-base font-semibold ${destacado ? 'text-accent-ink' : 'text-text'}`}
+      >
+        {valor}
+      </span>
+    )
+  }
+  if (valor) {
+    return (
+      <span
+        className={`inline-grid size-6 place-content-center rounded-full ${
+          destacado ? 'bg-accent text-on-accent' : 'bg-chip text-text2'
+        }`}
+      >
+        <Icon name="check" size={14} strokeWidth={2.8} />
+        <span className="sr-only">Sí</span>
+      </span>
+    )
+  }
+  return (
+    <span className="inline-block h-px w-3 bg-line3 align-middle">
+      <span className="sr-only">No</span>
+    </span>
+  )
+}
+
+function Comparar({ anual }) {
+  const marcaRef = useRef(null)
+  const [fijo, setFijo] = useState(false)
+
+  useEffect(() => {
+    const observador = new IntersectionObserver(([entrada]) =>
+      setFijo(!entrada.isIntersecting && entrada.boundingClientRect.top < 0),
+    )
+    observador.observe(marcaRef.current)
+    return () => observador.disconnect()
+  }, [])
+
+  const fondo = fijo ? 'bg-bg' : ''
+
+  return (
+    <section className="mx-auto mt-44 max-w-5xl">
+      <h2 className="text-center text-4xl sm:text-5xl">Compara nuestros planes</h2>
+
+      <div ref={marcaRef} aria-hidden="true" className="mt-12 h-px" />
+      <div className="max-sm:overflow-x-auto">
+        <table className="w-full min-w-[34rem] border-collapse text-left">
+          <caption className="sr-only">Comparación de los planes Básico y Pro</caption>
+          <thead>
+            <tr>
+              <th scope="col" className={`w-1/3 pt-6 pr-4 pb-4 align-top ${encabezado} ${fondo}`}>
+                <span className="font-display text-3xl">Funciones</span>
+              </th>
+              {comparados.map((plan) => (
+                <th
+                  key={plan.nombre}
+                  scope="col"
+                  className={`w-1/3 px-6 pt-6 pb-4 align-top ${encabezado} ${
+                    plan.popular
+                      ? `rounded-t-2xl ${fijo ? `${fondo} ${fondoPro}` : columnaPro}`
+                      : fondo
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="font-display text-3xl">{plan.nombre}</span>
+                    {plan.popular ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 font-display text-sm font-semibold whitespace-nowrap text-on-accent">
+                        <Icon name="check" size={15} strokeWidth={2.6} />
+                        Más popular
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-1 block font-display text-lg font-semibold text-text">
+                    {anual ? plan.precio.anual : plan.precio.mensual}
+                    <span className="text-sm font-normal text-muted"> / mes</span>
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {comparacion.map(({ grupo, filas }) => (
+            <tbody key={grupo}>
+              <tr>
+                <th
+                  scope="colgroup"
+                  className="pt-10 pr-4 pb-3 font-display text-base tracking-[0.15em] text-accent-ink uppercase"
+                >
+                  {grupo}
+                </th>
+                <td />
+                <td className={columnaPro} />
+              </tr>
+              {filas.map((fila) => (
+                <tr
+                  key={fila.label}
+                  className="border-t border-line2 transition-colors hover:bg-surface/60"
+                >
+                  <th scope="row" className="py-5 pr-4 text-sm font-medium text-text2">
+                    {fila.label}
+                  </th>
+                  {fila.valores.map((valor, indice) => (
+                    <td
+                      key={comparados[indice].nombre}
+                      className={`px-6 py-5 ${comparados[indice].popular ? columnaPro : ''}`}
+                    >
+                      <Valor valor={valor} destacado={comparados[indice].popular} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          ))}
+          <tfoot>
+            <tr className="border-t border-line2">
+              <td className="py-8" />
+              {comparados.map((plan) => {
+                const tono = tonos[plan.tono ?? 'basico']
+                const clases = `flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-base font-semibold whitespace-nowrap transition ${tono.boton}`
+                return (
+                  <td
+                    key={plan.nombre}
+                    className={`px-6 py-8 ${plan.popular ? `rounded-b-2xl ${columnaPro}` : ''}`}
+                  >
+                    {plan.accion.to ? (
+                      <Link to={plan.accion.to} className={clases}>
+                        {plan.accion.label}
+                      </Link>
+                    ) : (
+                      <a href={plan.accion.href} className={clases}>
+                        {plan.accion.label}
+                      </a>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  )
+}
 
 function Periodo({ anual, onCambiar }) {
   return (
@@ -194,7 +383,7 @@ export default function Precios() {
   const [anual, setAnual] = useState(false)
 
   return (
-    <div className="relative overflow-hidden px-6 pt-6 pb-24">
+    <div className="relative overflow-clip px-6 pt-6 pb-24">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -234,6 +423,8 @@ export default function Precios() {
             <Plan key={plan.nombre} plan={plan} anual={anual} />
           ))}
         </div>
+
+        <Comparar anual={anual} />
       </div>
     </div>
   )
