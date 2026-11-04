@@ -136,13 +136,15 @@ const textos = {
       },
     ],
     volver: 'AceCam, volver al inicio',
-    titulo: 'Tú eliges cómo',
-    tituloFin: 'medir tu juego',
+    titulo: 'Elige tu plan,',
+    tituloFin: 'nosotros medimos el resto',
     pruebaAntes: 'Prueba',
     pruebaDespues: 'gratis durante un mes con el plan Básico.',
     mensual: 'Mensual',
     anual: 'Anual',
-    pagoAnual: 'Pago anual',
+    pagoAnual: 'Periodo de pago',
+    mes: 'mes',
+    meses: 'meses',
     popular: 'Más popular',
     facturado: ', facturado al año',
     comparar: 'Compara nuestros planes',
@@ -259,13 +261,15 @@ const textos = {
       },
     ],
     volver: 'AceCam, back to home',
-    titulo: 'You choose how',
-    tituloFin: 'to measure your game',
+    titulo: 'Pick your plan,',
+    tituloFin: 'we measure the rest',
     pruebaAntes: 'Try',
     pruebaDespues: 'free for a month with the Basic plan.',
     mensual: 'Monthly',
     anual: 'Yearly',
-    pagoAnual: 'Yearly billing',
+    pagoAnual: 'Billing period',
+    mes: 'month',
+    meses: 'months',
     popular: 'Most popular',
     facturado: ', billed yearly',
     comparar: 'Compare our plans',
@@ -305,7 +309,7 @@ function Valor({ valor, destacado, t }) {
     )
   }
   return (
-    <span className="inline-block h-px w-3 bg-line3 align-middle">
+    <span className="inline-block h-0.5 w-4 rounded-full bg-muted align-middle">
       <span className="sr-only">{t.no}</span>
     </span>
   )
@@ -430,91 +434,222 @@ function Comparar({ anual }) {
   )
 }
 
+const gradas = [
+  { ancho: 'w-[70%]', alto: 'h-6', opacidad: 'opacity-40', personas: 34 },
+  { ancho: 'w-[80%]', alto: 'h-7', opacidad: 'opacity-65', personas: 40 },
+  { ancho: 'w-[90%]', alto: 'h-8', opacidad: 'opacity-90', personas: 46 },
+]
+
+const ropa = [
+  'bg-line3',
+  'bg-faint',
+  'bg-series2/60',
+  'bg-muted/50',
+  'bg-series1/55',
+  'bg-line3',
+  'bg-series4/55',
+  'bg-faint',
+  'bg-series3/60',
+]
+
+function Publico({ fila, personas }) {
+  return (
+    <span className="absolute inset-x-6 bottom-0 flex items-end justify-between">
+      {Array.from({ length: personas }, (_, indice) => {
+        const hincha = (indice * 13 + fila * 5) % 17 === 0
+        const color = hincha ? 'bg-accent/80' : ropa[(indice * 7 + fila * 3) % ropa.length]
+        const alto = (indice * 5 + fila) % 3
+        return (
+          <span
+            key={indice}
+            className="flex flex-col items-center"
+            style={{ marginBottom: `${-alto}px` }}
+          >
+            <span className="size-2 rounded-full bg-text2/40" />
+            <span className={`mt-px h-2.5 w-3.5 rounded-t-full ${color}`} />
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
+const lineasCancha =
+  'M20 780L980 780M322.1 20L677.9 20M20 780L322.1 20M980 780L677.9 20M139.9 780L366.5 20M860.1 780L633.5 20M241.3 440.1L758.7 440.1M343.8 96L656.2 96M500 440.1L500 96M500 780L500 754.7M500 20L500 23.6'
+
+function CanchaPerspectiva() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 1000 800"
+      preserveAspectRatio="none"
+      fill="none"
+      className="pointer-events-none absolute top-6 left-1/2 h-[46rem] w-[min(72rem,100%)] -translate-x-1/2"
+      style={{
+        maskImage:
+          'linear-gradient(to bottom, transparent 2%, black 35%, black 70%, transparent 100%)',
+      }}
+    >
+      <path
+        d={lineasCancha}
+        stroke="var(--line3)"
+        strokeWidth="1.5"
+        opacity="0.9"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d="M210 206V225.5 M222 206V225.5 M234 206V225.5 M246 206V225.5 M258 206V225.5 M270 206V225.5 M282 206V225.5 M294 206V225.5 M306 206V225.5 M318 206V225.5 M330 206V225.5 M342 206V225.5 M354 206V225.5 M366 206V225.5 M378 206V225.5 M390 206V225.5 M402 206V225.5 M414 206V225.5 M426 206V225.5 M438 206V225.5 M450 206V225.5 M462 206V225.5 M474 206V225.5 M486 206V225.5 M498 206V225.5 M510 206V225.5 M522 206V225.5 M534 206V225.5 M546 206V225.5 M558 206V225.5 M570 206V225.5 M582 206V225.5 M594 206V225.5 M606 206V225.5 M618 206V225.5 M630 206V225.5 M642 206V225.5 M654 206V225.5 M666 206V225.5 M678 206V225.5 M690 206V225.5 M702 206V225.5 M714 206V225.5 M726 206V225.5 M738 206V225.5 M750 206V225.5 M762 206V225.5 M774 206V225.5 M786 206V225.5 M798 206V225.5 M197.8 212.5H802.2M197.8 219H802.2"
+        stroke="var(--line3)"
+        strokeWidth="1"
+        opacity="0.45"
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d="M197.8 205H802.2M197.8 225.5V203M802.2 225.5V203"
+        stroke="var(--text2)"
+        strokeWidth="2"
+        opacity="0.3"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  )
+}
+
 function Preguntas() {
   const t = useTextos(textos)
   const [abierta, setAbierta] = useState(0)
 
   return (
-    <section className="relative mt-40 overflow-hidden rounded-t-[48px] border-t border-line2 bg-surface pt-28 sm:rounded-t-[64px]">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
-          backgroundSize: '22px 22px',
-          maskImage: 'linear-gradient(to bottom, black, transparent 70%)',
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] max-w-full -translate-x-1/2 rounded-full bg-accent/5 blur-3xl"
-      />
-      <div className="relative mx-auto max-w-3xl px-6">
-        <h2 className="text-center text-4xl sm:text-5xl">{t.faq}</h2>
-        <ul className="mt-14 divide-y divide-line2 border-y border-line2">
-          {t.preguntas.map(({ pregunta, respuesta }, indice) => {
-            const abiertaAhora = abierta === indice
-            return (
-              <li key={pregunta}>
-                <h3>
-                  <button
-                    type="button"
-                    aria-expanded={abiertaAhora}
-                    aria-controls={`respuesta-${indice}`}
-                    onClick={() => setAbierta(abiertaAhora ? null : indice)}
-                    className="group flex w-full items-center justify-between gap-6 py-6 text-left font-sans text-lg font-medium text-text"
-                  >
-                    {pregunta}
-                    <span
-                      className={`shrink-0 text-accent-ink transition-transform duration-300 ${
-                        abiertaAhora ? '' : 'rotate-45'
-                      }`}
-                    >
-                      <Icon name="close" size={22} strokeWidth={2.4} />
-                    </span>
-                  </button>
-                </h3>
-                <div
-                  id={`respuesta-${indice}`}
-                  className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-                    abiertaAhora ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
-                  }`}
-                >
-                  <p className="overflow-hidden pr-12 text-lg leading-relaxed text-muted">
-                    <span className="block pb-6">{respuesta}</span>
-                  </p>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+    <>
+      <div aria-hidden="true" className="mt-40 flex flex-col items-center gap-1.5">
+        {gradas.map(({ ancho, alto, opacidad, personas }, fila) => (
+          <span
+            key={ancho}
+            className={`relative block overflow-hidden rounded-t-[40px] border-t border-line2 bg-surface ${ancho} ${alto} ${opacidad}`}
+          >
+            <Publico fila={fila} personas={personas} />
+          </span>
+        ))}
       </div>
-      <FooterGrande />
-    </section>
+      <section className="relative mt-1.5 overflow-hidden rounded-t-[48px] border-t border-line2 bg-surface pt-28 sm:rounded-t-[64px]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
+            backgroundSize: '22px 22px',
+            maskImage: 'linear-gradient(to bottom, black, transparent 70%)',
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] max-w-full -translate-x-1/2 rounded-full bg-accent/5 blur-3xl"
+        />
+        <CanchaPerspectiva />
+        <div className="relative mx-auto max-w-3xl px-6">
+          <h2 className="text-center text-4xl sm:text-5xl">{t.faq}</h2>
+          <ul className="mt-14 divide-y divide-line2 border-y border-line2">
+            {t.preguntas.map(({ pregunta, respuesta }, indice) => {
+              const abiertaAhora = abierta === indice
+              return (
+                <li key={pregunta}>
+                  <h3>
+                    <button
+                      type="button"
+                      aria-expanded={abiertaAhora}
+                      aria-controls={`respuesta-${indice}`}
+                      onClick={() => setAbierta(abiertaAhora ? null : indice)}
+                      className="group flex w-full items-center justify-between gap-6 py-6 text-left font-sans text-lg font-medium text-text"
+                    >
+                      {pregunta}
+                      <span
+                        className={`shrink-0 text-accent-ink transition-transform duration-300 ${
+                          abiertaAhora ? '' : 'rotate-45'
+                        }`}
+                      >
+                        <Icon name="close" size={22} strokeWidth={2.4} />
+                      </span>
+                    </button>
+                  </h3>
+                  <div
+                    id={`respuesta-${indice}`}
+                    className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                      abiertaAhora ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                    }`}
+                  >
+                    <p className="overflow-hidden pr-12 text-lg leading-relaxed text-muted">
+                      <span className="block pb-6">{respuesta}</span>
+                    </p>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+        <FooterGrande />
+      </section>
+    </>
   )
 }
 
-function Periodo({ anual, onCambiar }) {
+function Lado({ activo, onElegir, children }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={activo}
+      onClick={onElegir}
+      className={`flex cursor-pointer items-center gap-2 self-stretch rounded-xl px-4 font-display text-sm font-semibold tracking-[0.18em] uppercase transition-colors ${
+        activo
+          ? 'bg-accent/12 text-text ring-1 ring-accent-line/50'
+          : 'text-muted hover:bg-surface hover:text-text'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`size-2 rounded-full transition-colors ${activo ? 'bg-accent' : 'bg-line3'}`}
+      />
+      {children}
+    </button>
+  )
+}
+
+function Periodo({ anual, onElegir }) {
   const t = useTextos(textos)
+  const digitos = anual ? ['1', '2'] : ['0', '1']
 
   return (
-    <div className="mx-auto mt-10 inline-flex items-center gap-3 rounded-full border border-line2 bg-surface px-4 py-2 text-sm">
-      <span className={anual ? 'text-muted' : 'text-text'}>{t.mensual}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={anual}
-        aria-label={t.pagoAnual}
-        onClick={onCambiar}
-        className="relative h-6 w-11 rounded-full border border-line3 bg-surface2 transition-colors"
+    <div
+      role="radiogroup"
+      aria-label={t.pagoAnual}
+      className="mx-auto mt-10 inline-flex items-center gap-1.5 rounded-2xl border border-line2 bg-surface2 p-1.5 shadow-tile"
+    >
+      <Lado activo={!anual} onElegir={() => onElegir(false)}>
+        {t.mensual}
+      </Lado>
+      <span
+        aria-hidden="true"
+        className="flex flex-col items-center gap-1 rounded-xl bg-bg px-2.5 pt-2 pb-1.5"
       >
-        <span
-          className={`absolute top-0.5 left-0.5 size-[18px] rounded-full bg-accent transition-transform duration-300 ${
-            anual ? 'translate-x-5' : ''
-          }`}
-        />
-      </button>
-      <span className={anual ? 'text-text' : 'text-muted'}>{t.anual}</span>
+        <span className="flex gap-1 [perspective:300px]">
+          {digitos.map((digito, indice) => (
+            <span
+              key={`${indice}-${digito}`}
+              style={{ animationDelay: `${indice * 90}ms` }}
+              className="relative grid h-11 w-8 place-content-center overflow-hidden rounded-md bg-surface font-display text-3xl leading-none font-bold text-accent-ink tabular-nums motion-safe:animate-voltear"
+            >
+              {digito}
+              <span className="absolute inset-x-0 top-1/2 h-px bg-bg" />
+            </span>
+          ))}
+        </span>
+        <span className="font-display text-[10px] tracking-[0.2em] text-muted uppercase">
+          {anual ? t.meses : t.mes}
+        </span>
+      </span>
+      <Lado activo={anual} onElegir={() => onElegir(true)}>
+        {t.anual}
+      </Lado>
     </div>
   )
 }
@@ -656,7 +791,7 @@ export default function Precios() {
           <p className="mx-auto mt-4 max-w-md text-lg text-text2">
             {t.pruebaAntes} <span className="text-accent-ink">AceCam</span> {t.pruebaDespues}
           </p>
-          <Periodo anual={anual} onCambiar={() => setAnual((valor) => !valor)} />
+          <Periodo anual={anual} onElegir={setAnual} />
         </header>
 
         <div className="mx-auto mt-14 grid max-w-5xl gap-5 md:grid-cols-3">

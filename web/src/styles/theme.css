@@ -83,6 +83,7 @@
 
   --animate-float: float 7s ease-in-out infinite;
   --animate-hop: hop 0.32s ease-out;
+  --animate-voltear: voltear 0.45s cubic-bezier(0.3, 1.3, 0.5, 1) both;
 
   @keyframes hop {
     0% {
@@ -93,6 +94,17 @@
     }
     100% {
       translate: 0 0;
+    }
+  }
+
+  @keyframes voltear {
+    0% {
+      transform: rotateX(90deg);
+      opacity: 0.2;
+    }
+    100% {
+      transform: rotateX(0);
+      opacity: 1;
     }
   }
 
