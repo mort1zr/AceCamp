@@ -68,13 +68,13 @@ def run_pipeline(config, render=True):
     court_line_detector = CourtLineDetector(court_model_path)
     court_keypoints = court_line_detector.predict(video_frames[0])
 
-    # choose players
-    player_detections = player_tracker.choose_and_filter_players(court_keypoints, player_detections)
-
     # Homografía imagen → pista (metros) a partir de los 14 puntos clave
     homography = CourtHomography.from_keypoints(court_keypoints)
     print(f"Homografía: error de reproyección medio {homography.mean_reprojection_error(court_keypoints):.1f} px, "
           f"{int(homography.inliers.sum())}/{len(homography.inliers)} puntos clave coherentes")
+
+    # Elegir a los dos jugadores: 1 = lado lejano, 2 = lado cercano
+    player_detections = player_tracker.choose_and_filter_players(homography, player_detections)
 
     # MiniCourt
     mini_court = MiniCourt(video_frames[0])

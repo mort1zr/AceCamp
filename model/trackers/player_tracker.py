@@ -1,7 +1,9 @@
 import cv2
 
-from utils import get_center_of_bbox, measure_distance
 from utils.detection_cache import load_detections, save_detections
+from utils.progress import report_progress
+
+from .player_selection import select_players
 
 
 class PlayerTracker:
@@ -19,34 +21,9 @@ class PlayerTracker:
             self._model = YOLO(self.model_path)
         return self._model
 
-    def choose_and_filter_players(self, court_keypoints, player_detections):
-        player_detections_first_frame = player_detections[0]
-        chosen_player = self.choose_players(court_keypoints, player_detections_first_frame)
-        filtered_player_detections = []
-        for player_dict in player_detections:
-            filtered_player_dict = {track_id: bbox for track_id, bbox in player_dict.items() if track_id in chosen_player}
-            filtered_player_detections.append(filtered_player_dict)
-        return filtered_player_detections
-
-    def choose_players(self, court_keypoints, player_dict):
-        distances = []
-        for track_id, bbox in player_dict.items():
-            player_center = get_center_of_bbox(bbox)
-
-            min_distance = float('inf')
-            for i in range(0,len(court_keypoints),2):
-                court_keypoint = (court_keypoints[i], court_keypoints[i+1])
-                distance = measure_distance(player_center, court_keypoint)
-                if distance < min_distance:
-                    min_distance = distance
-            distances.append((track_id, min_distance))
-        
-        # sorrt the distances in ascending order
-        distances.sort(key = lambda x: x[1])
-        # Choose the first 2 tracks
-        chosen_players = [distances[0][0], distances[1][0]]
-        return chosen_players
-
+    def choose_and_filter_players(self, homography, player_detections):
+        """Elige a los dos jugadores y los renumera: 1 = lado lejano, 2 = lado cercano."""
+        return select_players(player_detections, homography)
 
     def detect_frames(self, frames, cache_path=None, video_hash=None, use_cache=False):
         """Detecta y sigue a las personas en cada fotograma.
@@ -60,7 +37,10 @@ class PlayerTracker:
             if cached is not None and len(cached) == len(frames):
                 return cached
 
-        player_detections = [self.detect_frame(frame) for frame in frames]
+        player_detections = []
+        for i, frame in enumerate(frames, start=1):
+            player_detections.append(self.detect_frame(frame))
+            report_progress("Jugadores", i, len(frames))
 
         if cache_path is not None:
             save_detections(cache_path, player_detections, video_hash)
@@ -73,6 +53,9 @@ class PlayerTracker:
 
         player_dict = {}
         for box in results.boxes:
+            if box.id is None:
+                # El tracker aún no asignó ID a esta detección (p. ej. en el primer fotograma).
+                continue
             track_id = int(box.id.tolist()[0])
             result = box.xyxy.tolist()[0]
             object_cls_id = box.cls.tolist()[0]
