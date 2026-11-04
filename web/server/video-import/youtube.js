@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process'
 import { delimiter, dirname, isAbsolute } from 'node:path'
 import { promisify } from 'node:util'
-import { parseYouTubeUrl } from '../../src/lib/videoSources.js'
-import { awaitWithAbort } from '../../src/lib/videoImportProtocol.js'
+import { parseYouTubeUrl } from '../../src/panel/lib/videoSources.js'
+import { awaitWithAbort } from '../../src/panel/lib/videoImportProtocol.js'
 import { createPublicVideoDownloader } from './download.js'
 import { invalidSource, validateLimit, VideoImportError } from './errors.js'
 

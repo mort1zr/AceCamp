@@ -7,7 +7,7 @@ import {
   MATCH_STATS_VERSION,
   MATCH_STATUS as M,
   PLAYER_CONSENT_VERSION,
-} from '../src/lib/schema.js'
+} from '../src/panel/lib/schema.js'
 
 export const SEED_PASSWORD = 'acecam123'
 

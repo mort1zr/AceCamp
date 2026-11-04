@@ -10,7 +10,7 @@ import {
   isApplicationStatus,
   isIsoDate,
   isMatchStatus,
-} from '../src/lib/schema.js'
+} from '../src/panel/lib/schema.js'
 import { buildSeedData } from './seedData.mjs'
 
 const data = buildSeedData()

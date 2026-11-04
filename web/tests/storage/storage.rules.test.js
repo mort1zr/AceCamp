@@ -7,7 +7,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebas
 import { doc, setDoc } from 'firebase/firestore'
 import { getBytes, ref, uploadBytes } from 'firebase/storage'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { createVideoUploadService } from '../../src/lib/videoUpload.js'
+import { createVideoUploadService } from '../../src/panel/lib/videoUpload.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -24,8 +24,8 @@ let env
 beforeAll(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-acecam',
-    firestore: { rules: read('../../../firestore.rules'), host: '127.0.0.1', port: 8080 },
-    storage: { rules: read('../../../storage.rules'), host: '127.0.0.1', port: 9199 },
+    firestore: { rules: read('../../../firebase/firestore.rules'), host: '127.0.0.1', port: 8080 },
+    storage: { rules: read('../../../firebase/storage.rules'), host: '127.0.0.1', port: 9199 },
   })
 })
 

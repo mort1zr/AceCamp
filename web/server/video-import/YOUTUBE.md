@@ -6,7 +6,7 @@ el proveedor en el alojamiento acordado con Axel, junto con Auth, Storage y ffpr
 
 ## Entrada y disponibilidad
 
-`src/lib/videoSources.js` extrae un único ID de 11 caracteres desde enlaces HTTPS
+`src/panel/lib/videoSources.js` extrae un único ID de 11 caracteres desde enlaces HTTPS
 watch, youtu.be, shorts, embed o live de los hosts exactos admitidos. Quita parámetros
 de seguimiento, tiempo y lista al construir la URL canónica para consultar metadatos.
 Un enlace watch con lista se limita al video indicado; una playlist sin video,
