@@ -29,7 +29,7 @@ from pathlib import Path
 
 from config import load_config
 
-from .processor import run_forever, run_once
+from .processor import VideoTooLongError, run_forever, run_once
 
 DEFAULT_PROJECT_ID = "acecam-e93a2"
 
@@ -37,10 +37,16 @@ DEFAULT_PROJECT_ID = "acecam-e93a2"
 def make_analyzer(config_path=None, device=None):
     """Función vídeo → estadísticas del modelo, con la configuración de config.yaml."""
     import main as pipeline  # se importa aquí: carga trackers y modelos solo si hay trabajo
+    from utils import get_video_info
 
     base = load_config(config_path)
+    max_seconds = base["worker"]["max_duration_seconds"]
 
     def analyze(video_path: Path):
+        # La duración se lee de la cabecera del vídeo, sin cargar los fotogramas en memoria.
+        duration = get_video_info(video_path).duration_seconds
+        if max_seconds and duration > max_seconds:
+            raise VideoTooLongError(duration, max_seconds)
         config = {**base, "paths": {**base["paths"], "input": str(video_path)},
                   "detection": {**base["detection"], **({"device": device} if device else {})},
                   "use_cache": True}  # mismo vídeo (mismo hash) en un reintento: no repite YOLO

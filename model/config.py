@@ -26,6 +26,7 @@ DEFAULTS: dict[str, Any] = {
     "detection": {"device": None, "ball_confidence": 0.15, "ball_max_interpolation_gap": 5},
     "court": {"redetect_every_frames": 30, "smoothing": 0.3, "refine_keypoints": True},
     "shots": {"min_change_frames_for_hit": 25, "rolling_window": 5},
+    "worker": {"max_duration_seconds": 60},
     "use_cache": False,
     "render_video": True,
 }

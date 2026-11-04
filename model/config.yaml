@@ -31,3 +31,8 @@ shots:
   min_change_frames_for_hit: 25
   # Ventana de la media móvil sobre la altura de la pelota.
   rolling_window: 5
+
+worker:
+  # Duración máxima del vídeo que acepta el worker, en segundos. Los más largos pasan a
+  # 'error' antes de cargarlos (PCIT-147). Se puede subir cuando haya procesamiento por tramos.
+  max_duration_seconds: 60
