@@ -7,7 +7,11 @@ paths:
   cache_dir: cache
 
 models:
-  players: models/yolov8x.pt
+  # Detector de jugadores (los descarga scripts/download_models.py). Con el vídeo de ejemplo en CPU,
+  # yolov8m tarda un 39 % menos que yolov8x (700 frente a 1145 s por minuto de vídeo) y da las mismas
+  # estadísticas salvo un 1-2 % en el desplazamiento del jugador del fondo.
+  # Para la máxima precisión: models/yolov8x.pt
+  players: models/yolov8m.pt
   ball: models/yolo5_last.pt
   court_keypoints: models/keypoints_model.pth
 
@@ -17,6 +21,10 @@ detection:
   ball_confidence: 0.15
   # Huecos sin pelota de hasta estos fotogramas se interpolan; los más largos no.
   ball_max_interpolation_gap: 5
+  # Detectar jugadores en uno de cada N fotogramas e interpolar el resto (la pelota, en todos).
+  # 1 = en todos. Con 2, el vídeo de ejemplo tardó un 8 % menos, pero la distancia recorrida baja
+  # un poco (la interpolación en línea recta pierde los desvíos): solo para partidos completos.
+  player_every_n_frames: 1
 
 court:
   # Volver a detectar los puntos clave de la pista cada N fotogramas.

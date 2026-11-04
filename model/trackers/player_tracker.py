@@ -65,17 +65,15 @@ class PlayerTracker:
         
         return player_dict
 
-    def draw_bboxes(self,video_frames, player_detections):
-        output_video_frames = []
-        for frame, player_dict in zip(video_frames, player_detections):
-            # Draw Bounding Boxes
-            for track_id, bbox in player_dict.items():
-                x1, y1, x2, y2 = bbox
-                cv2.putText(frame, f"Player ID: {track_id}",(int(bbox[0]),int(bbox[1] -10 )),cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-                cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-            output_video_frames.append(frame)
-        
-        return output_video_frames
+    @staticmethod
+    def draw_frame(frame, player_dict):
+        """Dibuja las cajas de los jugadores en un fotograma (lo modifica y lo devuelve)."""
+        for track_id, bbox in player_dict.items():
+            x1, y1, x2, y2 = bbox
+            cv2.putText(frame, f"Player ID: {track_id}", (int(x1), int(y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
+                        (0, 0, 255), 2)
+            cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+        return frame
 
-
-    
+    def draw_bboxes(self, video_frames, player_detections):
+        return [self.draw_frame(frame, player_dict) for frame, player_dict in zip(video_frames, player_detections)]

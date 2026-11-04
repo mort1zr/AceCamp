@@ -26,6 +26,8 @@ DRIVE_FILES = {
 # Detector de personas preentrenado de Ultralytics.
 URL_FILES = {
     "models/yolov8x.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8x.pt",
+    # Versión más ligera, para vídeos largos (models.players en config.yaml).
+    "models/yolov8m.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8m.pt",
 }
 
 SAMPLE_VIDEO = {

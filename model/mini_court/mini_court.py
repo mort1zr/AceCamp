@@ -94,10 +94,21 @@ class MiniCourt:
     def draw_mini_court(self, frames):
         return [self.draw_court(self.draw_background_rectangle(frame)) for frame in frames]
 
+    def draw_points(self, frame, frame_positions, color=(0, 255, 0)):
+        """Dibuja en la mini-pista de un fotograma las posiciones {id: (x_m, y_m)}."""
+        for position in frame_positions.values():
+            if position is None or np.any(np.isnan(position)):
+                continue
+            cv2.circle(frame, self.meters_to_mini(position), 5, color, -1)
+        return frame
+
+    def draw_frame(self, frame, player_positions, ball_positions):
+        """Mini-pista completa de un fotograma: fondo, líneas, jugadores (verde) y pelota (amarillo)."""
+        frame = self.draw_court(self.draw_background_rectangle(frame))
+        frame = self.draw_points(frame, player_positions)
+        return self.draw_points(frame, ball_positions, color=(0, 255, 255))
+
     def draw_points_on_mini_court(self, frames, positions_m, color=(0, 255, 0)):
         for frame, frame_positions in zip(frames, positions_m):
-            for position in frame_positions.values():
-                if position is None or np.any(np.isnan(position)):
-                    continue
-                cv2.circle(frame, self.meters_to_mini(position), 5, color, -1)
+            self.draw_points(frame, frame_positions, color)
         return frames

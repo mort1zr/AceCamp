@@ -38,22 +38,63 @@ def get_video_info(video_path) -> VideoInfo:
     return VideoInfo(fps=float(fps), width=width, height=height, frame_count=frame_count)
 
 
-def read_video(video_path):
+def iter_frames(video_path):
+    """Recorre los fotogramas del vídeo de uno en uno (PCIT-146).
+
+    Solo hay un fotograma en memoria cada vez: la memoria no crece con la
+    duración del vídeo, a diferencia de read_video().
+    """
     cap = cv2.VideoCapture(str(video_path))
-    frames = []
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        frames.append(frame)
-    cap.release()
-    return frames
+    if not cap.isOpened():
+        raise ValueError(f"No se puede abrir el vídeo: {video_path}")
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            yield frame
+    finally:
+        cap.release()
+
+
+def read_video(video_path):
+    """Todos los fotogramas en una lista. Solo para clips cortos: a 1080p ocupa ~11 GB por minuto."""
+    return list(iter_frames(video_path))
+
+
+class VideoWriter:
+    """Escribe un vídeo fotograma a fotograma; el tamaño se toma del primero.
+
+        with VideoWriter(ruta, fps) as out:
+            for frame in ...:
+                out.write(frame)
+    """
+
+    def __init__(self, path, fps=FALLBACK_FPS, fourcc="MJPG"):
+        self.path = str(path)
+        self.fps = fps
+        self.fourcc = cv2.VideoWriter_fourcc(*fourcc)
+        self._out = None
+
+    def write(self, frame):
+        if self._out is None:
+            height, width = frame.shape[:2]
+            self._out = cv2.VideoWriter(self.path, self.fourcc, self.fps, (width, height))
+        self._out.write(frame)
+
+    def close(self):
+        if self._out is not None:
+            self._out.release()
+            self._out = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
 
 
 def save_video(output_video_frames, output_video_path, fps=FALLBACK_FPS):
-    fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-    height, width = output_video_frames[0].shape[:2]
-    out = cv2.VideoWriter(str(output_video_path), fourcc, fps, (width, height))
-    for frame in output_video_frames:
-        out.write(frame)
-    out.release()
+    with VideoWriter(output_video_path, fps) as out:
+        for frame in output_video_frames:
+            out.write(frame)

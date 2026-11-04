@@ -23,6 +23,47 @@ SMOOTHING = 0.3  # peso de la nueva detección en la media móvil
 JUMP_THRESHOLD_PX = 25.0  # desplazamiento mediano a partir del cual se reinicia
 
 
+class CourtTracker:
+    """Sigue la pista fotograma a fotograma, sin guardar los fotogramas (PCIT-146).
+
+    update(frame) recibe los fotogramas en orden y devuelve (puntos clave, homografía)
+    del fotograma actual. Así se puede leer el vídeo por bloques y descartar cada imagen
+    en cuanto se ha usado.
+    """
+
+    def __init__(self, predict, redetect_every=REDETECT_EVERY_FRAMES, smoothing=SMOOTHING,
+                 jump_threshold_px=JUMP_THRESHOLD_PX, cut_frames=()):
+        self.predict = predict
+        self.redetect_every = redetect_every
+        self.smoothing = smoothing
+        self.jump_threshold_px = jump_threshold_px
+        self.cuts = set(cut_frames)
+        self.index = 0
+        self.current = None
+        self.homography = None
+
+    def update(self, frame, cut=False):
+        i = self.index
+        self.index += 1
+        cut = cut or i in self.cuts
+        if self.current is None or i % self.redetect_every == 0 or cut:
+            detected = keypoints_to_array(self.predict(frame))
+            if self.current is None or cut:
+                new = detected
+            else:
+                shift = np.median(np.linalg.norm(detected - self.current, axis=1))
+                new = (detected if shift > self.jump_threshold_px
+                       else (1 - self.smoothing) * self.current + self.smoothing * detected)
+            try:
+                self.homography = CourtHomography.from_keypoints(new)
+                self.current = new
+            except ValueError:
+                # Detección inválida (pista tapada, plano sin pista): se conserva la anterior.
+                if self.homography is None:
+                    raise
+        return self.current.ravel().copy(), self.homography
+
+
 def track_court(frames, predict, redetect_every=REDETECT_EVERY_FRAMES, smoothing=SMOOTHING,
                 jump_threshold_px=JUMP_THRESHOLD_PX, cut_frames=()):
     """Devuelve (puntos clave por fotograma, homografía por fotograma).
@@ -30,27 +71,10 @@ def track_court(frames, predict, redetect_every=REDETECT_EVERY_FRAMES, smoothing
     predict(frame) debe devolver los 14 puntos clave como [x0, y0, x1, y1, ...].
     Los fotogramas que comparten puntos clave comparten el mismo objeto homografía.
     """
-    if not frames:
-        return [], []
-    cuts = set(cut_frames)
+    tracker = CourtTracker(predict, redetect_every, smoothing, jump_threshold_px, cut_frames)
     keypoints_per_frame, homographies = [], []
-    current, homography = None, None
-
-    for i, frame in enumerate(frames):
-        if current is None or i % redetect_every == 0 or i in cuts:
-            detected = keypoints_to_array(predict(frame))
-            if current is None or i in cuts:
-                new = detected
-            else:
-                shift = np.median(np.linalg.norm(detected - current, axis=1))
-                new = detected if shift > jump_threshold_px else (1 - smoothing) * current + smoothing * detected
-            try:
-                homography = CourtHomography.from_keypoints(new)
-                current = new
-            except ValueError:
-                # Detección inválida (pista tapada, plano sin pista): se conserva la anterior.
-                if homography is None:
-                    raise
-        keypoints_per_frame.append(current.ravel().copy())
+    for frame in frames:
+        keypoints, homography = tracker.update(frame)
+        keypoints_per_frame.append(keypoints)
         homographies.append(homography)
     return keypoints_per_frame, homographies
