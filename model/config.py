@@ -23,7 +23,7 @@ DEFAULTS: dict[str, Any] = {
         "ball": "models/yolo5_last.pt",
         "court_keypoints": "models/keypoints_model.pth",
     },
-    "detection": {"device": None, "ball_confidence": 0.15},
+    "detection": {"device": None, "ball_confidence": 0.15, "ball_max_interpolation_gap": 5},
     "shots": {"min_change_frames_for_hit": 25, "rolling_window": 5},
     "use_cache": False,
     "render_video": True,

@@ -2,6 +2,9 @@ import cv2
 import pandas as pd
 
 from utils.detection_cache import load_detections, save_detections
+from utils.progress import report_progress
+
+from .ball_selection import MAX_INTERPOLATION_GAP, fill_short_gaps, select_ball
 
 
 class BallTracker:
@@ -20,18 +23,13 @@ class BallTracker:
             self._model = YOLO(self.model_path)
         return self._model
 
-    def interpolate_ball_positions(self, ball_positions):
-        ball_positions = [x.get(1,[]) for x in ball_positions]
-        # convert the list into pandas dataframe
-        df_ball_positions = pd.DataFrame(ball_positions,columns=['x1','y1','x2','y2'])
+    def select_ball_positions(self, ball_candidates, frame_height=1080):
+        """Elige la pelota en cada fotograma entre todas las detecciones (ver ball_selection)."""
+        return select_ball(ball_candidates, scale=frame_height / 1080)
 
-        # interpolate the missing values
-        df_ball_positions = df_ball_positions.interpolate()
-        df_ball_positions = df_ball_positions.bfill()
-
-        ball_positions = [{1:x} for x in df_ball_positions.to_numpy().tolist()]
-
-        return ball_positions
+    def interpolate_ball_positions(self, ball_positions, max_gap=MAX_INTERPOLATION_GAP):
+        """Rellena solo los huecos cortos; los largos quedan sin pelota para no borrar botes."""
+        return fill_short_gaps(ball_positions, max_gap=max_gap)
 
     def get_ball_shot_frames(self, ball_positions, minimum_change_frames_for_hit=25, rolling_window=5):
         ball_positions = [x.get(1,[]) for x in ball_positions]
@@ -77,7 +75,10 @@ class BallTracker:
             if cached is not None and len(cached) == len(frames):
                 return cached
 
-        ball_detections = [self.detect_frame(frame) for frame in frames]
+        ball_detections = []
+        for i, frame in enumerate(frames, start=1):
+            ball_detections.append(self.detect_frame(frame))
+            report_progress("Pelota", i, len(frames))
 
         if cache_path is not None:
             save_detections(cache_path, ball_detections, video_hash)
@@ -87,19 +88,21 @@ class BallTracker:
     def detect_frame(self,frame):
         results = self.model.predict(frame, conf=self.conf, device=self.device, verbose=False)[0]
 
-        ball_dict = {}
-        for box in results.boxes:
-            result = box.xyxy.tolist()[0]
-            ball_dict[1] = result
-        
-        return ball_dict
+        # Todas las detecciones, de mayor a menor confianza: [x1, y1, x2, y2, conf].
+        # La pelota se elige después, con seguimiento entre fotogramas (select_ball_positions).
+        candidates = sorted(
+            (box.xyxy.tolist()[0] + [float(box.conf.tolist()[0])] for box in results.boxes),
+            key=lambda c: c[4],
+            reverse=True,
+        )
+        return {i: candidate for i, candidate in enumerate(candidates)}
 
     def draw_bboxes(self,video_frames, player_detections):
         output_video_frames = []
         for frame, ball_dict in zip(video_frames, player_detections):
             # Draw Bounding Boxes
             for track_id, bbox in ball_dict.items():
-                x1, y1, x2, y2 = bbox
+                x1, y1, x2, y2 = bbox[:4]
                 cv2.putText(frame, f"Ball ID: {track_id}",(int(bbox[0]),int(bbox[1] -10 )),cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
                 cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 255), 2)
             output_video_frames.append(frame)

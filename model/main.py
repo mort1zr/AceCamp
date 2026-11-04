@@ -53,14 +53,16 @@ def run_pipeline(config, render=True):
         video_hash=video_hash,
         use_cache=config["use_cache"],
     )
-    ball_detections = ball_tracker.detect_frames(
+    ball_candidates = ball_tracker.detect_frames(
         video_frames,
         cache_path=cache_path_for(cache_dir, video_hash, "ball", models["ball"],
-                                  conf=detection["ball_confidence"]),
+                                  conf=detection["ball_confidence"], all_candidates=True),
         video_hash=video_hash,
         use_cache=config["use_cache"],
     )
-    ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
+    ball_detections = ball_tracker.select_ball_positions(ball_candidates, frame_height=video_info.height)
+    ball_detections = ball_tracker.interpolate_ball_positions(ball_detections,
+                                                              max_gap=detection["ball_max_interpolation_gap"])
 
 
     # Court Line Detector model
@@ -114,6 +116,8 @@ def run_pipeline(config, render=True):
 
         # Quién golpea: el jugador más cercano a la pelota en la imagen en el fotograma del golpe.
         # (En la imagen y no en metros: la pelota está en el aire y su proyección al suelo no es fiable.)
+        if 1 not in ball_detections[start_frame]:
+            continue  # sin pelota en el fotograma del golpe: no se puede atribuir
         ball_center = get_center_of_bbox(ball_detections[start_frame][1])
         start_players = player_detections[start_frame]
         player_shot_ball = min(start_players.keys(),

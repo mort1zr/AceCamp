@@ -15,6 +15,8 @@ detection:
   # Dispositivo para la inferencia: null (automático), cpu, cuda:0, mps...
   device: null
   ball_confidence: 0.15
+  # Huecos sin pelota de hasta estos fotogramas se interpolan; los más largos no.
+  ball_max_interpolation_gap: 5
 
 shots:
   # Fotogramas seguidos con la misma dirección vertical para contar un golpe.
