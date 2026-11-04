@@ -10,6 +10,7 @@ import numpy as np
 
 from court import COURT_KEYPOINTS_M, COURT_LENGTH, COURT_LINES, DOUBLES_WIDTH, NET_Y, per_frame
 from utils import get_center_of_bbox, get_foot_position
+from utils.player_stats_drawer_utils import frame_scale
 
 # Espacio alrededor de la pista que también se dibuja (los jugadores suelen estar detrás del fondo).
 MARGIN_X_M = 1.5
@@ -17,11 +18,16 @@ MARGIN_Y_M = 3.0
 
 
 class MiniCourt:
+    """Mini-pista en la esquina superior derecha, a escala del fotograma (diseño de referencia: 1080p)."""
+
     def __init__(self, frame):
-        self.drawing_rectangle_width = 250
-        self.drawing_rectangle_height = 500
-        self.buffer = 50
-        self.padding = 10
+        self.scale = frame_scale(frame.shape)
+        self.drawing_rectangle_width = int(round(250 * self.scale))
+        self.drawing_rectangle_height = int(round(500 * self.scale))
+        self.buffer = int(round(50 * self.scale))
+        self.padding = int(round(10 * self.scale))
+        self.line_thickness = max(1, int(round(2 * self.scale)))
+        self.point_radius = max(2, int(round(5 * self.scale)))
 
         frame_width = frame.shape[1]
         self.end_x = frame_width - self.buffer
@@ -85,10 +91,11 @@ class MiniCourt:
     def draw_court(self, frame):
         for a, b in COURT_LINES:
             cv2.line(frame, self.meters_to_mini(COURT_KEYPOINTS_M[a]), self.meters_to_mini(COURT_KEYPOINTS_M[b]),
-                     (0, 0, 0), 2)
-        cv2.line(frame, self.meters_to_mini((0, NET_Y)), self.meters_to_mini((DOUBLES_WIDTH, NET_Y)), (255, 0, 0), 2)
+                     (0, 0, 0), self.line_thickness)
+        cv2.line(frame, self.meters_to_mini((0, NET_Y)), self.meters_to_mini((DOUBLES_WIDTH, NET_Y)), (255, 0, 0),
+                 self.line_thickness)
         for point in COURT_KEYPOINTS_M:
-            cv2.circle(frame, self.meters_to_mini(point), 3, (0, 0, 255), -1)
+            cv2.circle(frame, self.meters_to_mini(point), max(1, self.point_radius - 2), (0, 0, 255), -1)
         return frame
 
     def draw_mini_court(self, frames):
@@ -99,7 +106,7 @@ class MiniCourt:
         for position in frame_positions.values():
             if position is None or np.any(np.isnan(position)):
                 continue
-            cv2.circle(frame, self.meters_to_mini(position), 5, color, -1)
+            cv2.circle(frame, self.meters_to_mini(position), self.point_radius, color, -1)
         return frame
 
     def draw_frame(self, frame, player_positions, ball_positions):

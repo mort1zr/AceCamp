@@ -1,59 +1,85 @@
+"""Caja de estadísticas de los jugadores sobre el vídeo (TA-13).
+
+Se dibuja debajo de la mini-pista y a escala del fotograma: el diseño de
+referencia es 1080p y en 720p (o vídeos verticales) todo se reduce en proporción,
+sin salirse del fotograma ni pisar la mini-pista.
+
+Las fuentes de OpenCV solo tienen caracteres ASCII: los textos van sin tildes y un
+valor que todavía no se puede medir se muestra como "-" (nunca "nan").
+"""
+
+from __future__ import annotations
+
+import math
+
 import cv2
 
+MISSING = "-"
+FONT = cv2.FONT_HERSHEY_SIMPLEX
+WHITE = (255, 255, 255)
 
-def draw_player_stats(output_video_frames, player_stats):
-    for index, row in player_stats.iterrows():
-        output_video_frames[index] = draw_player_stats_frame(output_video_frames[index], row)
-    return output_video_frames
+# Medidas en píxeles para un fotograma de 1080 de alto.
+BOX_WIDTH, BOX_HEIGHT = 350, 230
+GAP_BELOW_MINI_COURT = 20
+ROWS = (
+    ("Vel. golpe", "last_shot_kmh"),
+    ("Vel. jugador", "last_speed_kmh"),
+    ("Media golpe", "avg_shot_kmh"),
+    ("Media jugador", "avg_speed_kmh"),
+)
 
 
-def draw_player_stats_frame(frame, row):
-    """Caja de estadísticas de un fotograma a partir de su fila de estadísticas."""
-    player_1_shot_speed = row['player_1_last_shot_speed']
-    player_2_shot_speed = row['player_2_last_shot_speed']
-    player_1_speed = row['player_1_last_player_speed']
-    player_2_speed = row['player_2_last_player_speed']
+def frame_scale(frame_shape) -> float:
+    """Factor de escala del overlay respecto a un vídeo horizontal de 1080p."""
+    height, width = frame_shape[:2]
+    return min(height / 1080, width / 1920) if width >= height else width / 1080
 
-    avg_player_1_shot_speed = row['player_1_average_shot_speed']
-    avg_player_2_shot_speed = row['player_2_average_shot_speed']
-    avg_player_1_speed = row['player_1_average_player_speed']
-    avg_player_2_speed = row['player_2_average_player_speed']
 
-    width=350
-    height=230
+def format_speed(value) -> str:
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return MISSING
+    return f"{value:.1f} km/h"
 
-    start_x = frame.shape[1]-400
-    start_y = frame.shape[0]-500
-    end_x = start_x+width
-    end_y = start_y+height
 
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (start_x, start_y), (end_x, end_y), (0, 0, 0), -1)
-    alpha = 0.5 
-    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+class StatsBox:
+    """Rectángulo de la caja: alineado a la derecha con la mini-pista y justo debajo de ella."""
 
-    text = "     Player 1     Player 2"
-    frame = cv2.putText(frame, text, (start_x+80, start_y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-    
-    text = "Shot Speed"
-    frame = cv2.putText(frame, text, (start_x+10, start_y+80), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-    text = f"{player_1_shot_speed:.1f} km/h    {player_2_shot_speed:.1f} km/h"
-    frame = cv2.putText(frame, text, (start_x+130, start_y+80), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    def __init__(self, frame_shape, right, top):
+        self.scale = frame_scale(frame_shape)
+        height, width = frame_shape[:2]
+        self.width = int(round(BOX_WIDTH * self.scale))
+        self.height = int(round(BOX_HEIGHT * self.scale))
+        self.end_x = min(int(right), width)
+        self.start_x = max(0, self.end_x - self.width)
+        self.start_y = int(top + GAP_BELOW_MINI_COURT * self.scale)
+        self.end_y = min(height, self.start_y + self.height)
 
-    text = "Player Speed"
-    frame = cv2.putText(frame, text, (start_x+10, start_y+120), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-    text = f"{player_1_speed:.1f} km/h    {player_2_speed:.1f} km/h"
-    frame = cv2.putText(frame, text, (start_x+130, start_y+120), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-    
-    
-    text = "avg. S. Speed"
-    frame = cv2.putText(frame, text, (start_x+10, start_y+160), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-    text = f"{avg_player_1_shot_speed:.1f} km/h    {avg_player_2_shot_speed:.1f} km/h"
-    frame = cv2.putText(frame, text, (start_x+130, start_y+160), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-    
-    text = "avg. P. Speed"
-    frame = cv2.putText(frame, text, (start_x+10, start_y+200), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-    text = f"{avg_player_1_speed:.1f} km/h    {avg_player_2_speed:.1f} km/h"
-    frame = cv2.putText(frame, text, (start_x+130, start_y+200), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    def _text(self, frame, text, x, y, size, thickness):
+        s = self.scale
+        cv2.putText(frame, text, (self.start_x + int(x * s), self.start_y + int(y * s)), FONT, size * s, WHITE,
+                    max(1, int(round(thickness * s))), cv2.LINE_AA)
 
-    return frame
+    def draw(self, frame, state):
+        """Dibuja la caja con el FrameState del fotograma (lo modifica y lo devuelve)."""
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (self.start_x, self.start_y), (self.end_x, self.end_y), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+
+        self._text(frame, "Jugador 1", 140, 30, 0.55, 2)
+        self._text(frame, "Jugador 2", 250, 30, 0.55, 2)
+        self._text(frame, "(fondo)", 150, 50, 0.4, 1)
+        self._text(frame, "(cerca)", 260, 50, 0.4, 1)
+        for row, (label, field) in enumerate(ROWS):
+            y = 90 + 38 * row
+            self._text(frame, label, 10, y, 0.45, 1)
+            self._text(frame, format_speed(getattr(state.players[1], field)), 140, y, 0.45, 1)
+            self._text(frame, format_speed(getattr(state.players[2], field)), 250, y, 0.45, 1)
+        return frame
+
+
+def draw_player_stats_frame(frame, state, box):
+    return box.draw(frame, state)
+
+
+def draw_player_stats(output_video_frames, frame_states, box):
+    return [box.draw(frame, state) for frame, state in zip(output_video_frames, frame_states)]

@@ -1,27 +1,17 @@
 import json
 import time
-from copy import deepcopy
 
 import cv2
-import pandas as pd
 
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
-from stats import build_model_statistics, renumber_far_near
+from stats import build_frame_states, build_model_statistics, measure_shots, renumber_far_near
 from trackers import BallTracker, PlayerTracker
-from utils import (
-    VideoWriter,
-    draw_player_stats_frame,
-    get_center_of_bbox,
-    get_foot_position,
-    get_video_info,
-    iter_frames,
-    measure_distance,
-    speed_km_per_hour,
-)
+from utils import VideoWriter, get_video_info, iter_frames
 from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
+from utils.player_stats_drawer_utils import StatsBox
 from utils.progress import report_progress
 
 
@@ -130,62 +120,8 @@ def run_pipeline(config, render=True):
                                                                              ball_detections,
                                                                              homography)
 
-    player_stats_data = [{
-        'frame_num':0,
-        'player_1_number_of_shots':0,
-        'player_1_total_shot_speed':0,
-        'player_1_last_shot_speed':0,
-        'player_1_total_player_speed':0,
-        'player_1_last_player_speed':0,
-
-        'player_2_number_of_shots':0,
-        'player_2_total_shot_speed':0,
-        'player_2_last_shot_speed':0,
-        'player_2_total_player_speed':0,
-        'player_2_last_player_speed':0,
-    } ]
-    shots = []
-
-    for ball_shot_ind in range(len(ball_shot_frames)-1):
-        start_frame = ball_shot_frames[ball_shot_ind]
-        end_frame = ball_shot_frames[ball_shot_ind+1]
-        shot_frames = end_frame - start_frame
-
-        # Quién golpea: el jugador más cercano a la pelota en la imagen en el fotograma del golpe.
-        # (En la imagen y no en metros: la pelota está en el aire y su proyección al suelo no es fiable.)
-        if 1 not in ball_detections[start_frame]:
-            continue  # sin pelota en el fotograma del golpe: no se puede atribuir
-        ball_center = get_center_of_bbox(ball_detections[start_frame][1])
-        start_players = player_detections[start_frame]
-        player_shot_ball = min(start_players.keys(),
-                               key=lambda player_id: measure_distance(get_foot_position(start_players[player_id]),
-                                                                      ball_center))
-        opponent_player_id = 1 if player_shot_ball == 2 else 2
-
-        # Distancia recorrida por la pelota: de la posición del que golpea a la del rival cuando la devuelve.
-        # Se usan los pies de los jugadores porque están en el suelo y su posición en metros es exacta.
-        distance_covered_by_ball_meters = measure_distance(player_court_positions[start_frame][player_shot_ball],
-                                                           player_court_positions[end_frame][opponent_player_id])
-        speed_of_ball_shot = speed_km_per_hour(distance_covered_by_ball_meters, shot_frames, video_info.fps)
-
-        # Velocidad del rival mientras la pelota viaja hacia él
-        distance_covered_by_opponent_meters = measure_distance(player_court_positions[start_frame][opponent_player_id],
-                                                               player_court_positions[end_frame][opponent_player_id])
-        speed_of_opponent = speed_km_per_hour(distance_covered_by_opponent_meters, shot_frames, video_info.fps)
-
-        shots.append({"frame": int(start_frame), "endFrame": int(end_frame),
-                      "player": int(player_shot_ball), "speedKmh": float(speed_of_ball_shot)})
-
-        current_player_stats= deepcopy(player_stats_data[-1])
-        current_player_stats['frame_num'] = start_frame
-        current_player_stats[f'player_{player_shot_ball}_number_of_shots'] += 1
-        current_player_stats[f'player_{player_shot_ball}_total_shot_speed'] += speed_of_ball_shot
-        current_player_stats[f'player_{player_shot_ball}_last_shot_speed'] = speed_of_ball_shot
-
-        current_player_stats[f'player_{opponent_player_id}_total_player_speed'] += speed_of_opponent
-        current_player_stats[f'player_{opponent_player_id}_last_player_speed'] = speed_of_opponent
-
-        player_stats_data.append(current_player_stats)
+    shots = measure_shots(ball_shot_frames, ball_detections, player_detections, player_court_positions,
+                          video_info.fps)
 
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
@@ -203,35 +139,28 @@ def run_pipeline(config, render=True):
     if not render:
         return result
 
-    player_stats_data_df = pd.DataFrame(player_stats_data)
-    frames_df = pd.DataFrame({'frame_num': list(range(num_frames))})
-    player_stats_data_df = pd.merge(frames_df, player_stats_data_df, on='frame_num', how='left')
-    player_stats_data_df = player_stats_data_df.ffill()
-
-    player_stats_data_df['player_1_average_shot_speed'] = player_stats_data_df['player_1_total_shot_speed']/player_stats_data_df['player_1_number_of_shots']
-    player_stats_data_df['player_2_average_shot_speed'] = player_stats_data_df['player_2_total_shot_speed']/player_stats_data_df['player_2_number_of_shots']
-    player_stats_data_df['player_1_average_player_speed'] = player_stats_data_df['player_1_total_player_speed']/player_stats_data_df['player_2_number_of_shots']
-    player_stats_data_df['player_2_average_player_speed'] = player_stats_data_df['player_2_total_player_speed']/player_stats_data_df['player_1_number_of_shots']
-
-
+    # Estadísticas de cada fotograma para el overlay (sin "nan": lo que aún no se mide es None)
+    frame_states = build_frame_states(shots, num_frames)
 
     # Segunda pasada: se vuelve a leer el vídeo y cada fotograma se dibuja y se escribe al momento.
     output_video_path = resolve_path(paths["output"])
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
-    stats_rows = player_stats_data_df.to_dict("records")
-    mini_court = None
+    mini_court = stats_box = None
     with VideoWriter(output_video_path, fps=video_info.fps) as out:
         for i, frame in enumerate(iter_frames(input_video_path)):
             if i >= num_frames:
                 break
             if mini_court is None:
                 mini_court = MiniCourt(frame)
+                stats_box = StatsBox(frame.shape, right=mini_court.end_x, top=mini_court.end_y)
+                text_scale = mini_court.scale
             frame = player_tracker.draw_frame(frame, player_detections[i])
             frame = ball_tracker.draw_frame(frame, ball_detections[i])
             frame = court_line_detector.draw_keypoints(frame, court_keypoints[i])
             frame = mini_court.draw_frame(frame, player_court_positions[i], ball_court_positions[i])
-            frame = draw_player_stats_frame(frame, stats_rows[i])
-            cv2.putText(frame, f"Frame: {i}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            frame = stats_box.draw(frame, frame_states[i])
+            cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
+                        text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))
             out.write(frame)
             report_progress("Vídeo anotado", i + 1, num_frames)
     print(f"Vídeo guardado en {output_video_path}")
