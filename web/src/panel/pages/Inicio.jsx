@@ -28,6 +28,7 @@ const textos = {
     postulacionesNuevas: 'Postulaciones nuevas',
     enRevision: (n) => `${n} en revisión`,
     enProcesamiento: 'En procesamiento',
+    cortas: ['Jugadores', 'Partidos', 'Postulantes', 'En cola'],
     estimado: (n) => `Tiempo estimado: ${n} min`,
     postulacionesRecientes: 'Postulaciones recientes',
     verTodas: 'Ver todas',
@@ -111,6 +112,7 @@ const textos = {
     postulacionesNuevas: 'New applications',
     enRevision: (n) => `${n} in review`,
     enProcesamiento: 'Processing',
+    cortas: ['Players', 'Matches', 'Applicants', 'In queue'],
     estimado: (n) => `Estimated time: ${n} min`,
     postulacionesRecientes: 'Recent applications',
     verTodas: 'View all',
@@ -384,19 +386,27 @@ function Tarjetas({ t, resumen, ahora }) {
   return (
     <section
       aria-label={t.resumen}
-      className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4"
+      className="grid grid-cols-4 gap-1.5 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] md:gap-4"
     >
       {datos.map((dato, indice) => {
         const vacio = dato.valor == null
         return (
-          <div key={dato.etiqueta} className={`${tarjeta} flex flex-col gap-2.5`}>
-            <p className={etiqueta}>{dato.etiqueta}</p>
+          <div
+            key={dato.etiqueta}
+            className={`${tarjeta} flex min-w-0 flex-col gap-2.5 max-md:items-center max-md:gap-1.5 max-md:rounded-xl max-md:px-1 max-md:py-5 max-md:text-center`}
+          >
+            <p className={`${etiqueta} max-md:hidden`}>{dato.etiqueta}</p>
             <p
-              className={`font-display text-[44px] leading-none font-bold ${vacio ? 'text-line3' : ''}`}
+              className={`font-display text-[44px] leading-none font-bold max-md:text-[28px] ${vacio ? 'text-line3' : ''}`}
             >
               {vacio ? 0 : dato.valor}
             </p>
-            <p className="text-[13px] text-muted">{vacio ? t.notasVacias[indice] : dato.nota}</p>
+            <p className="w-full truncate text-[10.5px] font-semibold text-muted md:hidden">
+              {t.cortas[indice]}
+            </p>
+            <p className="text-[13px] text-muted max-md:hidden">
+              {vacio ? t.notasVacias[indice] : dato.nota}
+            </p>
           </div>
         )
       })}

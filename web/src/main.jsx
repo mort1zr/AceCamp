@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import App from './App.jsx'
 import AuthProvider from './panel/context/AuthProvider.jsx'
+import EntradaProvider from './panel/context/EntradaProvider.jsx'
 import './index.css'
 import { IdiomaProvider } from './compartido/lib/idioma.jsx'
 import { startSmoothScroll } from './compartido/lib/smoothScroll.js'
@@ -18,7 +19,9 @@ createRoot(document.getElementById('root')).render(
     <IdiomaProvider>
       <BrowserRouter>
         <AuthProvider>
-          <App />
+          <EntradaProvider>
+            <App />
+          </EntradaProvider>
         </AuthProvider>
       </BrowserRouter>
     </IdiomaProvider>

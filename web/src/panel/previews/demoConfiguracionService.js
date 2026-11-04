@@ -6,12 +6,11 @@ function ejemplo() {
       position: 'Entrenador principal',
       role: 'admin',
     },
+    isOrganization: true,
     organization: {
       name: 'Universidad de ejemplo',
       program: 'Tenis varonil y femenil',
-      welcome:
-        'Gracias por tu interés en nuestro programa. Completa el formulario y sube un partido.',
-      requiredFields: { utr: true, guardian: true, ranking: false, video: true },
+      canEdit: true,
     },
     team: [
       {
@@ -43,14 +42,15 @@ function ejemplo() {
       units: 'kmh',
       notifications: { analysis: true, application: true, alerts: false, weekly: true },
     },
-    plan: { id: 'pro', used: 18, limit: 40, renewsAt: '2026-12-01' },
+    plan: { id: 'ultra', trial: false, used: 18, limit: null },
   }
 }
 
 const esperar = () => new Promise((resolve) => setTimeout(resolve, 200))
 
-export function createDemoConfiguracionService({ scenario = 'data' } = {}) {
+export function createDemoConfiguracionService({ scenario = 'data', plan } = {}) {
   let data = ejemplo()
+  if (plan) data = { ...data, isOrganization: plan.id === 'ultra', plan }
   const listeners = new Set()
   const emit = () => listeners.forEach((listener) => listener(structuredClone(data)))
 

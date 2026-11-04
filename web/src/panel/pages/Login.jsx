@@ -57,7 +57,8 @@ export default function Login() {
     setSubmitting(true)
     try {
       await login(values)
-      navigate(destination, { replace: true })
+      if (acceso?.entrar) await acceso.entrar(destination)
+      else navigate(destination, { replace: true })
     } catch (error) {
       setFormError(authErrorMessage(error))
       setSubmitting(false)

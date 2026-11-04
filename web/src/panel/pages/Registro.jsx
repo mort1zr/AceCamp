@@ -65,7 +65,8 @@ export default function Registro() {
     setSubmitting(true)
     try {
       await registerCoach(values)
-      navigate('/inicio', { replace: true })
+      if (acceso?.entrar) await acceso.entrar('/inicio')
+      else navigate('/inicio', { replace: true })
     } catch (error) {
       setFormError(authErrorMessage(error))
       setSubmitting(false)
