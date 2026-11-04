@@ -4,7 +4,7 @@ import AppLayout from './panel/components/AppLayout.jsx'
 import PublicLayout from './landing/components/PublicLayout.jsx'
 import RequireAuth from './panel/components/RequireAuth.jsx'
 import { useAuth } from './panel/context/AuthContext.js'
-import { db, storage } from './panel/lib/firebase.js'
+import { auth, db, storage } from './panel/lib/firebase.js'
 import { createHttpVideoImporter } from './panel/lib/services/httpVideoImportService.js'
 import { createVideoUploadService, MAX_VIDEO_BYTES } from './panel/lib/videoUpload.js'
 import Acceso from './panel/pages/Acceso.jsx'
@@ -59,7 +59,7 @@ export default function App() {
           <Route path="/partidos" element={<Partidos />} />
           <Route path="/comparador" element={<Comparador />} />
           <Route path="/reclutamiento" element={<Reclutamiento />} />
-          <Route path="/configuracion" element={<Configuracion />} />
+          <Route path="/configuracion" element={<Configuracion db={db} auth={auth} session={session} />} />
         </Route>
       </Route>
 

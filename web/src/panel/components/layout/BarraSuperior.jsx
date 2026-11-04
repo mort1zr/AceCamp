@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import Avatar from '../Avatar.jsx'
+import { useAvatar } from '../../hooks/useAvatar.js'
 import { useTheme } from '../../../compartido/hooks/useTheme.js'
 import { useIdioma } from '../../../compartido/lib/idioma.jsx'
 
@@ -136,16 +138,6 @@ function Trazo({ children, size = 20 }) {
   )
 }
 
-function iniciales(nombre) {
-  return nombre
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((palabra) => palabra[0])
-    .join('')
-    .toUpperCase()
-}
-
 function useDesplegable() {
   const [abierto, setAbierto] = useState(false)
   const caja = useRef(null)
@@ -168,7 +160,8 @@ function useDesplegable() {
   return { abierto, setAbierto, caja }
 }
 
-function Cuenta({ t, nombre, organizacion, onSalir }) {
+function Cuenta({ t, nombre, correo, organizacion, onSalir }) {
+  const { indice } = useAvatar(correo)
   const { abierto, setAbierto, caja } = useDesplegable()
   return (
     <div ref={caja} className="relative">
@@ -180,9 +173,7 @@ function Cuenta({ t, nombre, organizacion, onSalir }) {
         onClick={() => setAbierto((actual) => !actual)}
         className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full transition-[box-shadow] hover:ring-2 hover:ring-line3 aria-expanded:ring-2 aria-expanded:ring-electric"
       >
-        <span className="grid size-10 place-items-center rounded-full bg-series1 text-sm font-bold text-on-accent">
-          {iniciales(nombre)}
-        </span>
+        <Avatar nombre={nombre} indice={indice} className="size-10" />
       </button>
 
       {abierto && (
@@ -192,11 +183,8 @@ function Cuenta({ t, nombre, organizacion, onSalir }) {
           className="absolute top-full right-0 z-40 mt-2 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-card border border-line2 bg-surface shadow-tile"
         >
           <div className="flex items-center gap-3 px-4 py-4">
-            <span
-              aria-hidden="true"
-              className="grid size-11 shrink-0 place-items-center rounded-full bg-series1 text-sm font-bold text-on-accent"
-            >
-              {iniciales(nombre)}
+            <span aria-hidden="true" className="shrink-0">
+              <Avatar nombre={nombre} indice={indice} className="size-11" />
             </span>
             <div className="min-w-0 leading-tight">
               <p className="truncate font-semibold">{nombre}</p>
@@ -401,7 +389,13 @@ export default function BarraSuperior({
 
       <Avisos t={t} avisos={avisos} onLeer={onLeerAvisos} />
 
-      <Cuenta t={t} nombre={nombre} organizacion={organizacion} onSalir={onSalir} />
+      <Cuenta
+        t={t}
+        nombre={nombre}
+        correo={usuario?.correo}
+        organizacion={organizacion}
+        onSalir={onSalir}
+      />
     </header>
   )
 }
