@@ -34,7 +34,7 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 | `npm test` | Pruebas de los componentes compartidos |
 | `npm run emulators` | Emuladores locales de Auth, Firestore y Storage |
 | `npm run seed` | Carga datos de ejemplo en los emuladores (con los emuladores ya encendidos) |
-| `npm run test:rules` | Pruebas de las reglas de Firestore; enciende y apaga el emulador solo (PCIT-23) |
+| `npm run test:rules` | Pruebas de las reglas de Firestore (PCIT-23) y del registro (PCIT-21); enciende y apaga los emuladores de Auth y Firestore |
 
 ## Firebase (PCIT-20)
 

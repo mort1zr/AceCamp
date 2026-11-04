@@ -1,4 +1,6 @@
 import { NavLink, Outlet } from 'react-router'
+import { useAuth } from '../context/AuthContext.js'
+import Button from './Button.jsx'
 import Logo from './Logo.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 
@@ -14,6 +16,8 @@ const sections = [
 ]
 
 export default function AppLayout() {
+  const { user, profile, logout } = useAuth()
+
   return (
     <div className="min-h-dvh bg-bg text-text lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="border-b border-line bg-side lg:border-r lg:border-b-0">
@@ -44,7 +48,11 @@ export default function AppLayout() {
 
       <div className="flex min-w-0 flex-col">
         <header className="flex items-center justify-end gap-3 border-b border-line px-6 py-3">
+          <span className="truncate text-sm text-text2">{profile?.displayName ?? user?.email}</span>
           <ThemeToggle />
+          <Button variant="secondary" onClick={logout}>
+            Cerrar sesión
+          </Button>
         </header>
         <main className="min-w-0 flex-1 px-6 py-8">
           <Outlet />

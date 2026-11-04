@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router'
 import AppLayout from './components/AppLayout.jsx'
 import PublicLayout from './components/PublicLayout.jsx'
+import RequireAuth from './components/RequireAuth.jsx'
 import Analizar from './pages/Analizar.jsx'
 import Comparador from './pages/Comparador.jsx'
 import Configuracion from './pages/Configuracion.jsx'
@@ -30,15 +31,17 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/registro" element={<Registro />} />
 
-      <Route element={<AppLayout />}>
-        <Route path="/inicio" element={<Inicio />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/jugadores" element={<Jugadores />} />
-        <Route path="/analizar" element={<Analizar />} />
-        <Route path="/partidos" element={<Partidos />} />
-        <Route path="/comparador" element={<Comparador />} />
-        <Route path="/reclutamiento" element={<Reclutamiento />} />
-        <Route path="/configuracion" element={<Configuracion />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<AppLayout />}>
+          <Route path="/inicio" element={<Inicio />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/jugadores" element={<Jugadores />} />
+          <Route path="/analizar" element={<Analizar />} />
+          <Route path="/partidos" element={<Partidos />} />
+          <Route path="/comparador" element={<Comparador />} />
+          <Route path="/reclutamiento" element={<Reclutamiento />} />
+          <Route path="/configuracion" element={<Configuracion />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<NotFound />} />
