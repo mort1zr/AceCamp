@@ -4,15 +4,16 @@ from copy import deepcopy
 import cv2
 import pandas as pd
 
-import constants
 from config import config_from_args, resolve_path
+from court import CourtHomography
 from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
 from stats import build_model_statistics, renumber_far_near
 from trackers import BallTracker, PlayerTracker
 from utils import (
-    convert_pixel_distance_to_meters,
     draw_player_stats,
+    get_center_of_bbox,
+    get_foot_position,
     get_video_info,
     measure_distance,
     read_video,
@@ -70,8 +71,13 @@ def run_pipeline(config, render=True):
     # choose players
     player_detections = player_tracker.choose_and_filter_players(court_keypoints, player_detections)
 
+    # Homografía imagen → pista (metros) a partir de los 14 puntos clave
+    homography = CourtHomography.from_keypoints(court_keypoints)
+    print(f"Homografía: error de reproyección medio {homography.mean_reprojection_error(court_keypoints):.1f} px, "
+          f"{int(homography.inliers.sum())}/{len(homography.inliers)} puntos clave coherentes")
+
     # MiniCourt
-    mini_court = MiniCourt(video_frames[0]) 
+    mini_court = MiniCourt(video_frames[0])
 
     # Detect ball shots
     ball_shot_frames= ball_tracker.get_ball_shot_frames(
@@ -80,10 +86,10 @@ def run_pipeline(config, render=True):
         rolling_window=config["shots"]["rolling_window"],
     )
 
-    # Convert positions to mini court positions
-    player_mini_court_detections, ball_mini_court_detections = mini_court.convert_bounding_boxes_to_mini_court_coordinates(player_detections, 
-                                                                                                          ball_detections,
-                                                                                                          court_keypoints)
+    # Posiciones en metros sobre la pista
+    player_court_positions, ball_court_positions = MiniCourt.court_positions(player_detections,
+                                                                             ball_detections,
+                                                                             homography)
 
     player_stats_data = [{
         'frame_num':0,
@@ -106,31 +112,24 @@ def run_pipeline(config, render=True):
         end_frame = ball_shot_frames[ball_shot_ind+1]
         shot_frames = end_frame - start_frame
 
-        # Get distance covered by the ball
-        distance_covered_by_ball_pixels = measure_distance(ball_mini_court_detections[start_frame][1],
-                                                           ball_mini_court_detections[end_frame][1])
-        distance_covered_by_ball_meters = convert_pixel_distance_to_meters( distance_covered_by_ball_pixels,
-                                                                           constants.DOUBLE_LINE_WIDTH,
-                                                                           mini_court.get_width_of_mini_court()
-                                                                           ) 
+        # Quién golpea: el jugador más cercano a la pelota en la imagen en el fotograma del golpe.
+        # (En la imagen y no en metros: la pelota está en el aire y su proyección al suelo no es fiable.)
+        ball_center = get_center_of_bbox(ball_detections[start_frame][1])
+        start_players = player_detections[start_frame]
+        player_shot_ball = min(start_players.keys(),
+                               key=lambda player_id: measure_distance(get_foot_position(start_players[player_id]),
+                                                                      ball_center))
+        opponent_player_id = 1 if player_shot_ball == 2 else 2
 
-        # Speed of the ball shot in km/h
+        # Distancia recorrida por la pelota: de la posición del que golpea a la del rival cuando la devuelve.
+        # Se usan los pies de los jugadores porque están en el suelo y su posición en metros es exacta.
+        distance_covered_by_ball_meters = measure_distance(player_court_positions[start_frame][player_shot_ball],
+                                                           player_court_positions[end_frame][opponent_player_id])
         speed_of_ball_shot = speed_km_per_hour(distance_covered_by_ball_meters, shot_frames, video_info.fps)
 
-        # player who the ball
-        player_positions = player_mini_court_detections[start_frame]
-        player_shot_ball = min( player_positions.keys(), key=lambda player_id: measure_distance(player_positions[player_id],
-                                                                                                 ball_mini_court_detections[start_frame][1]))
-
-        # opponent player speed
-        opponent_player_id = 1 if player_shot_ball == 2 else 2
-        distance_covered_by_opponent_pixels = measure_distance(player_mini_court_detections[start_frame][opponent_player_id],
-                                                                player_mini_court_detections[end_frame][opponent_player_id])
-        distance_covered_by_opponent_meters = convert_pixel_distance_to_meters( distance_covered_by_opponent_pixels,
-                                                                           constants.DOUBLE_LINE_WIDTH,
-                                                                           mini_court.get_width_of_mini_court()
-                                                                           ) 
-
+        # Velocidad del rival mientras la pelota viaja hacia él
+        distance_covered_by_opponent_meters = measure_distance(player_court_positions[start_frame][opponent_player_id],
+                                                               player_court_positions[end_frame][opponent_player_id])
         speed_of_opponent = speed_km_per_hour(distance_covered_by_opponent_meters, shot_frames, video_info.fps)
 
         shots.append({"frame": int(start_frame), "endFrame": int(end_frame),
@@ -147,11 +146,7 @@ def run_pipeline(config, render=True):
 
         player_stats_data.append(current_player_stats)
 
-    # Sprint 1: posiciones de la mini-pista (píxeles) pasadas a metros con su escala.
-    meters_per_pixel = constants.DOUBLE_LINE_WIDTH / mini_court.get_width_of_mini_court()
-    player_positions_m = [{pid: (x * meters_per_pixel, y * meters_per_pixel) for pid, (x, y) in frame.items()}
-                          for frame in player_mini_court_detections]
-    stats_shots, stats_positions = renumber_far_near(shots, player_positions_m)
+    stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, len(video_frames))
     result = {"model_statistics": model_statistics, "shots": stats_shots, "output_video": None}
     if not render:
@@ -179,8 +174,9 @@ def run_pipeline(config, render=True):
 
     # Draw Mini Court
     output_video_frames = mini_court.draw_mini_court(output_video_frames)
-    output_video_frames = mini_court.draw_points_on_mini_court(output_video_frames,player_mini_court_detections)
-    output_video_frames = mini_court.draw_points_on_mini_court(output_video_frames,ball_mini_court_detections, color=(0,255,255))    
+    output_video_frames = mini_court.draw_points_on_mini_court(output_video_frames, player_court_positions)
+    output_video_frames = mini_court.draw_points_on_mini_court(output_video_frames, ball_court_positions,
+                                                               color=(0, 255, 255))
 
     # Draw Player Stats
     output_video_frames = draw_player_stats(output_video_frames,player_stats_data_df)

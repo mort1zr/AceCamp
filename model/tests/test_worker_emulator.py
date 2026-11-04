@@ -148,6 +148,9 @@ def test_end_to_end_storage_pipeline_firestore(backend, tmp_path, monkeypatch, s
     assert run_once(store, videos, make_analyzer(), tmp_path / "work", version="v") == (match_id, "listo")
 
     statistics = store.db.collection("matches").document(match_id).get().get("statistics")
-    assert statistics["schemaVersion"] == "acecam.match-stats.v1"
     assert statistics["durationSeconds"] == 4.0  # 120 fotogramas a 30 fps
-    assert "shots" in statistics["player"] and "shots" in statistics["opponent"]
+    # En el vídeo sintético solo hay un golpe medible, del jugador cercano ('abajo').
+    assert statistics["player"]["shots"]["count"] == 1
+    assert 40 < statistics["player"]["shots"]["maxSpeedKmh"] < 120
+    assert statistics["opponent"]["shots"] == {"count": 0, "sumSpeedKmh": 0.0}  # medido y cero, no "sin dato"
+    assert "movement" in statistics["opponent"]

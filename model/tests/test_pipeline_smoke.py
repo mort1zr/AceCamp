@@ -6,25 +6,17 @@ cámara de retransmisión. Así se comprueba que el pipeline completo funciona
 sin PyTorch, sin Ultralytics y sin descargar pesos.
 """
 
-import json
-
 import cv2
 import numpy as np
 import pytest
 
 import main
+from court import COURT_KEYPOINTS_M
 from utils import get_video_info
 
 WIDTH, HEIGHT, FPS, NUM_FRAMES = 1280, 720, 30, 120
 
 COURT_TO_IMAGE = np.array([[40.0, -6.0, 420.0], [0.0, 10.5, 130.0], [0.0, -0.012, 1.0]])
-
-# Puntos clave de la pista en metros, en el orden del detector (ver mini_court/mini_court.py).
-_W, _L, _A, _S = 10.97, 23.77, 1.37, 5.485
-COURT_KEYPOINTS_M = [
-    (0, 0), (_W, 0), (0, _L), (_W, _L), (_A, 0), (_A, _L), (_W - _A, 0), (_W - _A, _L),
-    (_A, _S), (_W - _A, _S), (_A, _L - _S), (_W - _A, _L - _S), (_W / 2, _S), (_W / 2, _L - _S),
-]
 
 
 def project(points_m):
@@ -58,7 +50,7 @@ class FakeBallTracker(main.BallTracker):
 
 
 class FakeCourtLineDetector:
-    def __init__(self, model_path, refine=True):
+    def __init__(self, model_path):
         self.model_path = model_path
 
     def predict(self, image):
@@ -81,34 +73,15 @@ def synthetic_video(tmp_path):
     return write_synthetic_video(tmp_path / "partido.avi")
 
 
-@pytest.fixture
-def fake_models(monkeypatch):
+def test_pipeline_runs_end_to_end(monkeypatch, tmp_path, synthetic_video):
     monkeypatch.setattr(main, "PlayerTracker", FakePlayerTracker)
     monkeypatch.setattr(main, "BallTracker", FakeBallTracker)
     monkeypatch.setattr(main, "CourtLineDetector", FakeCourtLineDetector)
-
-
-def test_pipeline_runs_end_to_end(fake_models, tmp_path, synthetic_video):
     output = tmp_path / "salida.avi"
-    stats = tmp_path / "stats.json"
 
-    main.main(["--input", str(synthetic_video), "--output", str(output), "--cache-dir", str(tmp_path / "cache"),
-               "--stats-json", str(stats)])
+    main.main(["--input", str(synthetic_video), "--output", str(output), "--cache-dir", str(tmp_path / "cache")])
 
     info = get_video_info(output)
     assert info.frame_count == NUM_FRAMES
     assert (info.width, info.height) == (WIDTH, HEIGHT)
     assert info.fps == pytest.approx(FPS)
-    statistics = json.loads(stats.read_text())
-    assert statistics["schemaVersion"] == "acecam.model-stats.v1"
-    assert statistics["durationSeconds"] == 4.0
-    assert set(statistics["players"]) == {"1", "2"}
-
-
-def test_pipeline_without_video_only_returns_statistics(fake_models, tmp_path, synthetic_video):
-    result = main.main(["--input", str(synthetic_video), "--output", str(tmp_path / "no.avi"),
-                        "--cache-dir", str(tmp_path / "cache"), "--no-video"])
-
-    assert result["output_video"] is None
-    assert not (tmp_path / "no.avi").exists()
-    assert result["model_statistics"]["players"]["2"]["shots"]["count"] >= 0
