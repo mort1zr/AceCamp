@@ -1,8 +1,10 @@
 import json
 import time
+from dataclasses import dataclass
 
 import cv2
 
+from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
@@ -15,7 +17,19 @@ from utils.player_stats_drawer_utils import StatsBox
 from utils.progress import report_progress
 
 
-def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tracker,
+@dataclass
+class VideoDetections:
+    """Resultado de la primera pasada: una entrada por fotograma (salvo cuts)."""
+
+    players: list
+    ball: list
+    keypoints: list
+    homographies: list
+    court_visible: list
+    cuts: list
+
+
+def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tracker, cut_detector=None,
                  cached_players=None, cached_ball=None, player_every=1):
     """Primera pasada (PCIT-146): recorre el vídeo una vez y guarda solo las detecciones.
 
@@ -26,11 +40,14 @@ def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tra
     player_every > 1 detecta a los jugadores en uno de cada N fotogramas; en el resto
     se dejan vacíos y la selección de jugadores interpola sus cajas.
 
-    Devuelve (jugadores, candidatos de pelota, puntos clave, homografías), una entrada
-    por fotograma.
+    Con cut_detector, cada corte de cámara obliga a volver a detectar la pista (TA-15).
     """
-    players, ball, keypoints, homographies = [], [], [], []
+    result = VideoDetections([], [], [], [], [], [])
+    players, ball = result.players, result.ball
     for i, frame in enumerate(iter_frames(video_path)):
+        cut = cut_detector.update(frame) if cut_detector is not None else False
+        if cut:
+            result.cuts.append(i)
         if cached_players is not None and i < len(cached_players):
             players.append(cached_players[i])
         elif i % player_every == 0:
@@ -41,11 +58,12 @@ def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tra
             ball.append(cached_ball[i])
         else:
             ball.append(ball_tracker.detect_frame(frame))
-        frame_keypoints, homography = court_tracker.update(frame)
-        keypoints.append(frame_keypoints)
-        homographies.append(homography)
+        frame_keypoints, homography = court_tracker.update(frame, cut=cut)
+        result.keypoints.append(frame_keypoints)
+        result.homographies.append(homography)
+        result.court_visible.append(court_tracker.court_visible)
         report_progress("Detección", i + 1, num_frames)
-    return players, ball, keypoints, homographies
+    return result
 
 
 def run_pipeline(config, render=True):
@@ -83,23 +101,41 @@ def run_pipeline(config, render=True):
     cached_players = load_detections(players_cache, video_hash) if config["use_cache"] else None
     cached_ball = load_detections(ball_cache, video_hash) if config["use_cache"] else None
 
-    player_detections, ball_candidates, court_keypoints, homography = detect_video(
+    detections = detect_video(
         input_video_path, video_info.frame_count, player_tracker, ball_tracker, court_tracker,
+        cut_detector=CutDetector() if config["cameras"]["detect_cuts"] else None,
         cached_players=cached_players, cached_ball=cached_ball, player_every=player_every)
-    num_frames = len(ball_candidates)
+    num_frames = len(detections.ball)
     if num_frames == 0:
         raise ValueError(f"El vídeo no tiene fotogramas: {input_video_path}")
     if cached_players is None or len(cached_players) != num_frames:
-        save_detections(players_cache, player_detections, video_hash)
+        save_detections(players_cache, detections.players, video_hash)
     if cached_ball is None or len(cached_ball) != num_frames:
-        save_detections(ball_cache, ball_candidates, video_hash)
+        save_detections(ball_cache, detections.ball, video_hash)
+    court_keypoints, homography = detections.keypoints, detections.homographies
+
+    # Cámara principal (TA-15): fuera de ella (repeticiones, primeros planos) se descartan
+    # jugadores y pelota, así que no generan golpes ni botes ni suman metros.
+    main_camera = main_camera_frames(court_keypoints, detections.court_visible, video_info.width,
+                                     max_shift_fraction=config["cameras"]["max_shift_fraction"])
+    main_segments = segments(main_camera)
+    if not main_segments:
+        raise ValueError("no se reconoció la pista en ningún tramo del vídeo")
+    main_frames = sum(end - start + 1 for start, end in main_segments)
+    if detections.cuts or main_frames < num_frames:
+        print(f"Cámara principal: {main_frames}/{num_frames} fotogramas en {len(main_segments)} tramos; "
+              f"{len(detections.cuts)} cortes de cámara")
+    player_detections = [d if main else {} for d, main in zip(detections.players, main_camera)]
+    ball_candidates = [d if main else {} for d, main in zip(detections.ball, main_camera)]
 
     ball_detections = ball_tracker.select_ball_positions(ball_candidates, frame_height=video_info.height)
     ball_detections = ball_tracker.interpolate_ball_positions(ball_detections,
                                                               max_gap=detection["ball_max_interpolation_gap"])
+    ball_detections = [d if main else {} for d, main in zip(ball_detections, main_camera)]
 
-    first = homography[0]
-    print(f"Homografía: error de reproyección medio {first.mean_reprojection_error(court_keypoints[0]):.1f} px, "
+    first_main = main_segments[0][0]
+    first = homography[first_main]
+    print(f"Homografía: error de reproyección medio {first.mean_reprojection_error(court_keypoints[first_main]):.1f} px, "
           f"{int(first.inliers.sum())}/{len(first.inliers)} puntos clave coherentes")
     discarded = [i for i, ok in enumerate(first.inliers) if not ok]
     if discarded:
@@ -107,6 +143,8 @@ def run_pipeline(config, render=True):
 
     # Elegir a los dos jugadores: 1 = lado lejano, 2 = lado cercano
     player_detections = player_tracker.choose_and_filter_players(homography, player_detections)
+    # La selección interpola las cajas en los huecos; fuera de la cámara principal no hay jugadores.
+    player_detections = [d if main else {} for d, main in zip(player_detections, main_camera)]
 
     # Detect ball shots
     ball_shot_frames= ball_tracker.get_ball_shot_frames(
@@ -121,7 +159,7 @@ def run_pipeline(config, render=True):
                                                                              homography)
 
     shots = measure_shots(ball_shot_frames, ball_detections, player_detections, player_court_positions,
-                          video_info.fps)
+                          video_info.fps, main_camera=main_camera)
 
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
@@ -135,6 +173,8 @@ def run_pipeline(config, render=True):
         "ball_detections": ball_detections,
         "court_keypoints": court_keypoints,
         "player_detections": player_detections,
+        "cuts": detections.cuts,
+        "main_camera_segments": main_segments,
     }
     if not render:
         return result
@@ -156,7 +196,11 @@ def run_pipeline(config, render=True):
                 text_scale = mini_court.scale
             frame = player_tracker.draw_frame(frame, player_detections[i])
             frame = ball_tracker.draw_frame(frame, ball_detections[i])
-            frame = court_line_detector.draw_keypoints(frame, court_keypoints[i])
+            if main_camera[i]:
+                frame = court_line_detector.draw_keypoints(frame, court_keypoints[i])
+            else:
+                cv2.putText(frame, "Otra camara: no se analiza", (int(10 * text_scale), int(70 * text_scale)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 165, 255), max(1, int(round(2 * text_scale))))
             frame = mini_court.draw_frame(frame, player_court_positions[i], ball_court_positions[i])
             frame = stats_box.draw(frame, frame_states[i])
             cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,

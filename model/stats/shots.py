@@ -8,7 +8,7 @@ from __future__ import annotations
 from utils import get_center_of_bbox, get_foot_position, measure_distance, speed_km_per_hour
 
 
-def measure_shots(shot_frames, ball_detections, player_detections, player_positions_m, fps):
+def measure_shots(shot_frames, ball_detections, player_detections, player_positions_m, fps, main_camera=None):
     """Un elemento por golpe medido: {"frame", "endFrame", "player", "speedKmh", "opponentSpeedKmh"}.
 
     Cada golpe va de su fotograma al del siguiente golpe (el último no se mide: no
@@ -19,9 +19,14 @@ def measure_shots(shot_frames, ball_detections, player_detections, player_positi
     - Velocidad de la pelota: de los pies del que golpea a los del rival cuando la
       devuelve, en metros (los pies están en el suelo: su posición en metros es exacta).
     - Velocidad del rival: lo que se desplaza mientras la pelota viaja hacia él.
+
+    main_camera (opcional, TA-15): por fotograma, si es de la cámara principal. Un golpe
+    cuyo recorrido incluye otro plano (una repetición) no se mide.
     """
     shots = []
     for start, end in zip(shot_frames, shot_frames[1:]):
+        if main_camera is not None and not all(main_camera[start:end + 1]):
+            continue
         ball = ball_detections[start].get(1)
         players = player_detections[start]
         if ball is None or not players:

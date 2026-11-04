@@ -34,6 +34,13 @@ court:
   # Ajustar cada punto clave al cruce de líneas blancas más cercano.
   refine_keypoints: true
 
+cameras:
+  # Detectar cortes de cámara y repeticiones (TA-15): fuera de la cámara principal no se analiza.
+  detect_cuts: true
+  # Cuánto puede desplazarse la pista respecto a su posición habitual (fracción del ancho del
+  # fotograma) para seguir contando como cámara principal.
+  max_shift_fraction: 0.08
+
 shots:
   # Fotogramas seguidos con la misma dirección vertical para contar un golpe.
   min_change_frames_for_hit: 25

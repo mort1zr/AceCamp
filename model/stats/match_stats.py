@@ -45,27 +45,54 @@ def _moving_average(points, window):
     return np.column_stack([np.convolve(points[:, k], kernel, mode="valid") for k in range(2)])
 
 
+def _valid(position):
+    return position is not None and not any(math.isnan(v) for v in position)
+
+
+def _runs(positions_m):
+    """Tramos seguidos de posiciones válidas (un hueco, por ejemplo una repetición, corta el tramo)."""
+    runs, current = [], []
+    for position in positions_m:
+        if _valid(position):
+            current.append(position)
+        elif current:
+            runs.append(current)
+            current = []
+    if current:
+        runs.append(current)
+    return runs
+
+
 def movement_stats(positions_m, fps, smoothing_seconds=SMOOTHING_SECONDS, window_seconds=SPEED_WINDOW_SECONDS):
     """Distancia recorrida y velocidades de un jugador a partir de su posición en cada fotograma.
 
     positions_m: lista de (x, y) en metros (None o NaN en los fotogramas sin posición).
+    Cada tramo seguido de posiciones se mide por separado: entre dos tramos (por ejemplo,
+    antes y después de una repetición) no se suma la distancia (TA-15).
     Devuelve None si no hay suficientes posiciones para medir.
     """
-    valid = [p for p in positions_m if p is not None and not any(math.isnan(v) for v in p)]
-    if len(valid) < 2:
-        return None
-    points = _moving_average(np.asarray(valid, dtype=float), max(1, int(round(smoothing_seconds * fps))))
-    steps = np.linalg.norm(np.diff(points, axis=0), axis=1)
-    distance = float(steps.sum())
-    # Tiempo del mismo tramo que la distancia (el suavizado recorta unos fotogramas en los extremos).
-    duration = len(steps) / fps
-
+    smoothing = max(1, int(round(smoothing_seconds * fps)))
     window = max(1, int(round(window_seconds * fps)))
-    if len(steps) >= window:
-        per_window = np.convolve(steps, np.ones(window), mode="valid")  # metros en cada ventana
-        max_speed = float(per_window.max()) / window_seconds * 3.6
-    else:
-        max_speed = distance / duration * 3.6
+    distance, num_steps, max_speed = 0.0, 0, None
+    for run in _runs(positions_m):
+        if len(run) < 2:
+            continue
+        points = _moving_average(np.asarray(run, dtype=float), smoothing)
+        steps = np.linalg.norm(np.diff(points, axis=0), axis=1)
+        if len(steps) == 0:
+            continue
+        distance += float(steps.sum())
+        num_steps += len(steps)
+        if len(steps) >= window:
+            per_window = np.convolve(steps, np.ones(window), mode="valid")  # metros en cada ventana
+            run_max = float(per_window.max()) / window_seconds * 3.6
+        else:
+            run_max = float(steps.sum()) / (len(steps) / fps) * 3.6
+        max_speed = run_max if max_speed is None else max(max_speed, run_max)
+    if num_steps == 0:
+        return None
+    # Tiempo de los mismos tramos que la distancia (el suavizado recorta unos fotogramas en los extremos).
+    duration = num_steps / fps
     return {
         "distanceMeters": _round(distance),
         "avgSpeedKmh": _round(distance / duration * 3.6),
