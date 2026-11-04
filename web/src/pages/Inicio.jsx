@@ -7,6 +7,7 @@ import { useIdioma } from '../lib/idioma.jsx'
 const textos = {
   es: {
     locale: 'es-PE',
+    coach: 'Coach',
     manana: 'Buenos días',
     tarde: 'Buenas tardes',
     noche: 'Buenas noches',
@@ -89,6 +90,7 @@ const textos = {
   },
   en: {
     locale: 'en-US',
+    coach: 'Coach',
     manana: 'Good morning',
     tarde: 'Good afternoon',
     noche: 'Good evening',
@@ -337,7 +339,7 @@ function Bienvenida({ t, nombre, resumen, ahora }) {
         <p className={etiqueta}>{fecha}</p>
         <h1 className="my-1.5 font-display text-[44px] leading-none font-bold">
           {saludo(t, ahora.getHours())}
-          {nombre ? `, ${nombre}` : ''}
+          {`, ${nombre || t.coach}`}
         </h1>
         {!resumen && <p className="text-base text-muted">{t.sinActividad}</p>}
         {resumen && (
