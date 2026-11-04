@@ -1,6 +1,12 @@
 import { Route, Routes } from 'react-router'
+import { useMemo } from 'react'
 import AppLayout from './components/AppLayout.jsx'
 import PublicLayout from './components/PublicLayout.jsx'
+import RequireAuth from './components/RequireAuth.jsx'
+import { useAuth } from './context/AuthContext.js'
+import { db, storage } from './lib/firebase.js'
+import { createHttpVideoImporter } from './lib/services/httpVideoImportService.js'
+import { createVideoUploadService, MAX_VIDEO_BYTES } from './lib/videoUpload.js'
 import Analizar from './pages/Analizar.jsx'
 import Comparador from './pages/Comparador.jsx'
 import Configuracion from './pages/Configuracion.jsx'
@@ -17,7 +23,18 @@ import Reclutamiento from './pages/Reclutamiento.jsx'
 import Registro from './pages/Registro.jsx'
 import Terminos from './pages/Terminos.jsx'
 
+const { uploadVideo } = createVideoUploadService({ storage })
+
 export default function App() {
+  const { user, profile } = useAuth()
+  const session = user && profile ? { uid: user.uid, orgId: profile.orgId } : undefined
+  const importVideo = useMemo(() => createHttpVideoImporter({
+    enabled: import.meta.env.DEV && import.meta.env.MODE === 'demo' && Boolean(user && profile),
+    supportsYouTube: true,
+    endpoint: '/api/video-import',
+    getSession: async () => ({ orgId: profile.orgId, actorId: user.uid, token: await user.getIdToken() }),
+  }), [user, profile])
+
   return (
     <Routes>
       <Route element={<PublicLayout />}>
@@ -30,15 +47,17 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/registro" element={<Registro />} />
 
-      <Route element={<AppLayout />}>
-        <Route path="/inicio" element={<Inicio />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/jugadores" element={<Jugadores />} />
-        <Route path="/analizar" element={<Analizar />} />
-        <Route path="/partidos" element={<Partidos />} />
-        <Route path="/comparador" element={<Comparador />} />
-        <Route path="/reclutamiento" element={<Reclutamiento />} />
-        <Route path="/configuracion" element={<Configuracion />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<AppLayout />}>
+          <Route path="/inicio" element={<Inicio />} />
+          <Route path="/dashboard" element={<Dashboard db={db} session={session} />} />
+          <Route path="/jugadores" element={<Jugadores db={db} session={session} />} />
+          <Route path="/analizar" element={<Analizar db={db} session={session} uploadVideo={uploadVideo} importVideo={importVideo} maxBytes={MAX_VIDEO_BYTES} />} />
+          <Route path="/partidos" element={<Partidos />} />
+          <Route path="/comparador" element={<Comparador />} />
+          <Route path="/reclutamiento" element={<Reclutamiento />} />
+          <Route path="/configuracion" element={<Configuracion />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<NotFound />} />

@@ -2,11 +2,11 @@ import './ui.css'
 
 const statuses = {
   'en cola': { label: 'En cola', tone: 'neutral' },
-  procesando: { label: 'Procesando', tone: 'accent' },
+  procesando: { label: 'Procesando', tone: 'info' },
   listo: { label: 'Listo', tone: 'positive' },
   error: { label: 'Error', tone: 'negative' },
   nueva: { label: 'Nueva', tone: 'accent' },
-  'en revisión': { label: 'En revisión', tone: 'neutral' },
+  'en revisión': { label: 'En revisión', tone: 'info' },
   analizada: { label: 'Analizada', tone: 'positive' },
   contactada: { label: 'Contactada', tone: 'positive' },
   descartada: { label: 'Descartada', tone: 'neutral' },

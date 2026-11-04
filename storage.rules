@@ -1,0 +1,40 @@
+rules_version = '2';
+
+// Reglas de Storage para los videos de partidos (PCIT-24).
+// Ruta: orgs/{orgId}/matches/{matchId}/video.mp4 | video.mov (la misma que valida la regla de matches).
+// Pruebas: web/tests/storage (npm run test:rules).
+//
+// - Solo usuarios con sesión cuya ficha en users tenga ese orgId.
+// - El video se sube antes de crear el documento del partido (flujo de PCIT-27),
+//   así que no se exige que matches/{matchId} exista todavía.
+// - Tamaño máximo: 500 MB (MAX_VIDEO_BYTES en web/src/lib/videoUpload.js; cambiar ambos a la vez).
+// - El worker (PCIT-35) lee con el Admin SDK, que no pasa por estas reglas.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function inOrg(orgId) {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.orgId == orgId;
+    }
+
+    function validVideo(fileName) {
+      return request.resource.size > 0
+        && request.resource.size <= 500 * 1024 * 1024
+        && ((fileName == 'video.mp4' && request.resource.contentType == 'video/mp4')
+          || (fileName == 'video.mov' && request.resource.contentType == 'video/quicktime'))
+        && request.resource.metadata.uploadedBy == request.auth.uid;
+    }
+
+    match /orgs/{orgId}/matches/{matchId}/{fileName} {
+      allow read: if inOrg(orgId);
+      // Se permite reemplazar el archivo para reintentar una subida.
+      allow create, update: if inOrg(orgId) && validVideo(fileName);
+      allow delete: if inOrg(orgId);
+    }
+
+    // Todo lo demás queda cerrado.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

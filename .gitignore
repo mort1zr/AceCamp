@@ -33,3 +33,8 @@ model/training/data/
 .DS_Store
 .idea/
 .vscode/
+
+# Firebase (CLI y emuladores)
+.firebase/
+*-debug.log
+firebase-export-*/
