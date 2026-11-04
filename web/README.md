@@ -35,7 +35,7 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 
 ## Componentes compartidos (PCIT-25)
 
-Con el servidor de desarrollo activo, abre `http://localhost:5173/components.html`
+Con el servidor de desarrollo activo, abre `http://localhost:5173/previews/components.html`
 para revisar tarjetas KPI, badges, tabla, selector y estados de carga/vacío/error
 en claro y oscuro. Los valores de esa página son ejemplos y no se publican en
 el build habitual. Contratos y uso: [src/components/ui/README.md](src/components/ui/README.md).
@@ -44,7 +44,7 @@ La separación de acceso a datos se describe en
 
 ## Jugadores v1 (PCIT-26)
 
-Vista de desarrollo: `http://localhost:5173/jugadores.html`.
+Vista de desarrollo: `http://localhost:5173/previews/jugadores.html`.
 Permite probar lista y alta sin recargar, con datos ficticios en memoria.
 La conexión real depende de Firebase/Auth y el esquema compartido de Axel;
 no se usa el modo demo como respaldo en producción.
@@ -52,7 +52,7 @@ Contrato de servicio y pasos de integración: [src/lib/services/PLAYERS.md](src/
 
 ## Analizar video v1 (PCIT-27)
 
-Vista de desarrollo: `http://localhost:5173/analizar.html`.
+Vista de desarrollo: `http://localhost:5173/previews/analizar.html`.
 Permite seleccionar archivo o enlace, vincular/crear jugador, completar el partido
 y probar una cola en memoria. No transfiere ni procesa videos reales.
 La integración pendiente con Storage, Firestore y el worker se detalla en
@@ -68,7 +68,7 @@ locales. La demostración acepta sus enlaces de ejemplo sin descargar videos.
 
 ## Interfaz de Dashboard (PCIT-138)
 
-Vista de desarrollo: `http://localhost:5173/dashboard.html`.
+Vista de desarrollo: `http://localhost:5173/previews/dashboard.html`.
 Selector de jugador, tarjetas y estados de carga/vacío/error con ejemplos
 identificados. El cálculo real y el gráfico corresponden a PCIT-139 y PCIT-140.
 Contrato de integración: [src/lib/services/DASHBOARD_UI.md](src/lib/services/DASHBOARD_UI.md).
