@@ -61,7 +61,7 @@ const claseOpcion =
 const opcionesCuenta = [
   {
     clave: 'perfil',
-    to: '/configuracion',
+    to: '/configuracion?seccion=cuenta',
     icono: (
       <>
         <circle cx="12" cy="8" r="4" />
@@ -87,7 +87,7 @@ const opcionesCuenta = [
   },
   {
     clave: 'plan',
-    to: '/precios',
+    to: '/configuracion?seccion=plan',
     icono: (
       <>
         <rect x="3" y="5" width="18" height="14" rx="2" />
