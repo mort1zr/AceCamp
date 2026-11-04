@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import Icon from '../components/Icon.jsx'
 import LinkDeslizante from '../components/LinkDeslizante.jsx'
+import FooterGrande from '../components/FooterGrande.jsx'
 import Logo from '../components/Logo.jsx'
 
 const INCLINACION = 8
@@ -258,6 +259,84 @@ function Comparar({ anual }) {
   )
 }
 
+const preguntas = [
+  {
+    pregunta: '¿Qué tipo de video sirve?',
+    respuesta:
+      'Un video del partido grabado desde el fondo de la pista, con la cancha completa en cuadro. Sirve un celular en un trípode, y acepta archivos subidos o un link de YouTube.',
+  },
+  {
+    pregunta: '¿Cuánto tarda el análisis?',
+    respuesta:
+      'Depende de la duración y la resolución del video. Verás el avance en la cola de procesamiento y recibirás un aviso cuando el reporte esté listo.',
+  },
+  {
+    pregunta: '¿Qué tan precisas son las velocidades?',
+    respuesta:
+      'Son estimaciones calculadas a partir del video, no mediciones de radar. Sirven para comparar saques entre sí y seguir la evolución de un jugador, no como dato oficial.',
+  },
+  {
+    pregunta: '¿Puedo analizar a los dos jugadores del partido?',
+    respuesta:
+      'Sí. Cada análisis saca las estadísticas de ambos jugadores del mismo video, sin tener que subirlo dos veces.',
+  },
+  {
+    pregunta: '¿Puedo cancelar cuando quiera?',
+    respuesta:
+      'Sí. El plan se cancela desde Configuración y sigue activo hasta el final del periodo ya pagado, sin penalidad.',
+  },
+]
+
+function Preguntas() {
+  const [abierta, setAbierta] = useState(0)
+
+  return (
+    <section className="relative mt-40 rounded-t-[48px] bg-surface pt-28 sm:rounded-t-[64px]">
+      <div className="mx-auto max-w-3xl px-6">
+        <h2 className="text-center text-4xl sm:text-5xl">Preguntas frecuentes</h2>
+        <ul className="mt-14 space-y-2">
+          {preguntas.map(({ pregunta, respuesta }, indice) => {
+            const abiertaAhora = abierta === indice
+            return (
+              <li key={pregunta}>
+                <h3>
+                  <button
+                    type="button"
+                    aria-expanded={abiertaAhora}
+                    aria-controls={`respuesta-${indice}`}
+                    onClick={() => setAbierta(abiertaAhora ? null : indice)}
+                    className="group flex w-full items-center justify-between gap-6 py-4 text-left font-sans text-lg font-medium text-text"
+                  >
+                    {pregunta}
+                    <span
+                      className={`shrink-0 text-accent-ink transition-transform duration-300 ${
+                        abiertaAhora ? '' : 'rotate-45'
+                      }`}
+                    >
+                      <Icon name="close" size={22} strokeWidth={2.4} />
+                    </span>
+                  </button>
+                </h3>
+                <div
+                  id={`respuesta-${indice}`}
+                  className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+                    abiertaAhora ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+                  }`}
+                >
+                  <p className="overflow-hidden pr-12 text-lg leading-relaxed text-muted">
+                    <span className="block pb-6">{respuesta}</span>
+                  </p>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+      <FooterGrande />
+    </section>
+  )
+}
+
 function Periodo({ anual, onCambiar }) {
   return (
     <div className="mx-auto mt-10 inline-flex items-center gap-3 rounded-full border border-line2 bg-surface px-4 py-2 text-sm">
@@ -383,7 +462,7 @@ export default function Precios() {
   const [anual, setAnual] = useState(false)
 
   return (
-    <div className="relative overflow-clip px-6 pt-6 pb-24">
+    <div className="relative overflow-clip pt-6">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -394,7 +473,7 @@ export default function Precios() {
         }}
       />
 
-      <div className="relative mx-auto max-w-6xl">
+      <div className="relative mx-auto max-w-6xl px-6">
         <LinkDeslizante
           to="/"
           sentido="atras"
@@ -426,6 +505,8 @@ export default function Precios() {
 
         <Comparar anual={anual} />
       </div>
+
+      <Preguntas />
     </div>
   )
 }

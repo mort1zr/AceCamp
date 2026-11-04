@@ -26,7 +26,7 @@ export default function PublicLayout() {
       <main>
         <Outlet />
       </main>
-      <PublicFooter />
+      {esPrecios ? null : <PublicFooter />}
     </div>
   )
 }
