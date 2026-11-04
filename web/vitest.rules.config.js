@@ -1,5 +1,5 @@
-// Configuración de Vitest para las pruebas con emuladores: reglas (PCIT-23) y registro (PCIT-21).
-// Se ejecutan con `npm run test:rules`, que enciende los emuladores de Auth y Firestore.
+// Configuración de Vitest para las pruebas con emuladores: reglas (PCIT-23, PCIT-24) y registro (PCIT-21).
+// Se ejecutan con `npm run test:rules`, que enciende los emuladores de Auth, Firestore y Storage.
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
