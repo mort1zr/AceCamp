@@ -291,10 +291,23 @@ function Preguntas() {
   const [abierta, setAbierta] = useState(0)
 
   return (
-    <section className="relative mt-40 rounded-t-[48px] bg-surface pt-28 sm:rounded-t-[64px]">
-      <div className="mx-auto max-w-3xl px-6">
+    <section className="relative mt-40 overflow-hidden rounded-t-[48px] border-t border-line2 bg-surface pt-28 sm:rounded-t-[64px]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+          maskImage: 'linear-gradient(to bottom, black, transparent 70%)',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] max-w-full -translate-x-1/2 rounded-full bg-accent/5 blur-3xl"
+      />
+      <div className="relative mx-auto max-w-3xl px-6">
         <h2 className="text-center text-4xl sm:text-5xl">Preguntas frecuentes</h2>
-        <ul className="mt-14 space-y-2">
+        <ul className="mt-14 divide-y divide-line2 border-y border-line2">
           {preguntas.map(({ pregunta, respuesta }, indice) => {
             const abiertaAhora = abierta === indice
             return (
@@ -305,7 +318,7 @@ function Preguntas() {
                     aria-expanded={abiertaAhora}
                     aria-controls={`respuesta-${indice}`}
                     onClick={() => setAbierta(abiertaAhora ? null : indice)}
-                    className="group flex w-full items-center justify-between gap-6 py-4 text-left font-sans text-lg font-medium text-text"
+                    className="group flex w-full items-center justify-between gap-6 py-6 text-left font-sans text-lg font-medium text-text"
                   >
                     {pregunta}
                     <span
@@ -488,7 +501,9 @@ export default function Precios() {
 
         <header className="mt-16 text-center">
           <h1 className="mx-auto max-w-2xl text-4xl sm:text-6xl">
-            Elige cómo quieres medir tu juego
+            Tú eliges cómo
+            <br />
+            medir tu juego
           </h1>
           <p className="mx-auto mt-4 max-w-md text-lg text-text2">
             Prueba <span className="text-accent-ink">AceCam</span> gratis durante un mes con el plan
