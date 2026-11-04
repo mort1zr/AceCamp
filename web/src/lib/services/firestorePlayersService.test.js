@@ -41,11 +41,17 @@ describe('Contrato del adaptador Firestore (SDK simulado)', () => {
   it('impide suplantar la organización y registra consentimiento con identidad y hora del servidor', async () => {
     addDoc.mockResolvedValue({ id: 'new-player' })
     const service = createFirestorePlayersService(identity)
-    const result = await service.create({ fullName: 'Ana Torres', birthDate: '2004-01-01', consentAccepted: true, orgId: 'org-b', createdBy: 'attacker' })
+    const result = await service.create({
+      fullName: 'Ana Torres', birthDate: '2024-01-01', consentAccepted: true,
+      guardianName: 'Apoderada de prueba', guardianPhone: '+51 900 000 000', guardianEmail: 'demo@example.test',
+      orgId: 'org-b', createdBy: 'attacker',
+    })
     expect(addDoc.mock.calls[0][1]).toMatchObject({
       orgId: 'org-a', createdBy: 'coach-a', createdAt: 'server-time',
+      guardian: { name: 'Apoderada de prueba', phone: '+51 900 000 000', email: 'demo@example.test' },
       consent: { accepted: true, recordedBy: 'coach-a', recordedAt: 'server-time', method: 'coach-attestation' },
     })
+    expect(addDoc.mock.calls[0][1]).not.toHaveProperty('guardianEmail')
     expect(result.id).toBe('new-player')
   })
 

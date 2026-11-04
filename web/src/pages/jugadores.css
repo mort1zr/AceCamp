@@ -64,6 +64,8 @@
 .players-form-fields { padding: 0; margin: 0; border: 0; min-width: 0; }
 .players-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
 .players-field-wide { grid-column: 1 / -1; }
+.players-guardian { margin: 1.5rem 0 0; }
+.players-guardian legend { margin-bottom: 0.875rem; font-weight: 600; }
 .players-field label { display: block; margin-bottom: 0.55rem; font-size: 0.875rem; }
 .players-field label span { color: var(--players-muted); }
 .players-field input { display: block; width: 100%; min-width: 0; min-height: 46px; padding: 0.7rem 0.85rem; border: 1px solid var(--players-line); border-radius: 0.5rem; color: var(--players-text); background: var(--players-field); color-scheme: dark; }

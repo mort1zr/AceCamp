@@ -1,12 +1,21 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { playersErrorMessage, validatePlayer } from '../../lib/players.js'
+import { playersErrorMessage, requiresPlayerGuardian, validatePlayer } from '../../lib/players.js'
+
+const guardianFields = [
+  { name: 'guardianName', label: 'Nombre del apoderado', type: 'text', maxLength: 120 },
+  { name: 'guardianPhone', label: 'Teléfono del apoderado', type: 'tel', maxLength: 32 },
+  { name: 'guardianEmail', label: 'Correo del apoderado', type: 'email', maxLength: 254 },
+]
 
 export default function PlayerForm({ service, onCancel, onCreated }) {
   const id = useId()
   const nameRef = useRef(null)
   const active = useRef(false)
   const submitting = useRef(false)
-  const [values, setValues] = useState({ fullName: '', birthDate: '', academy: '', consentAccepted: false })
+  const [values, setValues] = useState({
+    fullName: '', birthDate: '', academy: '',
+    guardianName: '', guardianPhone: '', guardianEmail: '', consentAccepted: false,
+  })
   const [errors, setErrors] = useState({})
   const [saveError, setSaveError] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -19,8 +28,20 @@ export default function PlayerForm({ service, onCancel, onCreated }) {
 
   const update = event => {
     const { name, value, type, checked } = event.target
-    setValues(previous => ({ ...previous, [name]: type === 'checkbox' ? checked : value }))
-    setErrors(previous => ({ ...previous, [name]: undefined }))
+    setValues(previous => {
+      const next = { ...previous, [name]: type === 'checkbox' ? checked : value }
+      if (name === 'birthDate') {
+        const needsGuardian = requiresPlayerGuardian(value)
+        if (!needsGuardian) for (const field of guardianFields) next[field.name] = ''
+        if (needsGuardian !== requiresPlayerGuardian(previous.birthDate)) next.consentAccepted = false
+      }
+      return next
+    })
+    setErrors(previous => {
+      const next = { ...previous, [name]: undefined }
+      if (name === 'birthDate') for (const field of guardianFields) delete next[field.name]
+      return next
+    })
   }
 
   async function submit(event) {
@@ -68,6 +89,25 @@ export default function PlayerForm({ service, onCancel, onCreated }) {
               {errors.academy && <p className="players-field-error" id={`${id}-academy-error`}>{errors.academy}</p>}
             </div>
           </div>
+          {requiresPlayerGuardian(values.birthDate) && (
+            <fieldset className="players-guardian players-form-fields">
+              <legend>Datos del apoderado</legend>
+              <div className="players-form-grid">
+                {guardianFields.map(({ name, label, type, maxLength }) => (
+                  <div className={name === 'guardianName' ? 'players-field players-field-wide' : 'players-field'} key={name}>
+                    <label htmlFor={`${id}-${name}`}>{label} *</label>
+                    <input
+                      id={`${id}-${name}`} name={name} type={type} maxLength={maxLength}
+                      autoComplete="off" required value={values[name]} onChange={update}
+                      aria-invalid={Boolean(errors[name])}
+                      aria-describedby={errors[name] ? `${id}-${name}-error` : undefined}
+                    />
+                    {errors[name] && <p className="players-field-error" id={`${id}-${name}-error`}>{errors[name]}</p>}
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <div className="players-consent">
             <label htmlFor={`${id}-consent`}><input id={`${id}-consent`} name="consentAccepted" type="checkbox" checked={values.consentAccepted} onChange={update} required aria-invalid={Boolean(errors.consentAccepted)} aria-describedby={`${id}-consent-note${errors.consentAccepted ? ` ${id}-consent-error` : ''}`} /><span>Confirmo que el jugador o su apoderado ha sido informado y autorizó el registro de sus datos para el seguimiento deportivo. *</span></label>
             <p id={`${id}-consent-note`}>La autorización es obligatoria. El registro guardará quién la confirmó y cuándo.</p>

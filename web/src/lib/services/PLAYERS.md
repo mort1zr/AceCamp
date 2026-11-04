@@ -3,16 +3,17 @@
 ## Estado de integración
 
 Interfaz, validaciones, servicio Firestore y demostración implementados en
-`interfaces_Fabian`. Las tareas PCIT-20/21/22/23 de Axel siguen pendientes en la
-consulta de Jira realizada durante esta implementación. No se dispone de una
-sesión Firebase ni de un esquema definitivo para probar datos reales.
+`interfaces_Fabian`. Axel publicó la inicialización de Firebase (PCIT-20) y
+el esquema de Firestore en revisión (PCIT-22, rama `FireBaseComienzo`,
+revisión `74572b6`). La conexión de sesión (PCIT-21) y las reglas por
+organización (PCIT-23) siguen pendientes.
 
 PCIT-26 permite empezar con ejemplos. Abrir `/jugadores.html` con `npm run dev`:
 la demostración está identificada, usa memoria y se reinicia al recargar. Usar
 solo datos ficticios. No se escribe en Firebase ni en almacenamiento del navegador.
 La entrada normal de producción no importa la demostración.
 
-## Contrato propuesto para acordar con PCIT-22
+## Campos del alta según el esquema en revisión de PCIT-22
 
 Colección `players`, documentos con estos campos mínimos:
 
@@ -21,6 +22,7 @@ Colección `players`, documentos con estos campos mínimos:
 | fullName | Nombre y apellidos, texto normalizado, 2–120 caracteres |
 | birthDate | Fecha calendario YYYY-MM-DD; no se guarda la edad calculada |
 | academy | Texto opcional, hasta 120 caracteres |
+| guardian | Para menores de 18 años, objeto con `name`, `phone` y `email` |
 | orgId | Organización autenticada, fuera del formulario |
 | createdBy | UID del entrenador autenticado |
 | createdAt | serverTimestamp de Firestore |
@@ -30,33 +32,26 @@ Colección `players`, documentos con estos campos mínimos:
 sobre la autorización recibida, no una firma directa del jugador. El texto del
 formulario está versionado como `players-v1`; el mecanismo y el aviso de privacidad
 definitivos deben coordinarse con las tareas de consentimiento y datos del equipo.
-No se declara que esta interfaz sustituya dicho proceso. Perfil deportivo,
-apoderado, edición, búsqueda y paginación pertenecen a PCIT-42.
+El alta mínima captura los datos del apoderado que exige el esquema para menores.
+El perfil deportivo, la edición, la búsqueda y la paginación pertenecen a PCIT-42.
 
 ## Conexión en la aplicación autenticada
 
-La página `src/pages/Jugadores.jsx` exporta `Jugadores({ service })`. Su ruta final
-será `/jugadores`, ya prevista en PCIT-96 en la rama de Rolando. No se ha fusionado
-esa rama ni reemplazado su layout dentro de la rama personal de Fabián.
-
-Crear el servicio **una vez por sesión/organización**, por ejemplo mediante
-`useMemo`, y pasarlo a la página:
+La ruta `/jugadores` de PCIT-96 puede pasar a `Jugadores` la instancia `db` de
+PCIT-20 y una sesión que reúna el UID y la organización del mismo usuario
+autenticado. La página mantiene una instancia del servicio por base de datos,
+usuario y organización. El proveedor de sesión debe retirar el valor al salir
+o mientras carga el perfil de otra cuenta.
 
 ```jsx
-import { createFirestorePlayersService } from './lib/services/firestorePlayersService.js'
-
-const playersService = useMemo(() => {
-  if (!db || !user?.uid || !profile?.orgId) return null
-  return createFirestorePlayersService({ db, orgId: profile.orgId, actorId: user.uid })
-}, [db, user?.uid, profile?.orgId])
-
-// En la ruta autenticada /jugadores:
-<Jugadores service={playersService} />
+<Route path="/jugadores" element={<Jugadores db={db} session={session} />} />
 ```
 
-`db`, `user` y `profile` proceden de Firebase y AuthContext de Axel. No se inicializa
-otra app Firebase. Sin servicio la página muestra indisponibilidad, nunca ejemplos
-como respaldo silencioso. No introducir credenciales en el código.
+`session` es `{ uid, orgId }` y debe derivarse de la sesión y el perfil verificados
+por PCIT-21. Si falta alguno de los dos valores, la pantalla muestra el estado de
+indisponibilidad. El prop `service` se conserva para las vistas de demostración y
+las pruebas. La conexión se ensayó en una copia aislada de la ruta y layout de
+Rolando (`fdddeed`) con el SDK de Firestore simulado.
 
 El servicio expone `subscribe(onPlayers, onError)` con función de limpieza y
 `create(input)`. El listener usa `where('orgId', '==', orgId)` y actualiza la lista
@@ -82,6 +77,12 @@ para la vista aislada, sin copiar su layout ni su selector global.
   sin pérdida del formulario, bloqueo de doble envío y cambio de organización.
 - El adaptador se prueba con SDK simulado: filtro por orgId, campos permitidos,
   identidad de sesión, consentimiento con timestamp y propagación de errores.
+- En el proyecto local `demo-acecam-pcit135`, con Auth y Firestore Emulator y dos
+  cuentas ficticias, se comprobó el alta de un menor, su aparición por suscripción,
+  la persistencia al iniciar sesión desde otra instancia de la app y el rechazo
+  de lecturas y escrituras entre organizaciones. También se verificó el rechazo
+  de lecturas sin sesión. Esta prueba usó reglas temporales de alcance reducido.
+  Falta repetirla con el proveedor de PCIT-21 y las reglas definitivas de PCIT-23.
 - `npm run lint` y `npm run build`.
 - Revisión visual de `/jugadores.html` en ambos temas y en móvil.
 

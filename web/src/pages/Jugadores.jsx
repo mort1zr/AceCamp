@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { DataTable, ErrorState } from '../components/ui'
 import PlayerForm from '../components/players/PlayerForm.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { playerAge } from '../lib/players.js'
+import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
 
 const columns = [
@@ -41,7 +42,18 @@ function PlayersWorkspace({ service }) {
   )
 }
 
-export default function Jugadores({ service }) {
-  if (!service) return <section className="players-page"><h1>Jugadores</h1><ErrorState title="Los jugadores aún no están disponibles" description="Cuando tu sesión de equipo esté disponible, podrás consultar y registrar jugadores." /></section>
-  return <PlayersWorkspace key={service.scopeKey} service={service} />
+export default function Jugadores({ service, db, session }) {
+  // The authentication provider supplies uid and orgId together from the same verified session.
+  const uid = session?.uid
+  const orgId = session?.orgId
+  const liveService = useMemo(() => {
+    if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()) {
+      return null
+    }
+    return createFirestorePlayersService({ db, actorId: uid, orgId })
+  }, [db, uid, orgId])
+
+  const playersService = service ?? liveService
+  if (!playersService) return <section className="players-page"><h1>Jugadores</h1><ErrorState title="Los jugadores aún no están disponibles" description="Cuando tu sesión de equipo esté disponible, podrás consultar y registrar jugadores." /></section>
+  return <PlayersWorkspace key={playersService.scopeKey} service={playersService} />
 }

@@ -15,7 +15,20 @@ describe('Validación de jugadores', () => {
     for (const birthDate of ['2025-02-29', '2024-02-30', '2024-13-01', '2099-01-01', '', '2004-1-3']) {
       expect(validatePlayer({ ...valid, birthDate }, '2026-11-02').birthDate).toBeTruthy()
     }
-    expect(validatePlayer({ ...valid, birthDate: '2024-02-29' }, '2026-11-02')).toEqual({})
+    expect(validatePlayer({ ...valid, birthDate: '2024-02-29' }, '2026-11-02').birthDate).toBeUndefined()
+  })
+
+  it('exige apoderado hasta el día anterior al cumpleaños 18 y omite sus datos para un adulto', () => {
+    const minor = { ...valid, birthDate: '2008-11-03' }
+    const today = '2026-11-02'
+    expect(validatePlayer(minor, today)).toMatchObject({
+      guardianName: expect.any(String), guardianPhone: expect.any(String), guardianEmail: expect.any(String),
+    })
+    const fields = { ...minor, guardianName: '  Ana   de Prueba  ', guardianPhone: ' +51 900 000 000 ', guardianEmail: ' demo@example.test ' }
+    expect(normalizePlayer(fields, today).guardian).toEqual({
+      name: 'Ana de Prueba', phone: '+51 900 000 000', email: 'demo@example.test',
+    })
+    expect(normalizePlayer(fields, '2026-11-03')).not.toHaveProperty('guardian')
   })
 
   it('exige consentimiento explícito y no admite cadenas equivalentes a true', () => {

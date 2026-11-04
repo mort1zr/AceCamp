@@ -2,8 +2,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { onSnapshot, where } from 'firebase/firestore'
 import Jugadores from './Jugadores.jsx'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
+
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(), where: vi.fn(), query: vi.fn(), onSnapshot: vi.fn(),
+  addDoc: vi.fn(), serverTimestamp: vi.fn(),
+}))
 
 afterEach(cleanup)
 
@@ -14,6 +20,27 @@ async function fillPlayer(user, name = 'Jugador de prueba') {
 }
 
 describe('Jugadores v1', () => {
+  it('pide datos del apoderado para menores y no muestra su contacto en la plantilla', async () => {
+    const service = createDemoPlayersService({ initialPlayers: [] })
+    const save = vi.spyOn(service, 'create')
+    const user = userEvent.setup()
+    render(<Jugadores service={service} />)
+    await user.click(screen.getByRole('button', { name: /Nuevo jugador/ }))
+    await user.type(screen.getByLabelText('Nombre completo *'), 'Jugador menor de ejemplo')
+    await user.type(screen.getByLabelText('Fecha de nacimiento *'), '2020-01-01')
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Guardar jugador' }))
+    expect(save).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(screen.getByLabelText('Nombre del apoderado *'))
+    await user.type(screen.getByLabelText('Nombre del apoderado *'), 'Apoderada de prueba')
+    await user.type(screen.getByLabelText('Teléfono del apoderado *'), '900 000 000')
+    await user.type(screen.getByLabelText('Correo del apoderado *'), 'demo@example.test')
+    await user.click(screen.getByRole('button', { name: 'Guardar jugador' }))
+    const table = await screen.findByRole('table', { name: 'Jugadores registrados' })
+    expect(within(table).getByText('Jugador menor de ejemplo')).toBeTruthy()
+    expect(within(table).queryByText('demo@example.test')).toBeNull()
+  })
+
   it('muestra vacío, exige autorización y agrega sin recargar, sin duplicar', async () => {
     const service = createDemoPlayersService({ initialPlayers: [] })
     const save = vi.spyOn(service, 'create')
@@ -91,5 +118,22 @@ describe('Jugadores v1', () => {
     expect(screen.getByText('Los jugadores aún no están disponibles')).toBeTruthy()
     expect(screen.queryByText('Modo demostración')).toBeNull()
     expect(screen.queryByRole('button', { name: /Nuevo jugador/ })).toBeNull()
+  })
+
+  it('abre la consulta con la sesión completa y la cierra al salir', async () => {
+    const unsubscribe = vi.fn()
+    onSnapshot.mockImplementationOnce((_, receive) => {
+      receive({ docs: [{ id: 'p1', data: () => ({ fullName: 'Jugador del equipo' }) }] })
+      return unsubscribe
+    })
+    const db = { app: { options: { projectId: 'prueba' } } }
+    const { rerender } = render(<Jugadores db={db} session={{ uid: 'coach-1' }} />)
+    expect(onSnapshot).not.toHaveBeenCalled()
+    rerender(<Jugadores db={db} session={{ uid: 'coach-1', orgId: 'equipo-1' }} />)
+    expect(await screen.findByText('Jugador del equipo')).toBeTruthy()
+    expect(where).toHaveBeenCalledWith('orgId', '==', 'equipo-1')
+    rerender(<Jugadores db={db} />)
+    expect(unsubscribe).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Jugador del equipo')).toBeNull()
   })
 })
