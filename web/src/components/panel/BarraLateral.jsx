@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink } from 'react-router'
+import { NavLink } from 'react-router'
 import { useTextos } from '../../lib/idioma.jsx'
-import Logo from '../Logo.jsx'
 
 const CLAVE = 'acecam-menu'
 
@@ -111,7 +110,6 @@ const textos = {
     reclutamiento: 'Reclutamiento',
     configuracion: 'Configuración',
     principal: 'Principal',
-    irInicio: 'AceCam, ir a Inicio',
     colapsar: 'Colapsar menú',
     expandir: 'Expandir menú',
     plan: 'Plan',
@@ -128,7 +126,6 @@ const textos = {
     reclutamiento: 'Recruiting',
     configuracion: 'Settings',
     principal: 'Main',
-    irInicio: 'AceCam, go to Home',
     colapsar: 'Collapse menu',
     expandir: 'Expand menu',
     plan: 'Plan',
@@ -145,15 +142,15 @@ function leerColapsado() {
   }
 }
 
-function Trazo({ children, className = '' }) {
+function Trazo({ children, className = '', size = 20, strokeWidth = 1.8 }) {
   return (
     <svg
-      width="20"
-      height="20"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.8"
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
@@ -185,18 +182,57 @@ export default function BarraLateral() {
         abierto ? 'w-19 lg:w-58' : 'w-19'
       }`}
     >
-      <Link
-        to="/inicio"
-        aria-label={t.irInicio}
-        className="flex items-center gap-2.5 px-2 py-1 text-text"
+      <button
+        type="button"
+        onClick={() => setColapsado((actual) => !actual)}
+        aria-label={abierto ? t.colapsar : t.expandir}
+        aria-expanded={abierto}
+        title={abierto ? t.colapsar : t.expandir}
+        className="group relative flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[10px] px-2 py-1 text-left text-text transition-colors hover:bg-surface2"
       >
-        <Logo size={30} withWordmark={false} className="shrink-0" />
+        <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true" className="shrink-0">
+          <path d="M3 25h24" stroke="var(--faint)" strokeWidth="2" strokeLinecap="round" />
+          <ellipse
+            cx="15"
+            cy="24.6"
+            rx="6"
+            ry="1.6"
+            fill="var(--series1)"
+            className={`origin-center transition-[scale,opacity] duration-500 [transform-box:fill-box] ${
+              abierto
+                ? 'scale-x-60 opacity-50 lg:scale-x-100 lg:opacity-100'
+                : 'scale-x-60 opacity-50'
+            }`}
+          />
+          <g
+            className={`transition-[translate] duration-500 ease-[cubic-bezier(0.3,1.5,0.5,1)] ${
+              abierto ? '-translate-y-1 lg:translate-y-0' : '-translate-y-1'
+            }`}
+          >
+            <circle cx="15" cy="12" r="7.5" fill="var(--accent)" />
+            <path
+              d="M9.6 7.4c2.9 2.4 2.9 6.8 0 9.2M20.4 7.4c-2.9 2.4-2.9 6.8 0 9.2"
+              stroke="var(--on-accent)"
+              strokeWidth="1.4"
+              fill="none"
+            />
+          </g>
+        </svg>
         <span
           className={`font-display text-[26px] leading-none font-bold tracking-[0.08em] ${texto}`}
         >
           AceCam
         </span>
-      </Link>
+        <span
+          className={`ml-auto text-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 ${
+            abierto ? 'hidden lg:block' : 'hidden'
+          }`}
+        >
+          <Trazo size={18}>
+            <path d="m14.5 7-5 5 5 5" />
+          </Trazo>
+        </span>
+      </button>
 
       <nav aria-label={t.principal}>
         <ul className="flex flex-col gap-1">
@@ -221,35 +257,54 @@ export default function BarraLateral() {
         </ul>
       </nav>
 
-      <div className="mt-auto flex flex-col gap-3">
-        <div
-          className={`flex-col gap-1.5 rounded-xl border border-line bg-surface p-3.5 ${
-            abierto ? 'hidden lg:flex' : 'hidden'
-          }`}
-        >
-          <p className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">{t.plan}</p>
-          <p className="font-semibold">{t.nombrePlan}</p>
-          <p className="text-[13px] text-muted">{t.uso}</p>
-          <div className="h-1.5 overflow-hidden rounded-full bg-line">
-            <div className="h-full w-[45%] rounded-full bg-electric" />
-          </div>
-        </div>
+      <div
+        role="img"
+        aria-label={`${t.plan} ${t.nombrePlan}. ${t.uso}`}
+        title={`${t.nombrePlan} · ${t.uso}`}
+        className={`mt-auto flex flex-col items-center gap-2 rounded-xl border border-line bg-surface py-3 ${abierto ? 'lg:hidden' : ''}`}
+      >
+        <span className="rounded-[5px] bg-accent px-1.5 py-0.5 font-display text-[11px] leading-none font-bold tracking-[0.06em] text-on-accent uppercase">
+          Pro
+        </span>
+        <svg width="42" height="42" viewBox="0 0 42 42" aria-hidden="true" className="-rotate-90">
+          <circle cx="21" cy="21" r="17" fill="none" stroke="var(--line2)" strokeWidth="4" />
+          <circle
+            cx="21"
+            cy="21"
+            r="17"
+            fill="none"
+            stroke="var(--electric)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            pathLength="100"
+            strokeDasharray="45 100"
+          />
+          <text
+            x="21"
+            y="21"
+            transform="rotate(90 21 21)"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fill="var(--text)"
+            className="font-display text-[16px] font-bold"
+          >
+            18
+          </text>
+        </svg>
+        <span className="text-[11px] leading-none font-semibold text-muted">/ 40</span>
+      </div>
 
-        <button
-          type="button"
-          onClick={() => setColapsado((actual) => !actual)}
-          aria-label={abierto ? t.colapsar : t.expandir}
-          aria-expanded={abierto}
-          title={abierto ? t.colapsar : t.expandir}
-          className="hidden min-h-11 items-center gap-3 rounded-[10px] px-3 text-[15px] font-medium whitespace-nowrap text-muted transition-colors hover:bg-surface2 hover:text-text lg:flex"
-        >
-          <Trazo className={`transition-transform duration-300 ${abierto ? '' : 'rotate-180'}`}>
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <path d="M9 4v16" />
-            <path d="M15.5 10l-2 2 2 2" />
-          </Trazo>
-          <span className={texto}>{abierto ? t.colapsar : t.expandir}</span>
-        </button>
+      <div
+        className={`mt-auto flex-col gap-1.5 rounded-xl border border-line bg-surface p-3.5 ${
+          abierto ? 'hidden lg:flex' : 'hidden'
+        }`}
+      >
+        <p className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">{t.plan}</p>
+        <p className="font-semibold">{t.nombrePlan}</p>
+        <p className="text-[13px] text-muted">{t.uso}</p>
+        <div className="h-1.5 overflow-hidden rounded-full bg-line">
+          <div className="h-full w-[45%] rounded-full bg-electric" />
+        </div>
       </div>
     </aside>
   )
