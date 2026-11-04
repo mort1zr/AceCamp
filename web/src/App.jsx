@@ -16,7 +16,6 @@ import Privacidad from './pages/Privacidad.jsx'
 import Reclutamiento from './pages/Reclutamiento.jsx'
 import Registro from './pages/Registro.jsx'
 import Terminos from './pages/Terminos.jsx'
-import { serviciosDemo } from './lib/serviciosDemo.js'
 
 export default function App() {
   return (
@@ -33,22 +32,9 @@ export default function App() {
 
       <Route element={<AppLayout />}>
         <Route path="/inicio" element={<Inicio />} />
-        <Route
-          path="/dashboard"
-          element={
-            <Dashboard
-              playersService={serviciosDemo.jugadores}
-              overviewService={serviciosDemo.resumen}
-            />
-          }
-        />
-        <Route path="/jugadores" element={<Jugadores service={serviciosDemo.jugadores} />} />
-        <Route
-          path="/analizar"
-          element={
-            <Analizar service={serviciosDemo.analisis} playersService={serviciosDemo.jugadores} />
-          }
-        />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/jugadores" element={<Jugadores />} />
+        <Route path="/analizar" element={<Analizar />} />
         <Route path="/partidos" element={<Partidos />} />
         <Route path="/comparador" element={<Comparador />} />
         <Route path="/reclutamiento" element={<Reclutamiento />} />

@@ -18,6 +18,7 @@
   --ace-ui-border: var(--line2);
   --ace-ui-muted: var(--muted);
   --ace-ui-accent: var(--accent-ink);
+  --ace-ui-info: var(--electric-ink);
   --ace-ui-positive: var(--good);
   --ace-ui-negative: var(--bad);
 
