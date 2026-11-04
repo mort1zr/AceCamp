@@ -94,3 +94,20 @@
     animation-delay: 310ms;
   }
 }
+
+@keyframes acceso-achicar {
+  to {
+    transform: scale(var(--acceso-escala));
+    border-radius: 9999px;
+  }
+}
+
+.acceso-saliendo {
+  animation: acceso-achicar 0.45s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  pointer-events: none;
+}
+
+.acceso-saliendo > * {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}

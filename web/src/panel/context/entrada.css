@@ -1,0 +1,86 @@
+.entrada {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.entrada-fondo {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  animation: entrada-fondo-entrar 0.5s ease both;
+}
+
+.entrada-pelota {
+  position: absolute;
+  left: var(--entrada-x);
+  top: var(--entrada-y);
+  width: var(--entrada-pelota);
+  height: var(--entrada-pelota);
+  translate: -50% -50%;
+  filter: drop-shadow(0 14px 32px color-mix(in srgb, var(--accent) 40%, transparent));
+  transition:
+    left 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: entrada-pelota-entrar 0.55s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+
+.entrada-pelota svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: entrada-giro 0.9s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.entrada-girando .entrada-pelota,
+.entrada-abriendo .entrada-pelota {
+  left: 50%;
+  top: 50%;
+}
+
+.entrada-abriendo .entrada-pelota {
+  animation: entrada-pelota-abrir 0.8s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+.entrada-abriendo .entrada-fondo {
+  animation: entrada-fondo-salir 0.6s 0.2s ease both;
+}
+
+@keyframes entrada-fondo-entrar {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes entrada-fondo-salir {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes entrada-pelota-entrar {
+  from {
+    transform: scale(var(--entrada-escala));
+    opacity: 0.6;
+  }
+}
+
+@keyframes entrada-pelota-abrir {
+  30% {
+    transform: scale(0.85);
+    opacity: 1;
+  }
+  to {
+    transform: scale(22);
+    opacity: 0;
+  }
+}
+
+@keyframes entrada-giro {
+  to {
+    transform: rotate(360deg);
+  }
+}

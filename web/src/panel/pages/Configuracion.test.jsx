@@ -42,7 +42,20 @@ describe('Configuración', () => {
 
   it('abre la pestaña indicada en la URL', async () => {
     montar(createDemoConfiguracionService(), '/configuracion?seccion=plan')
-    expect(await screen.findByText('18 de 40 análisis usados')).toBeTruthy()
+    expect(await screen.findByText('18 análisis este mes')).toBeTruthy()
+  })
+
+  it('en un plan personal oculta organización y equipo', async () => {
+    montar(
+      createDemoConfiguracionService({ plan: { id: 'pro', trial: false, used: 18, limit: 150 } }),
+      '/configuracion?seccion=equipo',
+    )
+    expect(await screen.findByDisplayValue('Coach Ramírez')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Equipo' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Organización' })).toBeNull()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Plan y facturación' }))
+    expect(screen.getByText('18 de 150 análisis usados')).toBeTruthy()
+    expect(screen.getByText('¿Trabajas con un equipo?')).toBeTruthy()
   })
 
   it('guarda la cuenta y valida el nombre', async () => {

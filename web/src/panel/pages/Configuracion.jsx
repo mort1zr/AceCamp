@@ -1,11 +1,21 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import Avatar from '../components/Avatar.jsx'
 import { ErrorState, LoadingState } from '../components/ui'
+import { useAvatar } from '../hooks/useAvatar.js'
 import { useConfiguracion } from '../hooks/useConfiguracion.js'
+import { useUnidades } from '../hooks/useUnidades.js'
+import { guardarUnidades } from '../lib/unidades.js'
 import { useIdioma } from '../../compartido/lib/idioma.jsx'
+import { usePlanVista } from '../context/PlanVistaContext.js'
+import {
+  createFirestoreConfiguracionService,
+  PLANES,
+} from '../lib/services/firestoreConfiguracionService.js'
 import './configuracion.css'
 
 const secciones = ['cuenta', 'organizacion', 'equipo', 'preferencias', 'plan']
+const seccionesPersonales = ['cuenta', 'preferencias', 'plan']
 
 const textos = {
   es: {
@@ -13,7 +23,7 @@ const textos = {
     menu: 'Secciones de configuración',
     pestanas: {
       cuenta: 'Cuenta',
-      organizacion: 'Organización y formulario',
+      organizacion: 'Organización',
       equipo: 'Equipo',
       preferencias: 'Preferencias',
       plan: 'Plan y facturación',
@@ -33,8 +43,10 @@ const textos = {
     cargo: 'Cargo',
     rol: 'Rol',
     roles: { admin: 'Administrador', coach: 'Entrenador' },
-    cambiarFoto: 'Cambiar foto',
     guardarCambios: 'Guardar cambios',
+    avatar: 'Tu avatar',
+    avatarTexto: 'Tócalo para cambiarlo.',
+    cambiarAvatar: 'Cambiar avatar',
     cambiarContrasena: 'Cambiar contraseña',
     contrasenaActual: 'Contraseña actual',
     contrasenaNueva: 'Nueva contraseña',
@@ -46,25 +58,15 @@ const textos = {
     contrasenaIncorrecta: 'La contraseña actual no es correcta.',
     contrasenaLista: 'Contraseña actualizada.',
     nombreRequerido: 'Escribe tu nombre.',
-    logo: 'Logo',
-    subirLogo: 'Subir logo',
-    logoNota: 'Aparece en los reportes PDF y en el formulario de postulación.',
     nombreOrg: 'Nombre de la organización',
     programa: 'Programa',
-    bienvenida: 'Mensaje de bienvenida del formulario',
-    camposObligatorios: 'Campos obligatorios del formulario',
-    campos: {
-      utr: 'UTR',
-      guardian: 'Contacto del apoderado (menores de edad)',
-      ranking: 'Ranking nacional',
-      video: 'Al menos un video de partido completo',
-    },
-    obligatorio: (campo) => `${campo} obligatorio`,
+    soloDueno: 'Solo quien creó la organización puede cambiar estos datos.',
     guardar: 'Guardar',
     invitar: 'Invitar por correo',
     invitarPlaceholder: 'correo@universidad.edu',
     enviarInvitacion: 'Enviar invitación',
     invitacionEnviada: 'Invitación enviada.',
+    invitacionesPronto: 'Las invitaciones estarán disponibles muy pronto.',
     correoInvalido: 'Escribe un correo válido.',
     miembro: 'Miembro',
     jugadoresACargo: 'Jugadores a cargo',
@@ -89,18 +91,24 @@ const textos = {
     sinPlan: 'Sin plan activo',
     sinPlanTexto: 'Elige un plan para empezar a analizar partidos.',
     usados: (usados, limite) => `${usados} de ${limite} análisis usados`,
+    usadosSinLimite: (usados) => `${usados} análisis este mes`,
+    prueba: 'Mes de prueba',
+    equipoTitulo: '¿Trabajas con un equipo?',
+    equipoTexto:
+      'Con Ultra tu organización tiene su propio espacio e invitas a todo tu cuerpo técnico.',
+    conocerUltra: 'Conocer Ultra',
     renueva: (fecha) => `Se renueva el ${fecha}`,
     planes: [
-      { id: 'basico', nombre: 'Básico', detalle: 'Para empezar a medir tus partidos.' },
+      { id: 'basico', nombre: 'Básico', detalle: 'Para jugadores y padres. Hasta 2 jugadores.' },
       {
         id: 'pro',
         nombre: 'Pro',
-        detalle: 'Más análisis, comparador y formulario de postulación.',
+        detalle: 'Para entrenadores y reclutadores. Hasta 24 jugadores.',
       },
       {
         id: 'ultra',
         nombre: 'Ultra',
-        detalle: 'Para academias y universidades con varios entrenadores.',
+        detalle: 'Para academias, clubes y universidades con varios entrenadores.',
       },
     ],
     verPrecios: 'Ver precios',
@@ -113,7 +121,7 @@ const textos = {
     menu: 'Settings sections',
     pestanas: {
       cuenta: 'Account',
-      organizacion: 'Organization and form',
+      organizacion: 'Organization',
       equipo: 'Team',
       preferencias: 'Preferences',
       plan: 'Plan and billing',
@@ -133,8 +141,10 @@ const textos = {
     cargo: 'Position',
     rol: 'Role',
     roles: { admin: 'Administrator', coach: 'Coach' },
-    cambiarFoto: 'Change photo',
     guardarCambios: 'Save changes',
+    avatar: 'Your avatar',
+    avatarTexto: 'Tap it to change it.',
+    cambiarAvatar: 'Change avatar',
     cambiarContrasena: 'Change password',
     contrasenaActual: 'Current password',
     contrasenaNueva: 'New password',
@@ -146,25 +156,15 @@ const textos = {
     contrasenaIncorrecta: 'Your current password is incorrect.',
     contrasenaLista: 'Password updated.',
     nombreRequerido: 'Enter your name.',
-    logo: 'Logo',
-    subirLogo: 'Upload logo',
-    logoNota: 'It appears in PDF reports and on the application form.',
     nombreOrg: 'Organization name',
     programa: 'Program',
-    bienvenida: 'Application form welcome message',
-    camposObligatorios: 'Required form fields',
-    campos: {
-      utr: 'UTR',
-      guardian: 'Guardian contact (minors)',
-      ranking: 'National ranking',
-      video: 'At least one full match video',
-    },
-    obligatorio: (campo) => `${campo} required`,
+    soloDueno: 'Only the person who created the organization can change this.',
     guardar: 'Save',
     invitar: 'Invite by email',
     invitarPlaceholder: 'email@university.edu',
     enviarInvitacion: 'Send invitation',
     invitacionEnviada: 'Invitation sent.',
+    invitacionesPronto: 'Invitations will be available very soon.',
     correoInvalido: 'Enter a valid email.',
     miembro: 'Member',
     jugadoresACargo: 'Players in charge',
@@ -189,14 +189,20 @@ const textos = {
     sinPlan: 'No active plan',
     sinPlanTexto: 'Choose a plan to start analyzing matches.',
     usados: (usados, limite) => `${usados} of ${limite} analyses used`,
+    usadosSinLimite: (usados) => `${usados} analyses this month`,
+    prueba: 'Trial month',
+    equipoTitulo: 'Working with a team?',
+    equipoTexto:
+      'With Ultra your organization gets its own space and you invite your whole coaching staff.',
+    conocerUltra: 'Discover Ultra',
     renueva: (fecha) => `Renews on ${fecha}`,
     planes: [
-      { id: 'basico', nombre: 'Basic', detalle: 'To start measuring your matches.' },
-      { id: 'pro', nombre: 'Pro', detalle: 'More analyses, comparison and application form.' },
+      { id: 'basico', nombre: 'Basic', detalle: 'For players and parents. Up to 2 players.' },
+      { id: 'pro', nombre: 'Pro', detalle: 'For coaches and recruiters. Up to 24 players.' },
       {
         id: 'ultra',
         nombre: 'Ultra',
-        detalle: 'For academies and universities with several coaches.',
+        detalle: 'For academies, clubs and universities with several coaches.',
       },
     ],
     verPrecios: 'View pricing',
@@ -296,7 +302,10 @@ function Contrasena({ t, service, onCerrar }) {
     guardar(
       () => service.changePassword({ current: valores.actual, next: valores.nueva }),
       t.contrasenaLista,
-      (fallo) => (fallo?.code === 'auth/wrong-password' ? t.contrasenaIncorrecta : t.errorGuardar),
+      (fallo) =>
+        ['auth/wrong-password', 'auth/invalid-credential'].includes(fallo?.code)
+          ? t.contrasenaIncorrecta
+          : t.errorGuardar,
     )
   }
 
@@ -354,6 +363,7 @@ function Cuenta({ t, datos, service, bloqueado }) {
     position: datos?.position ?? '',
   })
   const [verContrasena, setVerContrasena] = useState(false)
+  const { indice, siguiente } = useAvatar(datos?.email)
   const { estado, setEstado, ocupado, guardar } = useGuardar(t)
 
   const enviar = (evento) => {
@@ -372,15 +382,41 @@ function Cuenta({ t, datos, service, bloqueado }) {
       <form noValidate onSubmit={enviar} className="flex flex-col gap-4.5">
         <fieldset disabled={bloqueado || ocupado} className="flex min-w-0 flex-col gap-4.5">
           <div className="flex flex-wrap items-center gap-4">
-            <span className="grid size-18 place-items-center rounded-full bg-series1 font-display text-2xl font-bold text-on-accent">
-              {iniciales(valores.name)}
-            </span>
-            <label
-              className={`${botonNormal} has-disabled:cursor-not-allowed has-disabled:opacity-50`}
+            <button
+              type="button"
+              onClick={siguiente}
+              aria-label={t.cambiarAvatar}
+              title={t.cambiarAvatar}
+              className="group relative cursor-pointer rounded-full transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              {t.cambiarFoto}
-              <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" />
-            </label>
+              <Avatar
+                key={indice}
+                nombre={valores.name}
+                indice={indice}
+                className="avatar-aparecer size-18 font-display"
+                texto="text-2xl"
+              />
+              <span className="absolute -right-0.5 -bottom-0.5 grid size-6.5 place-items-center rounded-full border-2 border-surface bg-surface2 text-text2 transition-colors group-hover:text-text">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 12a8 8 0 01-13.7 5.6M4 12a8 8 0 0113.7-5.6" />
+                  <path d="M17.5 2.5v4h-4M6.5 21.5v-4h4" />
+                </svg>
+              </span>
+            </button>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[15px] font-semibold">{t.avatar}</span>
+              <span className="text-[13px] text-muted">{t.avatarTexto}</span>
+            </span>
           </div>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
             <label htmlFor={`${id}-nombre`} className={campo}>
@@ -452,26 +488,16 @@ function Organizacion({ t, datos, service, bloqueado }) {
   const [valores, setValores] = useState({
     name: datos?.name ?? '',
     program: datos?.program ?? '',
-    welcome: datos?.welcome ?? '',
-    requiredFields: {
-      utr: false,
-      guardian: false,
-      ranking: false,
-      video: false,
-      ...datos?.requiredFields,
-    },
   })
-  const { estado, ocupado, guardar } = useGuardar(t)
+  const { estado, setEstado, ocupado, guardar } = useGuardar(t)
+  const soloLectura = Boolean(datos) && datos.canEdit === false
 
   const enviar = (evento) => {
     evento.preventDefault()
+    if (valores.name.trim().length < 2)
+      return setEstado({ tipo: 'error', texto: t.nombreRequerido })
     guardar(() =>
-      service.saveOrganization({
-        ...valores,
-        name: valores.name.trim(),
-        program: valores.program.trim(),
-        welcome: valores.welcome.trim(),
-      }),
+      service.saveOrganization({ name: valores.name.trim(), program: valores.program.trim() }),
     )
   }
 
@@ -481,25 +507,10 @@ function Organizacion({ t, datos, service, bloqueado }) {
         {t.pestanas.organizacion}
       </h2>
       <form noValidate onSubmit={enviar}>
-        <fieldset disabled={bloqueado || ocupado} className="flex min-w-0 flex-col gap-4.5">
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="grid size-18 place-items-center rounded-[14px] border-2 border-dashed border-line3 text-xs text-muted">
-              {t.logo}
-            </span>
-            <div className="flex flex-col gap-1">
-              <label
-                className={`${botonNormal} self-start has-disabled:cursor-not-allowed has-disabled:opacity-50`}
-              >
-                {t.subirLogo}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/svg+xml"
-                  className="sr-only"
-                />
-              </label>
-              <span className="text-xs text-muted">{t.logoNota}</span>
-            </div>
-          </div>
+        <fieldset
+          disabled={bloqueado || ocupado || soloLectura}
+          className="flex min-w-0 flex-col gap-4.5"
+        >
           <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
             <label htmlFor={`${id}-nombre`} className={campo}>
               {t.nombreOrg}
@@ -522,44 +533,16 @@ function Organizacion({ t, datos, service, bloqueado }) {
               />
             </label>
           </div>
-          <label htmlFor={`${id}-bienvenida`} className={campo}>
-            {t.bienvenida}
-            <textarea
-              id={`${id}-bienvenida`}
-              rows={3}
-              maxLength={600}
-              value={valores.welcome}
-              onChange={(evento) => setValores({ ...valores, welcome: evento.target.value })}
-              className={`${entrada} h-auto resize-y py-3 leading-relaxed`}
-            />
-          </label>
-          <div>
-            <p className={`${etiqueta} mb-1`}>{t.camposObligatorios}</p>
-            <ul>
-              {Object.keys(t.campos).map((clave) => (
-                <li key={clave} className={fila}>
-                  <span className="text-[15px]">{t.campos[clave]}</span>
-                  <Interruptor
-                    activo={valores.requiredFields[clave]}
-                    etiqueta={t.obligatorio(t.campos[clave])}
-                    disabled={bloqueado || ocupado}
-                    onChange={(activo) =>
-                      setValores({
-                        ...valores,
-                        requiredFields: { ...valores.requiredFields, [clave]: activo },
-                      })
-                    }
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button type="submit" className={botonPrincipal}>
-              {ocupado ? t.guardando : t.guardar}
-            </button>
-            <Mensaje estado={estado} />
-          </div>
+          {soloLectura ? (
+            <p className="text-[13px] text-muted">{t.soloDueno}</p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button type="submit" className={botonPrincipal}>
+                {ocupado ? t.guardando : t.guardar}
+              </button>
+              <Mensaje estado={estado} />
+            </div>
+          )}
         </fieldset>
       </form>
     </section>
@@ -571,6 +554,7 @@ function Equipo({ t, miembros, service, bloqueado }) {
   const [correo, setCorreo] = useState('')
   const [rol, setRol] = useState('coach')
   const { estado, setEstado, ocupado, guardar } = useGuardar(t)
+  const sinInvitaciones = !service?.inviteMember
 
   const enviar = async (evento) => {
     evento.preventDefault()
@@ -590,7 +574,10 @@ function Equipo({ t, miembros, service, bloqueado }) {
         {t.pestanas.equipo}
       </h2>
       <form noValidate onSubmit={enviar}>
-        <fieldset disabled={bloqueado || ocupado} className="flex min-w-0 flex-col gap-2">
+        <fieldset
+          disabled={bloqueado || ocupado || sinInvitaciones}
+          className="flex min-w-0 flex-col gap-2"
+        >
           <div className="flex flex-wrap items-end gap-2.5">
             <label htmlFor={`${id}-correo`} className={`${campo} flex-[1_1_260px]`}>
               {t.invitar}
@@ -619,7 +606,11 @@ function Equipo({ t, miembros, service, bloqueado }) {
               {ocupado ? t.guardando : t.enviarInvitacion}
             </button>
           </div>
-          <Mensaje estado={estado} />
+          {sinInvitaciones && !bloqueado ? (
+            <p className="text-[13px] text-muted">{t.invitacionesPronto}</p>
+          ) : (
+            <Mensaje estado={estado} />
+          )}
         </fieldset>
       </form>
 
@@ -701,9 +692,10 @@ function Equipo({ t, miembros, service, bloqueado }) {
 
 function Preferencias({ t, datos, service, bloqueado }) {
   const id = useId()
+  const unidadesActuales = useUnidades()
   const { idioma, cambiarIdioma } = useIdioma()
   const [valores, setValores] = useState({
-    units: datos?.units ?? 'kmh',
+    units: datos?.units ?? unidadesActuales,
     notifications: {
       analysis: false,
       application: false,
@@ -716,7 +708,10 @@ function Preferencias({ t, datos, service, bloqueado }) {
 
   const enviar = (evento) => {
     evento.preventDefault()
-    guardar(() => service.savePreferences(valores))
+    guardar(async () => {
+      await service.savePreferences(valores)
+      guardarUnidades(valores.units)
+    })
   }
 
   return (
@@ -800,10 +795,11 @@ function Preferencias({ t, datos, service, bloqueado }) {
   )
 }
 
-function Plan({ t, plan, locale }) {
+function Plan({ t, plan, locale, esOrganizacion }) {
   const id = useId()
   const actual = t.planes.find((opcion) => opcion.id === plan?.id)
   const porcentaje = plan?.limit ? Math.min(100, Math.round((plan.used / plan.limit) * 100)) : 0
+  const tieneUso = typeof plan?.used === 'number'
   const renovacion =
     plan?.renewsAt &&
     new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
@@ -818,12 +814,19 @@ function Plan({ t, plan, locale }) {
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line2 bg-surface2 p-4.5">
         <div>
           <p className={etiqueta}>{t.planActual}</p>
-          <p className="mt-1 font-display text-[32px] leading-none font-bold">
+          <p className="mt-1 flex items-center gap-2.5 font-display text-[32px] leading-none font-bold">
             {actual ? actual.nombre : t.sinPlan}
+            {plan?.trial && (
+              <span className="rounded-full bg-electric/15 px-2.5 py-1 font-sans text-xs font-semibold text-electric-ink">
+                {t.prueba}
+              </span>
+            )}
           </p>
           <p className="mt-1 text-sm text-muted">{actual ? actual.detalle : t.sinPlanTexto}</p>
         </div>
-        {plan?.limit ? (
+        {tieneUso && !plan.limit ? (
+          <span className="text-sm">{t.usadosSinLimite(plan.used)}</span>
+        ) : plan?.limit ? (
           <div className="flex min-w-55 flex-col gap-1.5">
             <span className="text-sm">{t.usados(plan.used, plan.limit)}</span>
             <div
@@ -847,6 +850,17 @@ function Plan({ t, plan, locale }) {
           </Link>
         )}
       </div>
+      {!esOrganizacion && actual && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-dashed border-electric/50 bg-electric/5 p-4.5">
+          <span className="flex flex-col gap-1">
+            <span className="font-semibold">{t.equipoTitulo}</span>
+            <span className="max-w-[52ch] text-[13px] text-muted">{t.equipoTexto}</span>
+          </span>
+          <Link to="/precios" className={botonNormal}>
+            {t.conocerUltra}
+          </Link>
+        </div>
+      )}
       <ul className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
         {t.planes.map((opcion) => {
           const esActual = opcion.id === plan?.id
@@ -886,7 +900,7 @@ function Plan({ t, plan, locale }) {
   )
 }
 
-function Contenido({ seccion, t, datos, service, bloqueado, locale }) {
+function Contenido({ seccion, t, datos, service, bloqueado, locale, esOrganizacion }) {
   if (seccion === 'cuenta')
     return <Cuenta t={t} datos={datos?.account} service={service} bloqueado={bloqueado} />
   if (seccion === 'organizacion')
@@ -897,16 +911,34 @@ function Contenido({ seccion, t, datos, service, bloqueado, locale }) {
     return <Equipo t={t} miembros={datos?.team ?? []} service={service} bloqueado={bloqueado} />
   if (seccion === 'preferencias')
     return <Preferencias t={t} datos={datos?.preferences} service={service} bloqueado={bloqueado} />
-  return <Plan t={t} plan={datos?.plan} locale={locale} />
+  return <Plan t={t} plan={datos?.plan} locale={locale} esOrganizacion={esOrganizacion} />
 }
 
-export default function Configuracion({ service }) {
+export default function Configuracion({ service: inyectado, db, auth, session }) {
+  const uid = session?.uid
+  const orgId = session?.orgId
+  const service = useMemo(() => {
+    if (inyectado) return inyectado
+    if (!db || !auth || !uid || !orgId) return undefined
+    return createFirestoreConfiguracionService({ db, auth, uid, orgId })
+  }, [inyectado, db, auth, uid, orgId])
   const { idioma } = useIdioma()
   const t = textos[idioma]
   const [parametros, setParametros] = useSearchParams()
-  const pedida = parametros.get('seccion')
-  const seccion = secciones.includes(pedida) ? pedida : 'cuenta'
   const { data, error, loading, retry } = useConfiguracion(service)
+  const { planVista } = usePlanVista()
+  const planActual = planVista ?? data?.plan?.id
+  const esOrganizacion = planActual ? planActual === 'ultra' : Boolean(data?.isOrganization)
+  const visibles = !service || esOrganizacion ? secciones : seccionesPersonales
+  const datos =
+    data && planVista
+      ? {
+          ...data,
+          plan: { ...data.plan, id: planVista, trial: false, limit: PLANES[planVista].limite },
+        }
+      : data
+  const pedida = parametros.get('seccion')
+  const seccion = visibles.includes(pedida) ? pedida : 'cuenta'
   const locale = idioma === 'en' ? 'en-US' : 'es-PE'
 
   const elegir = (nueva) => {
@@ -932,15 +964,15 @@ export default function Configuracion({ service }) {
       <div className="flex flex-wrap items-start gap-5">
         <nav
           aria-label={t.menu}
-          className={`${tarjeta} flex flex-[1_1_220px] flex-col gap-0.5 p-2 lg:sticky lg:top-24`}
+          className={`${tarjeta} flex flex-[1_1_220px] flex-col gap-0.5 p-2 max-md:-mx-1 max-md:flex-row max-md:overflow-x-auto max-md:p-1.5 max-md:[scrollbar-width:none] lg:sticky lg:top-24`}
         >
-          {secciones.map((clave) => (
+          {visibles.map((clave) => (
             <button
               key={clave}
               type="button"
               aria-current={seccion === clave ? 'page' : undefined}
               onClick={() => elegir(clave)}
-              className="flex min-h-11 w-full cursor-pointer items-center rounded-[10px] px-3.5 text-left text-[15px] font-semibold text-text2 transition-colors hover:bg-surface2 hover:text-text aria-[current=page]:bg-line aria-[current=page]:text-text"
+              className="flex min-h-11 w-full cursor-pointer items-center rounded-[10px] px-3.5 text-left text-[15px] font-semibold whitespace-nowrap text-text2 max-md:w-auto max-md:shrink-0 transition-colors hover:bg-surface2 hover:text-text aria-[current=page]:bg-line aria-[current=page]:text-text"
             >
               {t.pestanas[clave]}
             </button>
@@ -966,10 +998,11 @@ export default function Configuracion({ service }) {
               key={`${seccion}-${service?.scopeKey ?? 'sin-conexion'}`}
               seccion={seccion}
               t={t}
-              datos={data}
+              datos={datos}
               service={service}
               bloqueado={!service}
               locale={locale}
+              esOrganizacion={esOrganizacion}
             />
           )}
         </div>
