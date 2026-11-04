@@ -1,6 +1,6 @@
 import { Outlet } from 'react-router'
 import BarraLateral from './panel/BarraLateral.jsx'
-import ThemeToggle from './ThemeToggle.jsx'
+import BarraSuperior from './panel/BarraSuperior.jsx'
 
 export default function AppLayout() {
   return (
@@ -8,9 +8,7 @@ export default function AppLayout() {
       <BarraLateral />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-end gap-3 border-b border-line px-6 py-3">
-          <ThemeToggle />
-        </header>
+        <BarraSuperior />
         <main className="min-w-0 flex-1 px-6 py-8">
           <Outlet />
         </main>
