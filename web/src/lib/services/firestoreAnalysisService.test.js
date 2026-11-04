@@ -10,6 +10,7 @@ const db = { app: { options: { projectId: 'test' } } }
 const input = { sourceType: 'file', file: { name: 'video.mp4', type: 'video/mp4', size: 50, lastModified: 1 }, playerId: 'p1', playerPosition: 'arriba', opponent: 'Rival', matchDate: '2026-01-01', orgId: 'forged', status: 'listo' }
 let tx
 let upload
+const matchPath = (matchId, orgId = 'org-a') => `orgs/${orgId}/matches/${matchId}/video.mp4`
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -19,14 +20,14 @@ beforeEach(() => {
   tx = { get: vi.fn().mockResolvedValue(absent), set: vi.fn() }
   runTransaction.mockImplementation((_, work) => work(tx))
   serverTimestamp.mockReturnValue('server-time')
-  upload = vi.fn().mockResolvedValue('org-a/videos/id/video.mp4')
+  upload = vi.fn(async ({ matchId, orgId }) => matchPath(matchId, orgId))
 })
 
 const make = options => createFirestoreAnalysisService({ db, orgId: 'org-a', actorId: 'coach-a', uploadVideo: upload, maxBytes: 100, ...options })
 
 describe('Cola Firestore (SDK y transferencias simulados)', () => {
   it('exige capacidad explícita del adaptador antes de aceptar YouTube y no guarda su URL', async () => {
-    const importer = vi.fn(async () => 'org-a/videos/youtube-match/video.mp4')
+    const importer = vi.fn(async () => matchPath('youtube-match'))
     const link = { ...input, sourceType: 'link', url: 'https://youtu.be/abcdefghijk?si=example' }
     expect(make({ importVideo: importer }).supportsYouTube).toBe(false)
     await expect(make({ importVideo: importer }).enqueue(link, { requestId: 'youtube-match' })).rejects.toMatchObject({ code: 'analysis/validation' })
@@ -35,7 +36,7 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     const service = make({ importVideo: importer })
     expect(service.supportsYouTube).toBe(true)
     await service.enqueue(link, { requestId: 'youtube-match' })
-    expect(tx.set.mock.calls[0][1]).toMatchObject({ videoPath: 'org-a/videos/youtube-match/video.mp4', status: 'en cola' })
+    expect(tx.set.mock.calls[0][1]).toMatchObject({ videoPath: matchPath('youtube-match'), status: 'en cola' })
     expect(JSON.stringify(tx.set.mock.calls[0][1])).not.toContain('youtu.be')
   })
 
@@ -53,9 +54,9 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     await vi.waitFor(() => expect(backend).toHaveBeenCalledOnce())
     expect(tx.set).not.toHaveBeenCalled()
     expect(backend.mock.calls[0][0]).toMatchObject({ matchId: 'http-match', requestContext: { bearerToken: 'test-verified-token' } })
-    finish('org-a/videos/http-match/video.mp4')
+    finish(matchPath('http-match'))
     await operation
-    expect(tx.set.mock.calls[0][1]).toMatchObject({ videoPath: 'org-a/videos/http-match/video.mp4', status: 'en cola', orgId: 'org-a' })
+    expect(tx.set.mock.calls[0][1]).toMatchObject({ videoPath: matchPath('http-match'), status: 'en cola', orgId: 'org-a' })
     expect(JSON.stringify(tx.set.mock.calls[0][1])).not.toMatch(/signature=secret|test-verified-token/)
   })
 
@@ -82,10 +83,21 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     const operation = service.enqueue(input, { requestId: 'request-1' })
     await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(1))
     expect(runTransaction).not.toHaveBeenCalled()
-    finish('org-a/video.mp4')
+    finish(matchPath('request-1'))
     await operation
-    expect(tx.set.mock.calls[0][1]).toMatchObject({ orgId: 'org-a', createdBy: 'coach-a', playerId: 'p1', status: 'en cola', videoPath: 'org-a/video.mp4', createdAt: 'server-time' })
+    expect(tx.set.mock.calls[0][1]).toMatchObject({ orgId: 'org-a', createdBy: 'coach-a', playerId: 'p1', status: 'en cola', videoPath: matchPath('request-1'), createdAt: 'server-time' })
     expect(tx.set.mock.calls[0][1]).not.toHaveProperty('file')
+  })
+
+  it('no encola una ruta de otro partido u organización y permite reintentar', async () => {
+    const service = make()
+    const options = { requestId: 'r1' }
+    upload.mockResolvedValueOnce(matchPath('r1', 'org-b')).mockResolvedValueOnce(matchPath('r2'))
+    await expect(service.enqueue(input, options)).rejects.toMatchObject({ code: 'analysis/video-path' })
+    await expect(service.enqueue(input, options)).rejects.toMatchObject({ code: 'analysis/video-path' })
+    expect(runTransaction).not.toHaveBeenCalled()
+    await expect(service.enqueue(input, options)).resolves.toMatchObject({ videoPath: matchPath('r1') })
+    expect(tx.set).toHaveBeenCalledOnce()
   })
 
   it('rechaza jugadores de otra organización antes de transferir el video', async () => {
@@ -109,7 +121,7 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
 
   it('una cancelación al finalizar la transferencia no crea un partido', async () => {
     const controller = new AbortController()
-    upload.mockImplementation(async () => { controller.abort(); return 'org-a/video.mp4' })
+    upload.mockImplementation(async () => { controller.abort(); return matchPath('r1') })
     await expect(make().enqueue(input, { requestId: 'r1', signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
     expect(tx.set).not.toHaveBeenCalled()
   })
@@ -118,7 +130,7 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     upload.mockRejectedValueOnce(new Error('upload failed'))
     await expect(make().enqueue(input, { requestId: 'r1' })).rejects.toThrow('upload failed')
     expect(tx.set).not.toHaveBeenCalled()
-    const importer = vi.fn().mockResolvedValue('org-a/imported.mp4')
+    const importer = vi.fn().mockResolvedValue(matchPath('r2'))
     await make({ importVideo: importer }).enqueue({ ...input, sourceType: 'link', url: 'https://ejemplo.com/video.mp4?signature=secret' }, { requestId: 'r2' })
     expect(importer).toHaveBeenCalledTimes(1)
     const data = tx.set.mock.calls[0][1]

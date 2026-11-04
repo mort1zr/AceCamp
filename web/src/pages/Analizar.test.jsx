@@ -2,9 +2,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { onSnapshot, where } from 'firebase/firestore'
 import Analizar from './Analizar.jsx'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
 import { createDemoAnalysisService } from '../previews/demoAnalysisService.js'
+
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(), where: vi.fn(), query: vi.fn(), onSnapshot: vi.fn(),
+  addDoc: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), runTransaction: vi.fn(), serverTimestamp: vi.fn(),
+}))
 
 afterEach(cleanup)
 function setup(options) {
@@ -22,6 +28,23 @@ async function fillMatch(user) {
 }
 
 describe('Analizar video v1', () => {
+  it('abre Jugadores y la cola para la misma sesión cuando hay un adaptador de subida', async () => {
+    const stop = vi.fn()
+    onSnapshot.mockImplementation((_, receive) => { receive({ docs: [] }); return stop })
+    const db = { app: { options: { projectId: 'prueba' } } }
+    const session = { uid: 'coach-1', orgId: 'equipo-1' }
+    const uploadVideo = vi.fn()
+    const { rerender } = render(<Analizar db={db} session={session} maxBytes={1024} />)
+    expect(onSnapshot).not.toHaveBeenCalled()
+    rerender(<Analizar db={db} session={session} uploadVideo={uploadVideo} maxBytes={1024} />)
+    expect(await screen.findByText('El próximo análisis empieza aquí')).toBeTruthy()
+    expect(where.mock.calls).toEqual([['orgId', '==', 'equipo-1'], ['orgId', '==', 'equipo-1']])
+    expect(screen.queryByText('Modo demostración')).toBeNull()
+    rerender(<Analizar db={db} uploadVideo={uploadVideo} maxBytes={1024} />)
+    expect(stop).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('El análisis aún no está disponible')).toBeTruthy()
+  })
+
   it('admite YouTube en la demostración dejando explícito que no descarga videos', async () => {
     const props = setup()
     const user = userEvent.setup()

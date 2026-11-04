@@ -30,18 +30,16 @@ La entrada normal de producción no importa las vistas de demostración.
 
 ## Servicios de la aplicación
 
-La página recibe `service` y `playersService`. Deben tener el mismo `scopeKey`
-(proyecto, organización, UID) y una instancia estable por sesión. La ausencia
-o diferencia de scopes muestra indisponibilidad y no permite cargar videos.
-El servicio de jugadores es el de PCIT-26. Crear el de análisis así:
+En la ruta `/analizar` de PCIT-96, la página construye sus servicios a partir
+de `db`, una sesión verificada `{ uid, orgId }`, la función de subida y el límite
+de tamaño. Ambos servicios comparten proyecto, usuario y organización.
+Las vistas de prueba pueden inyectar el par `service` y `playersService`.
 
 ```js
-const service = createFirestoreAnalysisService({
-  db, orgId, actorId: user.uid,
-  uploadVideo,    // Adaptación de la función de Axel, PCIT-24
-  importVideo,    // Opcional, backend de PCIT-134; sin él, enlace deshabilitado
-  maxBytes,      // Obligatorio: límite acordado con Axel
-})
+<Route path="/analizar" element={
+  <Analizar db={db} session={session} uploadVideo={uploadVideo}
+    importVideo={importVideo} maxBytes={maxBytes} />
+} />
 ```
 
 El adaptador de cada transferencia recibe un objeto:
@@ -50,14 +48,16 @@ El adaptador de cada transferencia recibe un objeto:
 { file /* o url */, orgId, actorId, matchId, maxBytes, signal, onProgress }
 ```
 
-Debe devolver una ruta de Storage como string, implementar cancelación mediante
+La ruta devuelta debe ser `orgs/{orgId}/matches/{matchId}/video.{mp4|mov}`, como
+indica PCIT-22. La cola verifica organización, partido y nombre del archivo antes
+de escribir un documento nuevo. El adaptador debe implementar cancelación con
 `signal` y llamar a `onProgress(percent)` con números de 0 a 100. La firma real de
 uploadVideo() todavía debe acordarse con Axel; envolverla si utiliza otros argumentos.
 No habilitar enlace en producción hasta implementar y probar importVideo.
 El importador debe verificar sesión y organización en servidor, destinos públicos,
 redirecciones, tipo real y tamaño real de descarga, antes de devolver videoPath.
 
-## Datos propuestos para acordar con PCIT-22/35
+## Campos de la cola según PCIT-22 en revisión
 
 Colección `matches`:
 
@@ -69,7 +69,7 @@ Colección `matches`:
 | tournament | Texto opcional, hasta 120 caracteres |
 | matchDate | Fecha calendario YYYY-MM-DD, no futura |
 | result | Texto opcional, hasta 120 caracteres |
-| videoPath | Ruta devuelta por el servicio de transferencia |
+| videoPath | Ruta del archivo en el partido y organización de la sesión |
 | orgId / createdBy | Identidad de la sesión, nunca tomada del formulario |
 | createdAt | serverTimestamp |
 | status | en cola; el worker actualizará a procesando, listo o error |
@@ -99,6 +99,11 @@ no certifica el contenido del video ni sustituye validación del servidor.
    del intento; cualquier cambio de datos genera otro ID.
 7. Suscribirse a matches por orgId; actualizar la tabla con el estado real del worker.
 
+La verificación previa y la transacción consultan el ID reservado aunque el
+documento todavía no exista. PCIT-23 debe contemplar esa lectura puntual por un
+usuario autenticado, además de proteger las lecturas de documentos existentes
+y las consultas por organización.
+
 Cancelar antes de la creación evita encolar. Durante la transacción final la UI
 deshabilita la cancelación: una escritura confirmada no se presenta como cancelada.
 Los adaptadores deben detener transferencias incompletas; una carga completa que
@@ -110,8 +115,15 @@ de Storage. La caché de reintentos es de sesión y no persiste al recargar.
 Las pruebas locales cubren validación, formulario, alta de jugador sin perder
 contexto, doble envío, cancelación, errores conservando campos, reintentos,
 identidad del documento, filtro por orgId y estados avanzados. El SDK de Firestore
-y las transferencias están simulados en estas pruebas: no acreditan reglas ni
-conexión real. No hay credenciales configuradas ni se accedió a datos de producción.
+y las transferencias están simulados en la suite habitual.
+
+La prueba de integración de PCIT-136 usó Auth, Firestore y Storage Emulator
+en el proyecto local `demo-acecam-pcit136`, con dos cuentas ficticias, reglas
+temporales y un adaptador de prueba. Verificó la transferencia y lectura de
+los bytes de prueba, la creación del partido después de la subida, la
+suscripción a la cola, el reintento sin otra subida, la cancelación antes de
+encolar y el rechazo de acceso entre organizaciones. Queda pendiente probar
+la función de PCIT-24 y las reglas de PCIT-23 en la aplicación integrada.
 
 Para cerrar PCIT-27 faltan: confirmar el contrato de datos, integrar Auth/ruta,
 probar uploadVideo y límites/reglas reales, completar importVideo (PCIT-134) y

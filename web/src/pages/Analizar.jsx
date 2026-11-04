@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { DataTable, ErrorState, StatusBadge } from '../components/ui'
 import AnalysisForm from '../components/analysis/AnalysisForm.jsx'
 import PlayerForm from '../components/players/PlayerForm.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { useAnalysisQueue } from '../hooks/useAnalysisQueue.js'
+import { createFirestoreAnalysisService } from '../lib/services/firestoreAnalysisService.js'
+import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
 import './analizar.css'
 
@@ -34,7 +36,24 @@ function AnalysisWorkspace({ service, playersService }) {
   )
 }
 
-export default function Analizar({ service, playersService }) {
-  if (!service || !playersService || service.scopeKey !== playersService.scopeKey) return <section className="players-page"><h1>Analizar video</h1><ErrorState title="El análisis aún no está disponible" description="Cuando tu sesión de equipo esté disponible, podrás cargar videos y consultar su estado." /></section>
-  return <AnalysisWorkspace key={service.scopeKey} service={service} playersService={playersService} />
+export default function Analizar({ service, playersService, db, session, uploadVideo, importVideo, maxBytes }) {
+  const uid = session?.uid
+  const orgId = session?.orgId
+  const hasInjectedServices = service != null || playersService != null
+  const liveServices = useMemo(() => {
+    if (hasInjectedServices || !db || typeof uid !== 'string' || !uid.trim() ||
+      typeof orgId !== 'string' || !orgId.trim() || typeof uploadVideo !== 'function' ||
+      !Number.isFinite(maxBytes) || maxBytes <= 0) return null
+
+    const identity = { db, orgId, actorId: uid }
+    return {
+      analysis: createFirestoreAnalysisService({ ...identity, uploadVideo, importVideo, maxBytes }),
+      players: createFirestorePlayersService(identity),
+    }
+  }, [hasInjectedServices, db, uid, orgId, uploadVideo, importVideo, maxBytes])
+
+  const analysis = service ?? liveServices?.analysis
+  const players = playersService ?? liveServices?.players
+  if (!analysis || !players || analysis.scopeKey !== players.scopeKey) return <section className="players-page"><h1>Analizar video</h1><ErrorState title="El análisis aún no está disponible" description="Cuando tu sesión de equipo esté disponible, podrás cargar videos y consultar su estado." /></section>
+  return <AnalysisWorkspace key={analysis.scopeKey} service={analysis} playersService={players} />
 }

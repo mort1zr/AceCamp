@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { analysisSignature, hashAnalysisSignature, normalizedMatch, throwIfAborted, validateAnalysis } from '../analysis.js'
+import { isStorageVideoPath } from '../videoImportProtocol.js'
 
 /** Adapters uploadVideo/importVideo return a Storage path, not a public URL. */
 export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo, importVideo, maxBytes }) {
@@ -38,7 +39,10 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
         orgId, actorId, matchId: requestId, maxBytes, signal,
         onProgress: value => { if (!signal?.aborted) onProgress?.({ phase: 'uploading', percent: Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0 }) },
       })
-      if (typeof videoPath !== 'string' || !videoPath.trim()) throw new Error('Upload did not return a path')
+      const basePath = `orgs/${orgId}/matches/${requestId}/video`
+      if (!isStorageVideoPath(videoPath) || (videoPath !== `${basePath}.mp4` && videoPath !== `${basePath}.mov`)) {
+        throw Object.assign(new Error('Unexpected video path for match.'), { code: 'analysis/video-path' })
+      }
       video = { signature, videoPath }
       uploaded.set(requestId, video)
     }
