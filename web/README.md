@@ -38,6 +38,59 @@ Vite levanta el servidor en http://localhost:5173 con recarga en caliente.
 
 ## Firebase (PCIT-20)
 
+### Demo local de Sprint 1 con importación por enlace
+
+Esta demo ejecuta Auth, Firestore, Storage, la API y el worker en tu equipo. Usa
+`demo-acecam` y los puertos locales del repositorio. Funciona sin cuenta de
+facturación, credenciales de nube ni despliegue. Usa únicamente datos ficticios.
+
+Prepara Node.js 24, Java 21 o posterior, Python y los binarios
+`ffprobe` y `yt-dlp` de sus distribuciones oficiales. La demo se verificó con
+ffprobe 9.0.2 y yt-dlp 2026.10.26. En `web/.env.demo.local`, usa rutas absolutas:
+
+```dotenv
+ACECAM_FFPROBE=C:/herramientas/ffmpeg/bin/ffprobe.exe
+ACECAM_YT_DLP=C:/herramientas/yt-dlp.exe
+```
+
+Desde la raíz del repositorio, prepara el código de `ModeloAI` en una copia aparte:
+
+```bash
+git fetch origin ModeloAI
+git worktree add --detach ../acecam-worker 6c17537
+```
+
+Desde `../acecam-worker/model`, activa un entorno virtual de Python, instala
+`python -m pip install -r requirements-worker.txt lap==0.5.14` y ejecuta
+`python scripts/download_models.py --no-video`. En la primera ejecución,
+TorchVision también necesita los pesos oficiales de ResNet50.
+
+Desde `web` de la rama de integración, corre `npm ci`. Usa tres terminales:
+
+1. `npm run emulators` para Auth, Firestore y Storage.
+2. `npm run demo` y abre **http://127.0.0.1:5176**.
+3. Con el entorno Python del worker activado,
+   `npm run demo:worker -- "/ruta/a/la/copia/ModeloAI/model"`.
+   Agrega `--once` para procesar un partido ya en cola y terminar.
+   Si tu ejecutable no está en PATH, configura `ACECAM_PYTHON` con su ruta.
+
+En la app, registra un entrenador de prueba, da de alta un jugador y abre
+**Analizar video**. La opción **Usar enlace** admite un MP4/MOV público directo
+alojado en `raw.githubusercontent.com` o un enlace público de YouTube que
+ofrezca un MP4 HTTPS compatible. El límite local para enlaces es de 24 MiB y 30 s,
+con una importación a la vez. La API verifica la sesión, inspecciona el archivo
+y devuelve la ruta de Storage antes de encolar el partido. Un enlace de tenis
+para verificar el Dashboard es
+[el video de ejemplo del modelo](https://raw.githubusercontent.com/abdullahtarek/tennis_analysis/main/input_videos/input_video.mp4).
+Si usas un clip ajeno al tenis, puedes comprobar la importación y la cola, y el
+worker puede devolver Error al intentar analizarlo.
+
+Cada integrante puede ejecutar su propia copia. Mantén la demo y los emuladores
+en loopback. El servidor rechaza configuración de emuladores externos. Los videos,
+pesos, archivos de configuración local y datos de prueba se quedan en el equipo.
+
+### Configuración general de Firebase
+
 La web usa un solo proyecto de Firebase con **Auth** (correo y contraseña),
 **Firestore** y **Storage**. Todo se inicializa una vez en
 [src/lib/firebase.js](src/lib/firebase.js); el resto de la app importa de ahí:

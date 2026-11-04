@@ -58,7 +58,7 @@ export function createYtDlpResolver({ executable, nodeExecutable = process.execP
       const stderr = typeof error?.stderr === 'string' ? error.stderr : ''
       if (/requested format.*not available/i.test(stderr)) throw new VideoImportError('youtube-format', 'No encontramos un MP4 compatible para este video.')
       // Classification only; extractor messages/URLs never reach the user.
-      if (/private video|video unavailable|not available|sign in|members.only|age.restrict|removed|deleted/i.test(stderr)) throw new VideoImportError('youtube-unavailable', 'El video no está disponible públicamente sin iniciar sesión.')
+      if (/private video|video (?:is )?unavailable|not available|sign in|members.only|age.restrict|removed|deleted/i.test(stderr)) throw new VideoImportError('youtube-unavailable', 'El video no está disponible públicamente sin iniciar sesión.')
       throw new VideoImportError('youtube-service', 'No pudimos consultar YouTube. Prueba más tarde o usa un archivo.')
     }
   }

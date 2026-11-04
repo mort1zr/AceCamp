@@ -72,7 +72,12 @@ describe('Proveedor de YouTube (sin ejecución de extractor ni red externa)', ()
   it('clasifica video eliminado, formato no disponible o ejecutable ausente sin filtrar stderr', async () => {
     const execute = vi.fn()
     const resolver = createYtDlpResolver({ executable: resolve('yt-dlp'), execute })
-    for (const [failure, code] of [[{ stderr: 'ERROR: Private video https://private.example?secret=abc' }, 'import/youtube-unavailable'], [{ stderr: 'ERROR: Requested format is not available secret' }, 'import/youtube-format'], [{ code: 'ENOENT' }, 'import/youtube-service']]) {
+    for (const [failure, code] of [
+      [{ stderr: 'ERROR: Private video https://private.example?secret=abc' }, 'import/youtube-unavailable'],
+      [{ stderr: 'ERROR: This video is unavailable' }, 'import/youtube-unavailable'],
+      [{ stderr: 'ERROR: Requested format is not available secret' }, 'import/youtube-format'],
+      [{ code: 'ENOENT' }, 'import/youtube-service'],
+    ]) {
       execute.mockRejectedValueOnce(failure)
       await expect(resolver({ url, maxBytes: 100 })).rejects.toMatchObject({ code, message: expect.not.stringContaining('secret') })
     }

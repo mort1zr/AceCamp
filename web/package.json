@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "demo": "vite --mode demo --host 127.0.0.1 --port 5176 --strictPort",
+    "demo:worker": "node scripts/demoWorker.mjs",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",

@@ -1,9 +1,11 @@
 import { Route, Routes } from 'react-router'
+import { useMemo } from 'react'
 import AppLayout from './components/AppLayout.jsx'
 import PublicLayout from './components/PublicLayout.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 import { useAuth } from './context/AuthContext.js'
 import { db, storage } from './lib/firebase.js'
+import { createHttpVideoImporter } from './lib/services/httpVideoImportService.js'
 import { createVideoUploadService, MAX_VIDEO_BYTES } from './lib/videoUpload.js'
 import Analizar from './pages/Analizar.jsx'
 import Comparador from './pages/Comparador.jsx'
@@ -26,6 +28,12 @@ const { uploadVideo } = createVideoUploadService({ storage })
 export default function App() {
   const { user, profile } = useAuth()
   const session = user && profile ? { uid: user.uid, orgId: profile.orgId } : undefined
+  const importVideo = useMemo(() => createHttpVideoImporter({
+    enabled: import.meta.env.DEV && import.meta.env.MODE === 'demo' && Boolean(user && profile),
+    supportsYouTube: true,
+    endpoint: '/api/video-import',
+    getSession: async () => ({ orgId: profile.orgId, actorId: user.uid, token: await user.getIdToken() }),
+  }), [user, profile])
 
   return (
     <Routes>
@@ -44,7 +52,7 @@ export default function App() {
           <Route path="/inicio" element={<Inicio />} />
           <Route path="/dashboard" element={<Dashboard db={db} session={session} />} />
           <Route path="/jugadores" element={<Jugadores db={db} session={session} />} />
-          <Route path="/analizar" element={<Analizar db={db} session={session} uploadVideo={uploadVideo} maxBytes={MAX_VIDEO_BYTES} />} />
+          <Route path="/analizar" element={<Analizar db={db} session={session} uploadVideo={uploadVideo} importVideo={importVideo} maxBytes={MAX_VIDEO_BYTES} />} />
           <Route path="/partidos" element={<Partidos />} />
           <Route path="/comparador" element={<Comparador />} />
           <Route path="/reclutamiento" element={<Reclutamiento />} />

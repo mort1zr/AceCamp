@@ -7,6 +7,7 @@ export const VIDEO_IMPORT_MESSAGES = Object.freeze({
   'import/unavailable': 'El video no está disponible públicamente. Prueba otro enlace o un archivo.',
   'import/format': 'Usa un MP4 o MOV válido con una pista de video.',
   'import/size': 'El video supera el límite o la descarga está incompleta.',
+  'import/duration': 'La demo admite enlaces a videos de hasta 30 segundos.',
   'import/permission': 'Tu sesión no permite importar este video. Vuelve a iniciar sesión.',
   'import/conflict': 'Este intento corresponde a otro video o sesión. Inicia un intento nuevo.',
   'import/busy': 'Hay una importación en curso. Espera un momento y vuelve a intentarlo.',

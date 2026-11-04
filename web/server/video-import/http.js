@@ -2,7 +2,7 @@ import { awaitWithAbort, isStorageVideoPath, readLimitedJson, VIDEO_IMPORT_MESSA
 
 const statuses = {
   'import/source': 400, 'import/input': 400, 'import/destination': 400, 'import/redirect': 400,
-  'import/unavailable': 422, 'import/format': 415, 'import/size': 413, 'import/permission': 403,
+  'import/unavailable': 422, 'import/format': 415, 'import/size': 413, 'import/duration': 422, 'import/permission': 403,
   'import/conflict': 409, 'import/busy': 429, 'import/timeout': 504, 'import/download': 502, 'import/failed': 502,
   'import/youtube-unavailable': 422, 'import/youtube-live': 422, 'import/youtube-format': 422, 'import/youtube-service': 503,
 }

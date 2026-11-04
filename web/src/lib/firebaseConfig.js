@@ -20,8 +20,9 @@ export const EMULATOR_PORTS = { auth: 9099, firestore: 8080, storage: 9199 }
  * @returns {{ useEmulators: boolean, emulatorHost: string, config: Record<string, string> }}
  */
 export function readFirebaseConfig(env) {
-  const useEmulators = String(env.VITE_USE_FIREBASE_EMULATORS ?? '').trim() === 'true'
-  const emulatorHost = String(env.VITE_FIREBASE_EMULATOR_HOST ?? '').trim() || '127.0.0.1'
+  const demo = env.MODE === 'demo'
+  const useEmulators = demo || String(env.VITE_USE_FIREBASE_EMULATORS ?? '').trim() === 'true'
+  const emulatorHost = demo ? '127.0.0.1' : String(env.VITE_FIREBASE_EMULATOR_HOST ?? '').trim() || '127.0.0.1'
 
   if (useEmulators) {
     // Proyecto "demo-*": los emuladores no tocan ningún recurso real

@@ -42,4 +42,13 @@ describe('readFirebaseConfig', () => {
     expect(readFirebaseConfig({ ...full, VITE_USE_FIREBASE_EMULATORS: 'false' }).useEmulators).toBe(false)
     expect(readFirebaseConfig({ ...full, VITE_USE_FIREBASE_EMULATORS: '1' }).useEmulators).toBe(false)
   })
+
+  it('la demo fija el proyecto y el host locales aunque exista una configuración real', () => {
+    const env = { ...full, MODE: 'demo', VITE_USE_FIREBASE_EMULATORS: 'false', VITE_FIREBASE_EMULATOR_HOST: 'otro-host' }
+    expect(readFirebaseConfig(env)).toMatchObject({
+      useEmulators: true,
+      emulatorHost: '127.0.0.1',
+      config: { projectId: EMULATOR_PROJECT_ID, storageBucket: 'demo-acecam.appspot.com' },
+    })
+  })
 })
