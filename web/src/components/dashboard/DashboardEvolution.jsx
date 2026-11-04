@@ -34,7 +34,7 @@ export default function DashboardEvolution({ playerId, evolution, loading = fals
             <XAxis dataKey="matchId" tickFormatter={key => formatMatchDate(byId.get(key)?.date, true)} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} axisLine={{ stroke: 'var(--players-line)' }} tickLine={false} minTickGap={24} />
             <YAxis width={48} domain={[0, 'auto']} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
             <Tooltip content={<EvolutionTooltip />} filterNull={false} cursor={{ stroke: 'var(--players-line)' }} />
-            <Line dataKey="averageShotSpeed" name="Velocidad media de golpe" unit=" km/h" type="linear" stroke="#D0623A" strokeWidth={2.5} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: '#D0623A', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+            <Line dataKey="averageShotSpeed" name="Velocidad media de golpe" unit=" km/h" type="linear" stroke="var(--electric, #4FE3FF)" strokeWidth={2.5} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: 'var(--electric, #4FE3FF)', strokeWidth: 0 }} activeDot={{ r: 6 }} />
           </LineChart>
         </ResponsiveContainer>
       </figure>}
