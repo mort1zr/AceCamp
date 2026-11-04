@@ -1,11 +1,18 @@
+import { useEffect } from 'react'
 import { Outlet } from 'react-router'
 import { useAuth } from '../context/AuthContext.js'
+import { useEntrada } from '../context/EntradaContext.js'
 import BarraLateral from './layout/BarraLateral.jsx'
 import BarraSuperior from './layout/BarraSuperior.jsx'
 
 export default function AppLayout() {
   const { user, profile, logout } = useAuth()
   const usuario = { nombre: profile?.displayName ?? user?.email }
+  const entrada = useEntrada()
+
+  useEffect(() => {
+    entrada?.panelListo()
+  }, [entrada])
 
   return (
     <div className="flex min-h-dvh bg-bg text-text">

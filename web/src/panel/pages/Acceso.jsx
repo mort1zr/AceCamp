@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import Button from '../../compartido/components/Button.jsx'
 import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
@@ -6,6 +6,7 @@ import Logo from '../../compartido/components/Logo.jsx'
 import ControlsPill from '../../compartido/components/ControlsPill.jsx'
 import { useAterrizaje } from '../../compartido/hooks/useAterrizaje.js'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
+import { PELOTA_PX, useEntrada } from '../context/EntradaContext.js'
 import './acceso.css'
 
 const opciones = [
@@ -69,7 +70,30 @@ export default function Acceso() {
   const [alto, setAlto] = useState()
   const [cambio, setCambio] = useState(null)
   const [boton, setBoton] = useState(null)
-  const contexto = useMemo(() => ({ setBoton }), [])
+  const entrada = useEntrada()
+  const tarjeta = useRef(null)
+  const [saliendo, setSaliendo] = useState(false)
+
+  const entrar = useCallback(
+    async (destino) => {
+      const caja = tarjeta.current
+      const reducir = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      if (!entrada || !caja || reducir) {
+        navigate(destino, { replace: true })
+        return
+      }
+      const { left, top, width, height } = caja.getBoundingClientRect()
+      const escala = PELOTA_PX / Math.max(width, height)
+      caja.style.setProperty('--acceso-escala', String(escala))
+      setSaliendo(true)
+      await new Promise((resolver) => setTimeout(resolver, 450))
+      await entrada.comenzar({ x: left + width / 2, y: top + height / 2, escala: 0.5 })
+      navigate(destino, { replace: true })
+    },
+    [entrada, navigate],
+  )
+
+  const contexto = useMemo(() => ({ setBoton, entrar }), [entrar])
   const aterrizaje = useAterrizaje()
 
   useLayoutEffect(() => {
@@ -102,7 +126,8 @@ export default function Acceso() {
           <Logo size={76} wordmarkClassName="text-6xl" className="gap-3.5" rebota />
         </LinkDeslizante>
         <div
-          className={`rounded-card border border-line bg-surface transition-[padding] duration-500 ${registro ? 'p-5 sm:p-7' : 'p-6 sm:p-8'}`}
+          ref={tarjeta}
+          className={`rounded-card border border-line bg-surface transition-[padding] duration-500 ${registro ? 'p-5 sm:p-7' : 'p-6 sm:p-8'} ${saliendo ? 'acceso-saliendo' : ''}`}
         >
           <div
             role="tablist"
