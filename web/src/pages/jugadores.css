@@ -6,6 +6,7 @@
   --players-text: var(--text, #f2eee8);
   --players-muted: var(--muted, #a89f93);
   --players-ink: var(--accent-ink, #d7f25c);
+  --players-info: var(--electric-ink, #4fe3ff);
   --players-bad: var(--bad, #e58a6a);
   --ace-ui-card: var(--players-card);
   --ace-ui-field: var(--players-field);
@@ -13,6 +14,7 @@
   --ace-ui-text: var(--players-text);
   --ace-ui-muted: var(--players-muted);
   --ace-ui-accent: var(--players-ink);
+  --ace-ui-info: var(--players-info);
   --ace-ui-positive: var(--good, #8fd49c);
   --ace-ui-negative: var(--players-bad);
   max-width: 1180px;
@@ -27,6 +29,7 @@
   --players-text: var(--text, #1a1815);
   --players-muted: var(--muted, #6b6358);
   --players-ink: var(--accent-ink, #5a6b00);
+  --players-info: var(--electric-ink, #00708f);
   --players-bad: var(--bad, #b0432a);
   --ace-ui-positive: var(--good, #2f7a3f);
 }
@@ -54,7 +57,7 @@
 .players-page .ac-table { min-width: 540px; }
 .players-table-hint { display: none; }
 .players-name > span:last-child { max-width: 34ch; overflow-wrap: anywhere; }
-.players-avatar { background: var(--players-field); color: var(--players-ink); width: 2.3rem; height: 2.3rem; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
+.players-avatar { background: var(--players-field); color: var(--players-info); width: 2.3rem; height: 2.3rem; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; }
 .players-footnote { color: var(--players-muted); font-size: 0.8125rem; margin: 1.2rem 0; }
 .players-form-panel { background: var(--players-card); border: 1px solid var(--players-line); border-radius: 1rem; padding: clamp(1.1rem, 3vw, 2rem); margin-top: 1.5rem; }
 .players-form-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.75rem; }

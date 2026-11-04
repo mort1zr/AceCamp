@@ -4,16 +4,23 @@ import { BrowserRouter } from 'react-router'
 import App from './App.jsx'
 import AuthProvider from './context/AuthProvider.jsx'
 import './index.css'
+import { IdiomaProvider } from './lib/idioma.jsx'
+import { startSmoothScroll } from './lib/smoothScroll.js'
 import { applyTheme, resolveInitialTheme } from './lib/theme.js'
 
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+window.scrollTo(0, 0)
 applyTheme(resolveInitialTheme())
+startSmoothScroll()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </BrowserRouter>
+    <IdiomaProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </BrowserRouter>
+    </IdiomaProvider>
   </StrictMode>,
 )

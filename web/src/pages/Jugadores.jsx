@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DataTable, ErrorState } from '../components/ui'
+import { DataTable } from '../components/ui'
 import PlayerForm from '../components/players/PlayerForm.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { playerAge } from '../lib/players.js'
@@ -54,6 +54,14 @@ export default function Jugadores({ service, db, session }) {
   }, [db, uid, orgId])
 
   const playersService = service ?? liveService
-  if (!playersService) return <section className="players-page"><h1>Jugadores</h1><ErrorState title="Los jugadores aún no están disponibles" description="Cuando tu sesión de equipo esté disponible, podrás consultar y registrar jugadores." /></section>
+  if (!playersService) return (
+    <section className="players-page" aria-labelledby="players-title">
+      <aside className="players-demo-notice"><strong>Los jugadores aún no están disponibles</strong><span>Cuando tu sesión de equipo esté disponible, podrás consultar y registrar jugadores.</span></aside>
+      <header className="players-page-heading"><div><p className="players-eyebrow">Tu equipo, en un solo lugar</p><h1 id="players-title">Jugadores<span className="players-title-dot">.</span></h1><p>Conoce a tus jugadores. Acompaña su evolución.</p></div></header>
+      <div className="players-list-heading"><h2>Tu plantilla</h2><span>0 jugadores</span></div>
+      <DataTable caption="Jugadores registrados" columns={columns} rows={[]} loading={false} error={null} emptyTitle="Tu equipo empieza aquí" emptyDescription="Registra a tu primer jugador para vincular sus videos y seguir su evolución." />
+      <p className="players-footnote">Cada jugador es una historia. El siguiente paso es analizar su juego.</p>
+    </section>
+  )
   return <PlayersWorkspace key={playersService.scopeKey} service={playersService} />
 }
