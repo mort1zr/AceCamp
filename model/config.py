@@ -26,6 +26,7 @@ DEFAULTS: dict[str, Any] = {
     "detection": {"device": None, "ball_confidence": 0.15},
     "shots": {"min_change_frames_for_hit": 25, "rolling_window": 5},
     "use_cache": False,
+    "render_video": True,
 }
 
 
@@ -60,6 +61,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--cache-dir", help="carpeta de la caché de detecciones")
     parser.add_argument("--device", help="dispositivo de inferencia: cpu, cuda:0, mps...")
+    parser.add_argument("--stats-json", help="guardar las estadísticas del partido en este archivo JSON")
+    parser.add_argument("--no-video", action="store_true", help="no dibujar ni guardar el vídeo anotado (más rápido)")
     return parser
 
 
@@ -78,6 +81,10 @@ def config_from_args(argv: list[str] | None = None) -> dict[str, Any]:
         overrides["detection"]["device"] = args.device
     if args.use_cache:
         overrides["use_cache"] = True
+    if args.stats_json:
+        overrides["paths"]["stats_json"] = args.stats_json
+    if args.no_video:
+        overrides["render_video"] = False
     return _merge(config, overrides)
 
 
