@@ -1,0 +1,248 @@
+"""Tests del worker (PCIT-35) con dobles en memoria de Firestore y Storage."""
+
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from stats import (
+    MATCH_STATS_VERSION,
+    MODEL_STATS_VERSION,
+    build_model_statistics,
+    renumber_far_near,
+    to_match_statistics,
+)
+from worker import processor
+from worker.processor import (
+    MESSAGE_BAD_MATCH_DATA,
+    MESSAGE_INTERNAL,
+    MESSAGE_NOT_RECOGNIZED,
+    MESSAGE_VIDEO_NOT_FOUND,
+    VideoNotFoundError,
+    run_forever,
+    run_once,
+)
+
+T0 = datetime(2026, 11, 4, 12, 0, tzinfo=timezone.utc)
+
+
+class MemoryStore:
+    """Imita las transiciones de estado de matches en Firestore."""
+
+    def __init__(self, matches):
+        self.matches = matches
+
+    def claim_next(self, worker_version):
+        queued = [(m.get("createdAt", T0), mid) for mid, m in self.matches.items() if m["status"] == "en cola"]
+        if not queued:
+            return None
+        _, match_id = min(queued)
+        match = self.matches[match_id]
+        match.update(status="procesando", workerVersion=worker_version, statistics=None, errorMessage=None)
+        return match_id, dict(match)
+
+    def mark_ready(self, match_id, statistics):
+        self.matches[match_id].update(status="listo", statistics=statistics, errorMessage=None, finishedAt=T0)
+
+    def mark_error(self, match_id, error_message):
+        self.matches[match_id].update(status="error", statistics=None, errorMessage=error_message, finishedAt=T0)
+
+
+class MemoryStorage:
+    def __init__(self, files):
+        self.files = files
+        self.downloaded = []
+
+    def download(self, video_path, destination):
+        if video_path not in self.files:
+            raise VideoNotFoundError(video_path)
+        destination.write_bytes(self.files[video_path])
+        self.downloaded.append(destination)
+
+
+def model_stats():
+    shots = [{"frame": 10, "player": 1, "speedKmh": 80.0}, {"frame": 50, "player": 2, "speedKmh": 62.5},
+             {"frame": 90, "player": 1, "speedKmh": 95.0}]
+    positions = [{1: (5.0, -1.0), 2: (5.0 + 0.05 * i, 25.0)} for i in range(120)]
+    return build_model_statistics(shots, positions, fps=30, num_frames=120)
+
+
+def queued_match(**fields):
+    return {"status": "en cola", "orgId": "org1", "playerId": "p1", "playerPosition": "abajo",
+            "videoPath": "orgs/org1/matches/m1/video.mp4", "createdAt": T0, **fields}
+
+
+def test_a_queued_match_ends_ready_with_statistics(tmp_path):
+    store = MemoryStore({"m1": queued_match()})
+    storage = MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"video"})
+
+    result = run_once(store, storage, lambda path: model_stats(), tmp_path, version="acecam-model test")
+
+    assert result == ("m1", "listo")
+    match = store.matches["m1"]
+    assert match["status"] == "listo"
+    assert match["workerVersion"] == "acecam-model test"
+    assert match["errorMessage"] is None
+    statistics = match["statistics"]
+    assert statistics["schemaVersion"] == MATCH_STATS_VERSION
+    assert statistics["player"]["shots"] == {"count": 1, "sumSpeedKmh": 62.5, "maxSpeedKmh": 62.5}  # 'abajo' = 2
+    assert statistics["opponent"]["shots"]["count"] == 2
+
+
+def test_the_downloaded_video_is_analyzed_and_then_deleted(tmp_path):
+    store = MemoryStore({"m1": queued_match()})
+    storage = MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"bytes del video"})
+    seen = []
+
+    def analyze(path):
+        seen.append(path.read_bytes())
+        return model_stats()
+
+    run_once(store, storage, analyze, tmp_path, version="v")
+
+    assert seen == [b"bytes del video"]
+    assert not storage.downloaded[0].exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_oldest_queued_match_goes_first_and_others_are_untouched(tmp_path):
+    store = MemoryStore({
+        "nuevo": queued_match(createdAt=T0 + timedelta(minutes=5)),
+        "viejo": queued_match(createdAt=T0),
+        "listo": queued_match(status="listo"),
+    })
+    storage = MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"})
+
+    assert run_once(store, storage, lambda p: model_stats(), tmp_path, version="v") == ("viejo", "listo")
+    assert store.matches["nuevo"]["status"] == "en cola"
+
+
+def test_empty_queue(tmp_path):
+    assert run_once(MemoryStore({}), MemoryStorage({}), lambda p: model_stats(), tmp_path, version="v") is None
+
+
+@pytest.mark.parametrize(
+    ("files", "analyze", "match_fields", "message"),
+    [
+        ({}, lambda p: model_stats(), {}, MESSAGE_VIDEO_NOT_FOUND),
+        ({"orgs/org1/matches/m1/video.mp4": b"v"}, None, {}, MESSAGE_NOT_RECOGNIZED),
+        ({"orgs/org1/matches/m1/video.mp4": b"v"}, "boom", {}, MESSAGE_INTERNAL),
+        ({"orgs/org1/matches/m1/video.mp4": b"v"}, lambda p: model_stats(), {"playerPosition": None},
+         MESSAGE_BAD_MATCH_DATA),
+        ({"orgs/org1/matches/m1/video.mp4": b"v"}, lambda p: model_stats(), {"videoPath": ""},
+         MESSAGE_BAD_MATCH_DATA),
+    ],
+    ids=["video-no-existe", "pista-no-reconocida", "error-inesperado", "sin-posicion", "sin-video"],
+)
+def test_failures_end_in_error_with_a_message_for_the_user(tmp_path, files, analyze, match_fields, message):
+    def not_recognized(path):
+        raise ValueError("no se encontró ningún jugador en el lado cercano de la pista")
+
+    def boom(path):
+        raise RuntimeError("CUDA out of memory")
+
+    analyze = {None: not_recognized, "boom": boom}.get(analyze, analyze)
+    store = MemoryStore({"m1": queued_match(**match_fields)})
+
+    assert run_once(store, MemoryStorage(files), analyze, tmp_path, version="v") == ("m1", "error")
+    match = store.matches["m1"]
+    assert match["errorMessage"] == message
+    assert match["statistics"] is None
+    assert "CUDA" not in match["errorMessage"]  # nunca detalles técnicos al usuario
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_run_forever_keeps_going_after_a_queue_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(processor.time, "sleep", lambda s: None)
+    calls = []
+
+    class FlakyStore(MemoryStore):
+        def claim_next(self, worker_version):
+            calls.append(1)
+            if len(calls) == 1:
+                raise ConnectionError("sin red")
+            return super().claim_next(worker_version)
+
+    store = FlakyStore({"m1": queued_match()})
+    storage = MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"})
+
+    run_forever(store, storage, lambda p: model_stats(), tmp_path, poll_seconds=0, max_iterations=3)
+
+    assert store.matches["m1"]["status"] == "listo"
+    assert len(calls) == 3
+
+
+def test_worker_version_names_the_model():
+    assert processor.worker_version().startswith("acecam-model ")
+
+
+# ------------------------------------------------------------- estadísticas
+
+
+def test_model_statistics_follow_the_schema_rules():
+    stats = model_stats()
+
+    assert stats["schemaVersion"] == MODEL_STATS_VERSION
+    assert stats["durationSeconds"] == 4.0
+    far = stats["players"]["1"]
+    assert far["shots"] == {"count": 2, "sumSpeedKmh": 175.0, "maxSpeedKmh": 95.0}  # sumas, no promedios
+    assert far["movement"]["distanceMeters"] == 0.0  # quieto: se midió y dio cero
+    near = stats["players"]["2"]
+    assert near["movement"]["avgSpeedKmh"] == pytest.approx(5.4, abs=0.2)  # 0,05 m por fotograma a 30 fps
+
+
+def test_a_player_without_shots_has_count_zero_and_no_max():
+    stats = build_model_statistics([], [{1: (0.0, 0.0), 2: (1.0, 1.0)}] * 10, fps=30, num_frames=10)
+
+    assert stats["players"]["1"]["shots"] == {"count": 0, "sumSpeedKmh": 0.0}
+
+
+def test_movement_is_omitted_when_it_cannot_be_measured():
+    stats = build_model_statistics([], [{1: (0.0, 0.0)}], fps=30, num_frames=1)
+
+    assert "movement" not in stats["players"]["2"]
+
+
+def test_detector_jitter_does_not_add_meters():
+    import numpy as np
+
+    rng = np.random.default_rng(0)
+    still_with_jitter = [{1: tuple(rng.normal(0, 0.05, 2)), 2: (0.0, 0.0)} for _ in range(300)]
+
+    stats = build_model_statistics([], still_with_jitter, fps=30, num_frames=300)
+
+    # Sin suavizar sumaría unos 20 m en 10 s; con suavizado se queda en pocos metros.
+    assert stats["players"]["1"]["movement"]["distanceMeters"] < 5.0
+
+
+@pytest.mark.parametrize(("position", "player_key"), [("arriba", "1"), ("abajo", "2")])
+def test_player_position_picks_the_registered_player(position, player_key):
+    stats = model_stats()
+
+    match_stats = to_match_statistics(stats, position)
+
+    assert match_stats["player"] == stats["players"][player_key]
+    assert match_stats["opponent"] == stats["players"]["2" if player_key == "1" else "1"]
+
+
+def test_invalid_inputs_for_match_statistics():
+    with pytest.raises(ValueError):
+        to_match_statistics(model_stats(), "izquierda")
+    with pytest.raises(ValueError):
+        to_match_statistics({"schemaVersion": "otra"}, "arriba")
+
+
+def test_players_are_renumbered_by_side_whatever_their_tracker_id():
+    positions = [{7: (5.0, 24.0), 3: (5.0, -1.0)} for _ in range(5)]  # 7 = cercano, 3 = lejano
+    shots = [{"frame": 1, "player": 7, "speedKmh": 60.0}, {"frame": 3, "player": 3, "speedKmh": 80.0}]
+
+    new_shots, new_positions = renumber_far_near(shots, positions)
+
+    assert new_positions[0] == {1: (5.0, -1.0), 2: (5.0, 24.0)}
+    assert [s["player"] for s in new_shots] == [2, 1]
+
+
+def test_renumbering_keeps_players_already_numbered_by_side():
+    positions = [{1: (5.0, -1.0), 2: (5.0, 24.0)}] * 3
+    shots = [{"frame": 1, "player": 1, "speedKmh": 60.0}]
+
+    assert renumber_far_near(shots, positions) == (shots, positions)

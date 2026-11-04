@@ -11,7 +11,7 @@ force-exclude = true
 select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["config", "constants", "court_line_detector", "mini_court", "trackers", "utils"]
+known-first-party = ["config", "constants", "court_line_detector", "mini_court", "scoring", "stats", "trackers", "utils", "worker"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 
 import cv2
@@ -7,6 +8,7 @@ import constants
 from config import config_from_args, resolve_path
 from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
+from stats import build_model_statistics, renumber_far_near
 from trackers import BallTracker, PlayerTracker
 from utils import (
     convert_pixel_distance_to_meters,
@@ -20,14 +22,19 @@ from utils import (
 from utils.detection_cache import cache_path_for, file_sha256
 
 
-def main(argv=None):
-    config = config_from_args(argv)
+def run_pipeline(config, render=True):
+    """Analiza el vídeo de config["paths"]["input"].
+
+    Devuelve un diccionario con las estadísticas del modelo (build_model_statistics),
+    los golpes medidos y la ruta del vídeo anotado (None si render es False).
+    Lanza ValueError si no se reconoce la pista o los jugadores.
+    """
     paths, models, detection = config["paths"], config["models"], config["detection"]
 
     # Read Video
     input_video_path = resolve_path(paths["input"])
     if not input_video_path.exists():
-        raise SystemExit(f"No existe el vídeo de entrada: {input_video_path}")
+        raise FileNotFoundError(f"No existe el vídeo de entrada: {input_video_path}")
     video_info = get_video_info(input_video_path)
     video_frames = read_video(str(input_video_path))
     video_hash = file_sha256(input_video_path)
@@ -92,7 +99,8 @@ def main(argv=None):
         'player_2_total_player_speed':0,
         'player_2_last_player_speed':0,
     } ]
-    
+    shots = []
+
     for ball_shot_ind in range(len(ball_shot_frames)-1):
         start_frame = ball_shot_frames[ball_shot_ind]
         end_frame = ball_shot_frames[ball_shot_ind+1]
@@ -125,6 +133,9 @@ def main(argv=None):
 
         speed_of_opponent = speed_km_per_hour(distance_covered_by_opponent_meters, shot_frames, video_info.fps)
 
+        shots.append({"frame": int(start_frame), "endFrame": int(end_frame),
+                      "player": int(player_shot_ball), "speedKmh": float(speed_of_ball_shot)})
+
         current_player_stats= deepcopy(player_stats_data[-1])
         current_player_stats['frame_num'] = start_frame
         current_player_stats[f'player_{player_shot_ball}_number_of_shots'] += 1
@@ -135,6 +146,16 @@ def main(argv=None):
         current_player_stats[f'player_{opponent_player_id}_last_player_speed'] = speed_of_opponent
 
         player_stats_data.append(current_player_stats)
+
+    # Sprint 1: posiciones de la mini-pista (píxeles) pasadas a metros con su escala.
+    meters_per_pixel = constants.DOUBLE_LINE_WIDTH / mini_court.get_width_of_mini_court()
+    player_positions_m = [{pid: (x * meters_per_pixel, y * meters_per_pixel) for pid, (x, y) in frame.items()}
+                          for frame in player_mini_court_detections]
+    stats_shots, stats_positions = renumber_far_near(shots, player_positions_m)
+    model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, len(video_frames))
+    result = {"model_statistics": model_statistics, "shots": stats_shots, "output_video": None}
+    if not render:
+        return result
 
     player_stats_data_df = pd.DataFrame(player_stats_data)
     frames_df = pd.DataFrame({'frame_num': list(range(len(video_frames)))})
@@ -172,6 +193,23 @@ def main(argv=None):
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     save_video(output_video_frames, str(output_video_path), fps=video_info.fps)
     print(f"Vídeo guardado en {output_video_path}")
+    result["output_video"] = output_video_path
+    return result
+
+
+def main(argv=None):
+    config = config_from_args(argv)
+    try:
+        result = run_pipeline(config, render=config["render_video"])
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+    stats_path = config["paths"].get("stats_json")
+    if stats_path:
+        stats_path = resolve_path(stats_path)
+        stats_path.parent.mkdir(parents=True, exist_ok=True)
+        stats_path.write_text(json.dumps(result["model_statistics"], indent=2, ensure_ascii=False))
+        print(f"Estadísticas guardadas en {stats_path}")
+    return result
 
 if __name__ == "__main__":
     main()

@@ -41,7 +41,8 @@ jobs:
         run: ruff check .
 
       - name: Tests (pytest)
-        run: pytest
+        # El motor de puntuación exige 100 % de cobertura (criterio de TA-27).
+        run: pytest --cov=scoring --cov-fail-under=100
 
   secretos:
     runs-on: ubuntu-latest
