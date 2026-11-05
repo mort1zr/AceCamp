@@ -19,6 +19,7 @@ export const SECCIONES_POR_PLAN = {
 }
 
 export function incluyeSeccion(plan, seccion) {
+  if (plan === 'ninguno') return seccion === 'configuracion'
   const planes = SECCIONES_POR_PLAN[seccion]
   return !planes || !plan || planes.includes(plan)
 }
