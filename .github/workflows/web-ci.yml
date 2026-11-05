@@ -57,6 +57,10 @@ jobs:
       - name: Build (vite)
         run: npm run build
 
+      # La CSP de firebase.json debe permitir los scripts en línea del build (PCIT-169).
+      - name: Comprobar la CSP
+        run: npm run check:csp
+
   reglas:
     # Reglas de Firestore y Storage contra los emuladores (PCIT-23, PCIT-24, PCIT-39).
     runs-on: ubuntu-latest
