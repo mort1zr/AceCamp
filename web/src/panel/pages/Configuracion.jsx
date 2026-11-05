@@ -112,6 +112,8 @@ const textos = {
       },
     ],
     verPrecios: 'Ver precios',
+    elegirPlan: 'Elegir plan',
+    cambiarA: 'Cambiar a este plan',
     metodoPago: 'Método de pago',
     sinMetodo: 'Sin método de pago registrado',
     actualizar: 'Actualizar',
@@ -206,6 +208,8 @@ const textos = {
       },
     ],
     verPrecios: 'View pricing',
+    elegirPlan: 'Choose a plan',
+    cambiarA: 'Switch to this plan',
     metodoPago: 'Payment method',
     sinMetodo: 'No payment method on file',
     actualizar: 'Update',
@@ -845,8 +849,8 @@ function Plan({ t, plan, locale, esOrganizacion }) {
             {renovacion && <span className="text-xs text-muted">{t.renueva(renovacion)}</span>}
           </div>
         ) : (
-          <Link to="/precios" className={botonPrincipal}>
-            {t.verPrecios}
+          <Link to="/inicio" className={botonPrincipal}>
+            {t.elegirPlan}
           </Link>
         )}
       </div>
@@ -856,7 +860,7 @@ function Plan({ t, plan, locale, esOrganizacion }) {
             <span className="font-semibold">{t.equipoTitulo}</span>
             <span className="max-w-[52ch] text-[13px] text-muted">{t.equipoTexto}</span>
           </span>
-          <Link to="/precios" className={botonNormal}>
+          <Link to="/checkout?plan=ultra" className={botonNormal}>
             {t.conocerUltra}
           </Link>
         </div>
@@ -877,10 +881,10 @@ function Plan({ t, plan, locale, esOrganizacion }) {
                 </span>
               ) : (
                 <Link
-                  to="/precios"
+                  to={`/checkout?plan=${opcion.id}`}
                   className="self-start text-sm font-semibold text-accent-ink hover:underline"
                 >
-                  {t.verPrecios}
+                  {actual ? t.cambiarA : t.elegirPlan}
                 </Link>
               )}
             </li>

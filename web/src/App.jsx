@@ -9,6 +9,7 @@ import { createHttpVideoImporter } from './panel/lib/services/httpVideoImportSer
 import { createVideoUploadService, MAX_VIDEO_BYTES } from './panel/lib/videoUpload.js'
 import Acceso from './panel/pages/Acceso.jsx'
 import Analizar from './panel/pages/Analizar.jsx'
+import Checkout from './panel/pages/Checkout.jsx'
 import Comparador from './panel/pages/Comparador.jsx'
 import Configuracion from './panel/pages/Configuracion.jsx'
 import Dashboard from './panel/pages/Dashboard.jsx'
@@ -49,6 +50,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Registro />} />
       </Route>
+
+      <Route path="/checkout" element={<Checkout />} />
 
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>

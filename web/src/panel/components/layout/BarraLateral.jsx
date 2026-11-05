@@ -125,6 +125,9 @@ const textos = {
     planReal: 'Usar mi plan real',
     cambiarVista: (plan) => `Ver el panel como plan ${plan}`,
     desdePro: 'Disponible desde el plan Pro',
+    sinPlan: 'Sin plan',
+    eligePlan: 'Elige un plan para empezar',
+    elegirPlan: 'Elegir plan',
     cerrarMenu: 'Cerrar menú',
     idioma: 'Idioma',
     tema: 'Tema',
@@ -154,6 +157,9 @@ const textos = {
     planReal: 'Use my real plan',
     cambiarVista: (plan) => `View the panel as the ${plan} plan`,
     desdePro: 'Available from the Pro plan',
+    sinPlan: 'No plan',
+    eligePlan: 'Choose a plan to get started',
+    elegirPlan: 'Choose a plan',
     cerrarMenu: 'Close menu',
     idioma: 'Language',
     tema: 'Theme',
@@ -197,7 +203,9 @@ export default function BarraLateral({ movil = false, onCerrar }) {
   const { plan, planVista, setPlanVista, uso } = usePlanVista()
   const usados = uso.usados ?? 0
   const porcentaje = uso.limite ? Math.min(100, Math.round((usados / uso.limite) * 100)) : 0
-  const textoUso = t.uso(usados, uso.limite)
+  const sinPlan = plan === 'ninguno'
+  const textoUso = sinPlan ? t.eligePlan : t.uso(usados, uso.limite)
+  const motivo = sinPlan ? t.eligePlan : t.desdePro
   const actual = PLANES_VISTA.find((opcion) => opcion.id === plan)
   const siguiente = PLANES_VISTA[(PLANES_VISTA.indexOf(actual) + 1) % PLANES_VISTA.length]
 
@@ -309,10 +317,10 @@ export default function BarraLateral({ movil = false, onCerrar }) {
             ) : (
               <li key={seccion.to}>
                 <Link
-                  to="/configuracion?seccion=plan"
+                  to={sinPlan ? seccion.to : '/configuracion?seccion=plan'}
                   onClick={alElegir}
-                  title={`${t[seccion.clave]} · ${t.desdePro}`}
-                  aria-label={`${t[seccion.clave]}. ${t.desdePro}`}
+                  title={`${t[seccion.clave]} · ${motivo}`}
+                  aria-label={`${t[seccion.clave]}. ${motivo}`}
                   className="relative flex min-h-11 items-center gap-2.5 rounded-[10px] px-3 text-[15px] font-medium whitespace-nowrap text-muted transition-colors hover:bg-surface2 hover:text-text2"
                 >
                   <Trazo className="opacity-60">{seccion.icono}</Trazo>
@@ -323,7 +331,14 @@ export default function BarraLateral({ movil = false, onCerrar }) {
                       movil ? 'inline-flex' : abierto ? 'hidden lg:inline-flex' : 'hidden'
                     }`}
                   >
-                    Pro
+                    {sinPlan ? (
+                      <Trazo size={10} strokeWidth={2.6}>
+                        <rect x="5" y="11" width="14" height="10" rx="2" />
+                        <path d="M8 11V8a4 4 0 018 0v3" />
+                      </Trazo>
+                    ) : (
+                      'Pro'
+                    )}
                   </span>
                   <span
                     aria-hidden="true"
@@ -345,8 +360,8 @@ export default function BarraLateral({ movil = false, onCerrar }) {
 
       <div
         role="img"
-        aria-label={`${t.plan} ${actual?.nombre ?? ''}. ${textoUso}`}
-        title={`${actual?.nombre ?? t.nombrePlan} · ${textoUso}`}
+        aria-label={`${t.plan} ${actual?.nombre ?? (sinPlan ? t.sinPlan : '')}. ${textoUso}`}
+        title={`${actual?.nombre ?? (sinPlan ? t.sinPlan : t.nombrePlan)} · ${textoUso}`}
         className={`mt-auto flex flex-col items-center gap-2 rounded-xl border border-line bg-surface py-3 ${movil ? 'hidden' : abierto ? 'lg:hidden' : ''}`}
       >
         <button
@@ -356,7 +371,7 @@ export default function BarraLateral({ movil = false, onCerrar }) {
           title={t.cambiarVista(siguiente.nombre)}
           className="cursor-pointer rounded-[5px] bg-accent px-1.5 py-0.5 font-display text-[11px] leading-none font-bold tracking-[0.06em] text-on-accent uppercase transition-opacity hover:opacity-85"
         >
-          {actual?.nombre ?? 'Pro'}
+          {actual?.nombre ?? (sinPlan ? '—' : 'Pro')}
         </button>
         <svg width="42" height="42" viewBox="0 0 42 42" aria-hidden="true" className="-rotate-90">
           <circle cx="21" cy="21" r="17" fill="none" stroke="var(--line2)" strokeWidth="4" />
@@ -369,7 +384,7 @@ export default function BarraLateral({ movil = false, onCerrar }) {
             strokeWidth="4"
             strokeLinecap="round"
             pathLength="100"
-            strokeDasharray={`${uso.limite ? porcentaje : 100} 100`}
+            strokeDasharray={`${sinPlan ? 0 : uso.limite ? porcentaje : 100} 100`}
           />
           <text
             x="21"
@@ -384,7 +399,7 @@ export default function BarraLateral({ movil = false, onCerrar }) {
           </text>
         </svg>
         <span className="text-[11px] leading-none font-semibold text-muted">
-          {uso.limite ? `/ ${uso.limite}` : t.sinLimite}
+          {sinPlan ? t.sinPlan : uso.limite ? `/ ${uso.limite}` : t.sinLimite}
         </span>
       </div>
 
@@ -394,12 +409,23 @@ export default function BarraLateral({ movil = false, onCerrar }) {
         }`}
       >
         <p className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">{t.plan}</p>
-        <p className="font-semibold">{actual ? actual.nombre : t.nombrePlan}</p>
+        <p className="font-semibold">
+          {actual ? actual.nombre : sinPlan ? t.sinPlan : t.nombrePlan}
+        </p>
         <p className="text-[13px] text-muted">{textoUso}</p>
+        {sinPlan && (
+          <Link
+            to="/inicio"
+            onClick={alElegir}
+            className="mt-1 inline-flex min-h-9 items-center justify-center rounded-full bg-accent px-4 text-[13px] font-semibold text-on-accent transition-opacity hover:opacity-90"
+          >
+            {t.elegirPlan}
+          </Link>
+        )}
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
           <div
             className="h-full rounded-full bg-electric transition-[width] duration-500"
-            style={{ width: `${uso.limite ? porcentaje : 100}%` }}
+            style={{ width: `${sinPlan ? 0 : uso.limite ? porcentaje : 100}%` }}
           />
         </div>
         <div className="mt-1.5 flex flex-col gap-1.5 border-t border-chip pt-2.5">

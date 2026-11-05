@@ -10,7 +10,8 @@ import {
 } from 'firebase/firestore'
 
 export const PLANES = {
-  free: { id: 'basico', prueba: true, limite: 15 },
+  free: { id: 'ninguno', prueba: false, limite: 0 },
+  prueba: { id: 'basico', prueba: true, limite: 15 },
   basico: { id: 'basico', prueba: false, limite: 30 },
   pro: { id: 'pro', prueba: false, limite: 150 },
   ultra: { id: 'ultra', prueba: false, limite: null },

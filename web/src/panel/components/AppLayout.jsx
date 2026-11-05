@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
 import { useAuth } from '../context/AuthContext.js'
 import { useEntrada } from '../context/EntradaContext.js'
 import PlanVistaProvider from '../context/PlanVistaProvider.jsx'
+import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
+import SinPlan from '../pages/SinPlan.jsx'
 import { usePlanOrganizacion } from '../hooks/usePlanOrganizacion.js'
 import { db } from '../lib/firebase.js'
 import BarraLateral from './layout/BarraLateral.jsx'
 import BarraSuperior from './layout/BarraSuperior.jsx'
+
+function Contenido() {
+  const { plan } = usePlanVista()
+  const { pathname } = useLocation()
+  const seccion = pathname.split('/')[1]
+  if (plan === 'ninguno' && !incluyeSeccion(plan, seccion)) return <SinPlan />
+  return <Outlet />
+}
 
 export default function AppLayout() {
   const { user, profile, logout } = useAuth()
@@ -28,7 +38,7 @@ export default function AppLayout() {
   }, [menu])
 
   return (
-    <PlanVistaProvider planReal={planReal} usados={usados}>
+    <PlanVistaProvider key={user?.uid} cuenta={user?.uid} planReal={planReal} usados={usados}>
       <div className="relative flex min-h-dvh overflow-clip bg-bg text-text">
         <BarraLateral />
 
@@ -59,7 +69,7 @@ export default function AppLayout() {
         <div className="flex min-w-0 flex-1 flex-col">
           <BarraSuperior usuario={usuario} onSalir={logout} onMenu={() => setMenu(true)} />
           <main className="min-w-0 flex-1 px-4 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-6 md:py-8">
-            <Outlet />
+            <Contenido />
           </main>
         </div>
       </div>

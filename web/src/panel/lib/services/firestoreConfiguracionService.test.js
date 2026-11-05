@@ -76,7 +76,7 @@ describe('Servicio de Configuración con Firestore', () => {
     const datos = recibir.mock.calls.at(-1)[0]
     expect(datos.account).toMatchObject({ name: 'Coach', email: 'coach@acecam.test' })
     expect(datos.organization).toMatchObject({ name: 'Universidad Demo', canEdit: true })
-    expect(datos.plan).toEqual({ id: 'basico', trial: true, used: 1, limit: 15 })
+    expect(datos.plan).toEqual({ id: 'ninguno', trial: false, used: 1, limit: 0 })
     expect(datos.isOrganization).toBe(false)
     expect(datos.team[0]).toMatchObject({ id: 'u1', players: 1 })
   })

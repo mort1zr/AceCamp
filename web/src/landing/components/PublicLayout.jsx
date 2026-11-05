@@ -22,7 +22,7 @@ export default function PublicLayout() {
           />
         </>
       ) : esPrecios ? (
-        <ControlsPill className="max-sm:absolute" />
+        <ControlsPill cuenta className="max-sm:absolute" />
       ) : (
         <PublicHeader />
       )}
