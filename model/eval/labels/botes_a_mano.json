@@ -1,0 +1,40 @@
+{
+ "_info": "Botes marcados a mano por Aaron en el vídeo anotado (fotograma en que la pelota toca el suelo). Referencia para comparar detectores de pelota (TA-14b) mientras se completan las etiquetas de TA-9.",
+ "videos": {
+  "input_video.mp4": {
+   "sha256": "5f2584a2010864d5d8624c325d7f0571d48bd0756164657ef603dc8a97bab22d",
+   "bounces": [
+    44,
+    80,
+    117,
+    170,
+    203
+   ]
+  },
+  "h1.mp4": {
+   "sha256": "9021ce737bb40f048504b6a7f60e2f862203d65ba62aa2672e4cdc64f2308cbb",
+   "bounces": [
+    143,
+    179,
+    287,
+    321,
+    356,
+    386,
+    429,
+    469,
+    577
+   ]
+  },
+  "h4.mp4": {
+   "sha256": "07e0ddf5a3eca8aca7414b2cca951660663d13472c4c92b43c4b537541b159ea",
+   "bounces": [
+    49,
+    109,
+    166,
+    277,
+    357,
+    398
+   ]
+  }
+ }
+}

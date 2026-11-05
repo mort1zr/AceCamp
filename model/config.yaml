@@ -14,10 +14,15 @@ models:
   players: models/yolov8m.pt
   ball: models/yolo5_last.pt
   court_keypoints: models/keypoints_model.pth
+  # Detector de pelota TrackNet (TA-14b): solo se usa con detection.ball_detector: tracknet.
+  ball_tracknet: models/tracknet.pt
 
 detection:
   # Dispositivo para la inferencia: null (automático), cpu, cuda:0, mps...
   device: null
+  # Detector de la pelota: yolo (models.ball) o tracknet (models.ball_tracknet, en evaluación
+  # en TA-14b: mira 3 fotogramas seguidos y ve mejor la pelota borrosa).
+  ball_detector: yolo
   ball_confidence: 0.15
   # Tamaño al que se reescala cada fotograma para buscar la pelota: auto, null (640, el de YOLO)
   # o un número. Con auto, los vídeos de menos de 1280 px de ancho se analizan a 1280: en 640x360

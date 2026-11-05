@@ -17,7 +17,7 @@ from stats import (
     measure_shots,
     renumber_far_near,
 )
-from trackers import BallTracker, PlayerTracker
+from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
 from utils import VideoWriter, get_video_info, iter_frames
 from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
 from utils.player_stats_drawer_utils import StatsBox
@@ -106,10 +106,21 @@ def run_pipeline(config, render=True):
 
     ball_image_size = resolve_ball_image_size(detection.get("ball_image_size"), video_info.width)
     player_tracker = PlayerTracker(model_path=str(resolve_path(models["players"])), device=detection["device"])
-    ball_tracker = BallTracker(model_path=str(resolve_path(models["ball"])),
-                               conf=detection["ball_confidence"],
-                               device=detection["device"],
-                               image_size=ball_image_size)
+    ball_detector = detection.get("ball_detector", "yolo")
+    if ball_detector == "tracknet":  # TA-14b: detector de pelota que mira 3 fotogramas seguidos
+        ball_model = models["ball_tracknet"]
+        ball_tracker = TrackNetBallTracker(model_path=str(resolve_path(ball_model)), device=detection["device"])
+        ball_cache_params = {"detector": "tracknet"}
+    elif ball_detector == "yolo":
+        ball_model = models["ball"]
+        ball_tracker = BallTracker(model_path=str(resolve_path(ball_model)),
+                                   conf=detection["ball_confidence"],
+                                   device=detection["device"],
+                                   image_size=ball_image_size)
+        ball_cache_params = {"conf": detection["ball_confidence"],
+                             **({"imgsz": ball_image_size} if ball_image_size else {})}
+    else:
+        raise ValueError(f"detection.ball_detector debe ser 'yolo' o 'tracknet', no {ball_detector!r}")
     court_line_detector = CourtLineDetector(str(resolve_path(models["court_keypoints"])),
                                             refine=config["court"]["refine_keypoints"])
     # Puntos clave y homografía imagen → pista (metros), re-detectados cada N fotogramas y suavizados
@@ -120,9 +131,7 @@ def run_pipeline(config, render=True):
     player_every = int(detection.get("player_every_n_frames", 1))
     players_cache = cache_path_for(cache_dir, video_hash, "players", models["players"],
                                    **({"every": player_every} if player_every > 1 else {}))
-    ball_cache = cache_path_for(cache_dir, video_hash, "ball", models["ball"],
-                                conf=detection["ball_confidence"], all_candidates=True,
-                                **({"imgsz": ball_image_size} if ball_image_size else {}))
+    ball_cache = cache_path_for(cache_dir, video_hash, "ball", ball_model, all_candidates=True, **ball_cache_params)
     cached_players = load_detections(players_cache, video_hash) if config["use_cache"] else None
     cached_ball = load_detections(ball_cache, video_hash) if config["use_cache"] else None
 

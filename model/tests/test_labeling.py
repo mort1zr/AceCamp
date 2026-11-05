@@ -187,9 +187,10 @@ def test_draw_overlays_without_a_window(session):
 
 
 def test_prelabel_command_end_to_end(monkeypatch, tmp_path):
+    import test_pipeline_smoke as smoke
+
     import main
     from eval.prelabel import main as prelabel_main
-    from tests import test_pipeline_smoke as smoke
 
     monkeypatch.setattr(main, "PlayerTracker", smoke.FakePlayerTracker)
     monkeypatch.setattr(main, "BallTracker", smoke.FakeBallTracker)

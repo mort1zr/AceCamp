@@ -58,13 +58,13 @@ def clear_queue(store):
 
 @pytest.fixture
 def synthetic_video(tmp_path):
-    from tests.test_pipeline_smoke import write_synthetic_video
+    from test_pipeline_smoke import write_synthetic_video
 
     return write_synthetic_video(tmp_path / "partido.avi")
 
 
 def model_stats(path):
-    from tests.test_worker import model_stats as fake
+    from test_worker import model_stats as fake
 
     return fake()
 
@@ -131,8 +131,9 @@ def test_a_match_changed_while_processing_is_not_overwritten(backend):
 
 def test_end_to_end_storage_pipeline_firestore(backend, tmp_path, monkeypatch, synthetic_video):
     """Video en Storage → pipeline real (modelos sustituidos) → estadísticas en Firestore."""
+    import test_pipeline_smoke as smoke
+
     import main
-    from tests import test_pipeline_smoke as smoke
     from worker.__main__ import make_analyzer
 
     monkeypatch.setattr(main, "PlayerTracker", smoke.FakePlayerTracker)

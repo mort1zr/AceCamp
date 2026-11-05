@@ -94,7 +94,7 @@ def test_detect_frame_returns_every_candidate_sorted_by_confidence():
 
 
 def test_shot_detection_tolerates_frames_without_ball():
-    from tests.test_ball_shots import triangle_trajectory
+    from test_ball_shots import triangle_trajectory
 
     detections = triangle_trajectory(num_frames=200, half_period=40)
     for i in range(100, 108):
