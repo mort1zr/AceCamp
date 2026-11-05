@@ -9,6 +9,8 @@ rules_version = '2';
 //   así que no se exige que matches/{matchId} exista todavía.
 // - Tamaño máximo: 500 MB (MAX_VIDEO_BYTES en web/src/panel/lib/videoUpload.js; cambiar ambos a la vez).
 // - El worker (PCIT-35) lee con el Admin SDK, que no pasa por estas reglas.
+// - processed.mp4 (PCIT-161) se lee con sesión de la misma organización;
+//   solo el worker puede escribirlo o borrarlo mediante el Admin SDK.
 service firebase.storage {
   match /b/{bucket}/o {
 
@@ -29,7 +31,7 @@ service firebase.storage {
       allow read: if inOrg(orgId);
       // Se permite reemplazar el archivo para reintentar una subida.
       allow create, update: if inOrg(orgId) && validVideo(fileName);
-      allow delete: if inOrg(orgId);
+      allow delete: if inOrg(orgId) && fileName != 'processed.mp4';
     }
 
     // Todo lo demás queda cerrado.

@@ -56,7 +56,7 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard db={db} session={session} />} />
           <Route path="/jugadores" element={<Jugadores db={db} session={session} />} />
           <Route path="/analizar" element={<Analizar db={db} session={session} uploadVideo={uploadVideo} importVideo={importVideo} maxBytes={MAX_VIDEO_BYTES} />} />
-          <Route path="/partidos" element={<Partidos db={db} session={session} />} />
+          <Route path="/partidos" element={<Partidos db={db} storage={storage} session={session} />} />
           <Route path="/comparador" element={<Comparador db={db} session={session} />} />
           <Route path="/reclutamiento" element={<Reclutamiento />} />
           <Route path="/configuracion" element={<Configuracion db={db} auth={auth} session={session} />} />

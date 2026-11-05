@@ -7,6 +7,7 @@ import { formatMatchDate } from '../lib/dashboardEvolution.js'
 import { createFirestoreMatchesService } from '../lib/services/firestoreMatchesService.js'
 import { createFirestoreMatchNotesService } from '../lib/services/firestoreMatchNotesService.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
+import { createProcessedVideoService } from '../lib/services/processedVideoService.js'
 import './jugadores.css'
 
 function matchesErrorMessage(error) {
@@ -16,7 +17,7 @@ function matchesErrorMessage(error) {
   return 'No pudimos cargar los partidos. Revisa tu conexión y vuelve a intentarlo.'
 }
 
-function MatchesList({ matchesService, playersService, notesService }) {
+function MatchesList({ matchesService, playersService, notesService, videoService }) {
   const matches = useAnalysisQueue(matchesService, matchesErrorMessage)
   const players = usePlayers(playersService)
   const [playerId, setPlayerId] = useState('')
@@ -77,6 +78,7 @@ function MatchesList({ matchesService, playersService, notesService }) {
       match={selectedMatch}
       playerName={playerNames.get(selectedMatch.playerId) || 'Jugador no disponible'}
       notesService={notesService}
+      videoService={videoService}
       onBack={() => setMatchId('')}
     />
   )
@@ -126,7 +128,7 @@ function MatchesList({ matchesService, playersService, notesService }) {
   )
 }
 
-export default function Partidos({ db, session }) {
+export default function Partidos({ db, storage, session }) {
   const { uid, orgId, role } = session ?? {}
   const services = useMemo(() => {
     if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()
@@ -136,8 +138,9 @@ export default function Partidos({ db, session }) {
       playersService: createFirestorePlayersService({ ...identity, onlyOwned: role === 'coach' }),
       matchesService: createFirestoreMatchesService(identity),
       notesService: createFirestoreMatchNotesService(identity),
+      videoService: storage ? createProcessedVideoService({ storage, orgId }) : null,
     }
-  }, [db, uid, orgId, role])
+  }, [db, storage, uid, orgId, role])
 
   return (
     <section className="players-page" aria-labelledby="matches-title">

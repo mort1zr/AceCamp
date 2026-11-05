@@ -141,9 +141,9 @@ def test_end_to_end_storage_pipeline_firestore(backend, tmp_path, monkeypatch, s
     monkeypatch.setattr(main, "CourtLineDetector", smoke.FakeCourtLineDetector)
     store, videos, bucket, org = backend
     clear_queue(store)
-    path = f"orgs/{org}/matches/e2e/video.avi"
-    bucket.blob(path).upload_from_filename(str(synthetic_video))
     match_id = f"{org}-e2e"
+    path = f"orgs/{org}/matches/{match_id}/video.avi"
+    bucket.blob(path).upload_from_filename(str(synthetic_video))
     add_match(store, org, match_id, path, playerPosition="abajo")
 
     assert run_once(store, videos, make_analyzer(), tmp_path / "work", version="v") == (match_id, "listo")
@@ -155,3 +155,6 @@ def test_end_to_end_storage_pipeline_firestore(backend, tmp_path, monkeypatch, s
     assert 40 < statistics["player"]["shots"]["maxSpeedKmh"] < 120
     assert statistics["opponent"]["shots"] == {"count": 0, "sumSpeedKmh": 0.0}  # medido y cero, no "sin dato"
     assert "movement" in statistics["opponent"]
+    output = store.db.collection("matches").document(match_id).get().get("processedVideoPath")
+    assert output == f"orgs/{org}/matches/{match_id}/processed.mp4"
+    assert bucket.blob(output).download_as_bytes()[4:8] == b"ftyp"

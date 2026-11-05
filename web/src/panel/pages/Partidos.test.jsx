@@ -106,7 +106,10 @@ it('abre el reporte con el contrato del worker y mantiene los filtros al volver'
       opponent: 'Rival de prueba',
       statistics: {
         schemaVersion: 'acecam.match-stats.v1',
-        player: { shots: { count: 2, sumSpeedKmh: 100, maxSpeedKmh: 70 } },
+        player: { shots: { count: 2, sumSpeedKmh: 100, maxSpeedKmh: 70 },
+          movement: { distanceMeters: 31, avgSpeedKmh: 3, maxSpeedKmh: 10 },
+          serve: { count: 1, sampleCount: 1, sumSpeedKmh: 100, firstServeAttempts: 2, firstServeIn: 1, doubleFaults: 0 } },
+        rallies: { count: 2, sumShots: 10, longestShots: 7 },
       },
     }),
     record('m-unknown', { ...fields, opponent: 'Rival sin medición', statistics: { schemaVersion: 'anterior' } }),
@@ -127,6 +130,11 @@ it('abre el reporte con el contrato del worker y mantiene los filtros al volver'
   expect(card('Golpes medidos').getByText('2')).toBeTruthy()
   expect(card('Velocidad media de golpe').getByText('50')).toBeTruthy()
   expect(card('Velocidad máxima de golpe').getByText('70')).toBeTruthy()
+  expect(card('Distancia recorrida').getByText('31')).toBeTruthy()
+  expect(card('Velocidad media de saque').getByText('100')).toBeTruthy()
+  expect(card('Primer saque dentro').getByText('50')).toBeTruthy()
+  expect(card('Dobles faltas').getByText('0')).toBeTruthy()
+  expect(card('Golpes por peloteo').getByText('5')).toBeTruthy()
   act(() => guardarUnidades('mph'))
   expect(card('Velocidad máxima de golpe').getByText(/43[.,]5/)).toBeTruthy()
   expect(report.getByText('Video procesado no disponible.')).toBeTruthy()
@@ -136,7 +144,7 @@ it('abre el reporte con el contrato del worker y mantiene los filtros al volver'
   expect(screen.getByLabelText('Desde').value).toBe('2026-10-23')
   expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Historial de partidos' }))
   await user.click(screen.getByRole('button', { name: /Ver reporte del partido con Rival sin medición/ }))
-  expect(screen.getAllByText('Sin datos')).toHaveLength(3)
+  expect(within(screen.getByRole('heading', { name: 'Golpes medidos' }).closest('article')).getByText('Sin datos')).toBeTruthy()
   expect(onSnapshot).toHaveBeenCalledTimes(2)
   rerender(<Partidos db={db} />)
   expect(screen.queryByText(/Rival sin medición/)).toBeNull()

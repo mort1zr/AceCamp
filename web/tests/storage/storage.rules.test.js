@@ -23,8 +23,8 @@ let env
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'demo-acecam',
-    firestore: { rules: read('../../../firebase/firestore.rules'), host: '127.0.0.1', port: 8080 },
+    projectId: process.env.ACECAM_RULES_PROJECT || 'demo-acecam',
+    firestore: { rules: read('../../../firebase/firestore.rules'), host: '127.0.0.1', port: Number(process.env.FIRESTORE_EMULATOR_HOST?.split(':').at(-1) || 8080) },
     storage: { rules: read('../../../firebase/storage.rules'), host: '127.0.0.1', port: 9199 },
   })
 })
@@ -47,6 +47,16 @@ beforeEach(async () => {
 const coachStorage = () => env.authenticatedContext(COACH, { email: 'coach@acecam.test' }).storage()
 
 describe('reglas de Storage', () => {
+  it('el resultado del worker es privado por organización y no se puede falsificar ni borrar desde la web', async () => {
+    const output = path(ORG, 'processed.mp4')
+    await env.withSecurityRulesDisabled(context => uploadBytes(ref(context.storage(), output), bytes(), { contentType: 'video/mp4' }))
+    await assertSucceeds(getBytes(ref(coachStorage(), output)))
+    await assertFails(getBytes(ref(env.unauthenticatedContext().storage(), output)))
+    await assertFails(getBytes(ref(env.authenticatedContext(OTHER_COACH).storage(), output)))
+    await assertFails(uploadBytes(ref(coachStorage(), output), bytes(), mp4()))
+    const { deleteObject } = await import('firebase/storage')
+    await assertFails(deleteObject(ref(coachStorage(), output)))
+  })
   it('el entrenador sube a su organización un .mp4 o .mov con su autoría', async () => {
     await assertSucceeds(uploadBytes(ref(coachStorage(), path(ORG)), bytes(), mp4()))
     await assertSucceeds(uploadBytes(ref(coachStorage(), path(ORG, 'video.mov')), bytes(), { contentType: 'video/quicktime', customMetadata: { uploadedBy: COACH } }))

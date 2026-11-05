@@ -289,7 +289,7 @@ def test_the_analyzer_rejects_long_videos_before_running_the_model(tmp_path, mon
     config.write_text("worker:\n  max_duration_seconds: 2\n  min_resolution: 0\n")
     ran = []
     monkeypatch.setattr(main, "run_pipeline", lambda config, render: ran.append(1) or {"model_statistics": {}})
-    analyze = make_analyzer(config)
+    analyze = make_analyzer(config, render_video=False)
 
     with pytest.raises(processor.VideoTooLongError) as error:
         analyze(write_video(tmp_path / "largo.avi", seconds=3))
@@ -325,7 +325,7 @@ def test_the_analyzer_checks_the_resolution_before_running_the_model(tmp_path, m
 
     ran = []
     monkeypatch.setattr(main, "run_pipeline", lambda config, render: ran.append(1) or {"model_statistics": {}})
-    analyze = make_analyzer()
+    analyze = make_analyzer(render_video=False)
     video = write_video(tmp_path / "v.avi", seconds=0.3, size=size)
 
     if accepted:

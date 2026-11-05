@@ -151,6 +151,18 @@ en cola ──▶ procesando ──▶ listo
 El worker toma un partido `'en cola'` y lo marca `'procesando'` dentro de una
 transacción, para que dos workers no tomen el mismo.
 
+### Video procesado (PCIT-161)
+
+`matches.processedVideoPath` es un campo opcional escrito solo por el worker:
+`orgs/{orgId}/matches/{matchId}/processed.mp4`. El archivo MP4 H.264 se sube antes
+de guardar la referencia y las estadísticas en la transacción final a `listo`.
+Al reclamar un reintento o al terminar en error se borra la referencia del
+documento. Los partidos históricos pueden no tenerla.
+
+El cliente lee por SDK autenticado y reglas de Storage de la misma organización;
+no guarda URLs públicas ni tokens permanentes. Solo Admin SDK puede escribir o
+borrar el resultado. Ver `docs/PCIT-161-video-procesado.md`.
+
 ### `matches.statistics` (v1)
 
 Estadísticas **de ese partido**, escritas por el worker (`model/stats/match_stats.py`).
