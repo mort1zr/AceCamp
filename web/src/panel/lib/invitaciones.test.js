@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const setDoc = vi.fn()
+const deleteDoc = vi.fn()
 vi.mock('firebase/firestore', () => ({
+  deleteDoc: (...args) => deleteDoc(...args),
   doc: (db, ...ruta) => ({ path: ruta.join('/') }),
   serverTimestamp: () => 'SERVER_TIME',
   setDoc: (...args) => setDoc(...args),
 }))
 
-const { invitarMiembro, normalizarCorreo, validarInvitacion } = await import('./invitaciones.js')
+const { anularInvitacion, enlaceInvitacion, invitarMiembro, normalizarCorreo, validarInvitacion } = await import('./invitaciones.js')
 
 describe('validarInvitacion', () => {
   it('acepta un correo y un rol válidos', () => {
@@ -39,5 +41,11 @@ describe('invitarMiembro', () => {
 
   it('normaliza correos', () => {
     expect(normalizarCorreo('  A@B.Pe ')).toBe('a@b.pe')
+  })
+
+  it('arma el enlace de registro y anula por correo', async () => {
+    expect(enlaceInvitacion('https://acecam.app', 'Ana@Club.pe')).toBe('https://acecam.app/registro?invitacion=ana%40club.pe')
+    await anularInvitacion({ db: {}, email: 'Ana@Club.pe' })
+    expect(deleteDoc).toHaveBeenCalledWith({ path: 'invites/ana@club.pe' })
   })
 })

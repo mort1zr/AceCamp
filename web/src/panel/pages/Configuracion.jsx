@@ -73,6 +73,9 @@ const textos = {
     copiarEnlace: 'Copiar enlace',
     enlaceCopiado: 'Enlace copiado',
     invitacionExiste: 'Ese correo ya tiene una invitación o no se puede invitar.',
+    anular: 'Anular',
+    anularInvitacion: (correo) => `Anular la invitación a ${correo}`,
+    invitacionAnulada: 'Invitación anulada.',
     correoInvalido: 'Escribe un correo válido.',
     miembro: 'Miembro',
     jugadoresACargo: 'Jugadores a cargo',
@@ -178,6 +181,9 @@ const textos = {
     copiarEnlace: 'Copy link',
     enlaceCopiado: 'Link copied',
     invitacionExiste: 'That email already has an invitation or cannot be invited.',
+    anular: 'Cancel',
+    anularInvitacion: (correo) => `Cancel the invitation to ${correo}`,
+    invitacionAnulada: 'Invitation cancelled.',
     correoInvalido: 'Enter a valid email.',
     miembro: 'Member',
     jugadoresACargo: 'Players in charge',
@@ -595,6 +601,12 @@ function Equipo({ t, miembros, service, bloqueado, puedeInvitar = true }) {
     setCorreo('')
   }
 
+  const puedeAnular = puedeInvitar && !bloqueado && Boolean(service?.cancelInvite)
+  const anular = (email) => {
+    setEnlace('')
+    return guardar(() => service.cancelInvite({ email }), t.invitacionAnulada)
+  }
+
   const copiar = async () => {
     try {
       await navigator.clipboard.writeText(enlace)
@@ -727,6 +739,17 @@ function Equipo({ t, miembros, service, bloqueado, puedeInvitar = true }) {
                       />
                       {t.estados[miembro.status] ?? miembro.status}
                     </span>
+                    {miembro.status === 'invitado' && puedeAnular && (
+                      <button
+                        type="button"
+                        disabled={ocupado}
+                        onClick={() => anular(miembro.email)}
+                        aria-label={t.anularInvitacion(miembro.email)}
+                        className="ml-2 text-xs font-semibold text-muted underline-offset-2 hover:text-text hover:underline"
+                      >
+                        {t.anular}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -114,6 +114,9 @@ describe('Configuración', () => {
     expect(screen.getAllByText('nuevo@ejemplo.test').length).toBeGreaterThan(0)
     // PCIT-40: sin envío de correos, se comparte el enlace de registro.
     expect(screen.getByText(/\/registro\?invitacion=nuevo%40ejemplo\.test$/)).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Anular la invitación a nuevo@ejemplo.test' }))
+    expect(await screen.findByText('Invitación anulada.')).toBeTruthy()
+    expect(screen.queryByText('nuevo@ejemplo.test')).toBeNull()
   })
 
   it('sin conexión muestra los formularios vacíos y bloqueados', () => {

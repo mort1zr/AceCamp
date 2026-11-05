@@ -9,7 +9,7 @@ import {
   where,
 } from 'firebase/firestore'
 
-import { invitarMiembro } from '../invitaciones.js'
+import { anularInvitacion, invitarMiembro } from '../invitaciones.js'
 import { PLANES } from '../planes.js'
 import { INVITE_STATUS } from '../schema.js'
 import { usagePeriod, usageRef } from '../usage.js'
@@ -180,6 +180,9 @@ export function createFirestoreConfiguracionService({
     },
     inviteMember({ email, role: rolInvitado = 'coach' }) {
       return invitarMiembro({ db, orgId, uid, email, role: rolInvitado })
+    },
+    cancelInvite({ email }) {
+      return anularInvitacion({ db, email })
     },
     async savePreferences(preferencias) {
       localStorage.setItem(clavePreferencias, JSON.stringify(preferencias))

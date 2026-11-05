@@ -3,7 +3,7 @@
 // así la persona invitada la encuentra al registrarse sin poder listar las de otros.
 // El plan Spark no envía correos: quien invita comparte el enlace de registro.
 
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { deleteDoc, doc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { COLLECTIONS, INVITE_STATUS, ROLES } from './schema.js'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -36,6 +36,11 @@ export async function invitarMiembro({ db, orgId, uid, email, role = 'coach' }) 
     createdAt: serverTimestamp(),
   })
   return correo
+}
+
+/** Anula una invitación que todavía no se usó (las reglas solo dejan borrar las pendientes). */
+export function anularInvitacion({ db, email }) {
+  return deleteDoc(invitacionRef(db, email))
 }
 
 /** Enlace de registro para compartir con la persona invitada (el plan Spark no envía correos). */

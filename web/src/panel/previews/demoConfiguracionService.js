@@ -101,5 +101,13 @@ export function createDemoConfiguracionService({ scenario = 'data', plan } = {})
       }
       emit()
     },
+    async cancelInvite({ email }) {
+      await esperar()
+      data = {
+        ...data,
+        team: data.team.filter((miembro) => !(miembro.status === 'invitado' && miembro.email === email)),
+      }
+      emit()
+    },
   }
 }
