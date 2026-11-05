@@ -15,6 +15,51 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+it('completa siete KPIs y gráficos de saque/peloteos con el mismo periodo y limpia el jugador anterior', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 10, 5, 12))
+  const orgId = 'org-a'
+  const playerId = 'p1'
+  const player = { orgId, fullName: 'Jugador de gráficos' }
+  const stats = () => ({ schemaVersion: 'acecam.match-stats.v1', player: {
+    shots: { count: 1, sumSpeedKmh: 50 },
+    serve: { sampleCount: 2, sumSpeedKmh: 200, firstServeAttempts: 4, firstServeIn: 3, doubleFaults: 0 },
+    movement: { distanceMeters: 10, maxSpeedKmh: 12 },
+  }, rallies: { count: 2, sumShots: 10, longestShots: 7, short: 1, medium: 1, long: 0 } })
+  const rows = ['2026-09-10', '2026-11-01', '2026-11-02'].map((matchDate, i) => ({ id: `advanced-${i}`, data: () => ({ orgId, playerId, status: 'listo', matchDate, statistics: stats() }) }))
+  collection.mockImplementation((_, name) => name)
+  query.mockImplementation(name => name)
+  getDoc.mockResolvedValue({ exists: () => true, data: () => player })
+  onSnapshot.mockImplementation((name, receive) => {
+    receive({ docs: name === 'players' ? [{ id: playerId, data: () => player }, { id: 'p2', data: () => ({ ...player, fullName: 'Otro jugador' }) }] : rows })
+    return () => {}
+  })
+  const user = userEvent.setup()
+  render(<Dashboard db={{ app: { options: { projectId: 'test' } } }} session={{ uid: 'coach', orgId }} />)
+  await user.selectOptions(await screen.findByLabelText('Jugador'), playerId)
+  const metrics = within(await screen.findByRole('region', { name: 'Resumen de rendimiento' }))
+  expect(metrics.getAllByRole('article')).toHaveLength(7)
+  const distance = () => within(screen.getByRole('heading', { name: 'Distancia recorrida' }).closest('article'))
+  expect(distance().getByText('30')).toBeTruthy()
+  await user.selectOptions(screen.getByLabelText('Periodo'), '1')
+  expect(distance().getByText('20')).toBeTruthy()
+  expect(distance().getByText('+10 m vs. periodo anterior')).toBeTruthy()
+  const serves = within(screen.getByRole('region', { name: 'Saque' }))
+  expect(serves.getByRole('row', { name: 'Primeros dentro 6' })).toBeTruthy()
+  expect(serves.getByRole('row', { name: 'Segundos dentro Sin datos' })).toBeTruthy()
+  expect(serves.getByRole('row', { name: 'Dobles faltas 0' })).toBeTruthy()
+  const rallies = within(screen.getByRole('region', { name: 'Peloteos' }))
+  expect(rallies.getByRole('row', { name: '0–4 golpes 2' })).toBeTruthy()
+  const evolution = within(screen.getByRole('region', { name: 'Evolución del saque' }))
+  expect(evolution.getByRole('figure', { name: 'Velocidad media de saque km/h' })).toBeTruthy()
+  await user.click(evolution.getByText('Ver datos del gráfico'))
+  expect(within(evolution.getByRole('table')).getAllByText('100 km/h')).toHaveLength(2)
+  await user.selectOptions(screen.getByLabelText('Jugador'), 'p2')
+  expect(await screen.findByText('No hay estadísticas en este periodo')).toBeTruthy()
+  expect(distance().getByText('Sin datos')).toBeTruthy()
+  expect(screen.queryByText('+10 m vs. periodo anterior')).toBeNull()
+})
+
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), onSnapshot: vi.fn(),
   query: vi.fn(), where: vi.fn(), addDoc: vi.fn(), serverTimestamp: vi.fn(),
@@ -75,7 +120,7 @@ it('avisa de resultados incompatibles y no los convierte en estadísticas de saq
   expect(await screen.findByText('Algunos análisis terminados aún no tienen indicadores disponibles. El resumen incluye únicamente los resultados verificables.')).toBeTruthy()
   expect(screen.getByText('Todavía no hay estadísticas para este jugador')).toBeTruthy()
   expect(screen.queryByText('160')).toBeNull()
-  expect(screen.getAllByText('Sin datos')).toHaveLength(3)
+  expect(within(screen.getByRole('heading', { name: 'Velocidad media de saque' }).closest('article')).getByText('Sin datos')).toBeTruthy()
 })
 
 it('muestra una diferencia de porcentajes en puntos porcentuales', () => {

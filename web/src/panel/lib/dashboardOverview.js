@@ -10,6 +10,11 @@ export const dashboardMetricDefinitions = [
   { key: 'doubleFaults', label: 'Dobles faltas', integer: true, lowerIsBetter: true },
 ]
 
+export const completeDashboardMetricDefinitions = [
+  ...dashboardMetricDefinitions,
+  { key: 'distanceMeters', label: 'Distancia recorrida', unit: 'm' },
+]
+
 export function isDashboardMetricValue(metric, value) {
   return Number.isFinite(value) && value >= 0 && (!metric.integer || Number.isSafeInteger(value))
     && (metric.max == null || value <= metric.max)

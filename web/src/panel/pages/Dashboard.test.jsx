@@ -48,7 +48,8 @@ describe('Dashboard v1 · interfaz PCIT-138', () => {
     await user.selectOptions(screen.getByLabelText('Jugador'), 'example-3')
     expect(await screen.findByText('Todavía no hay estadísticas para este jugador')).toBeTruthy()
     expect(screen.queryByText('128.5')).toBeNull()
-    expect(screen.getAllByText('Sin datos')).toHaveLength(4)
+    expect(within(card('Velocidad media de saque')).getByText('Sin datos')).toBeTruthy()
+    expect(within(card('Distancia recorrida')).getByText('Sin datos')).toBeTruthy()
     expect(within(card('Partidos analizados')).queryByText('0')).toBeNull()
   })
 
@@ -116,7 +117,8 @@ describe('Dashboard v1 · interfaz PCIT-138', () => {
     const user = userEvent.setup()
     render(<Dashboard {...props} />)
     await selectPlayer(user)
-    expect(screen.getAllByText('Sin datos')).toHaveLength(4)
+    expect(within(card('Primer saque dentro')).getByText('Sin datos')).toBeTruthy()
+    expect(within(card('Dobles faltas')).getByText('Sin datos')).toBeTruthy()
     expect(screen.queryByText('NaN')).toBeNull()
   })
 

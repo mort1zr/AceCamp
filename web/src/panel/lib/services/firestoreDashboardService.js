@@ -2,6 +2,7 @@ import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/fire
 import { buildDashboardOverview, normalizeDashboardStatistics } from '../dashboardOverview.js'
 import { buildDashboardEvolution } from '../dashboardEvolution.js'
 import { buildDashboardPeriods } from '../dashboardPeriods.js'
+import { buildDashboardDetails } from '../dashboardDetails.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
 function summarizeDashboard(rows, context) {
@@ -9,6 +10,8 @@ function summarizeDashboard(rows, context) {
   const summarize = matches => {
     const overview = buildDashboardOverview(matches, context)
     const evolution = buildDashboardEvolution(matches, context)
+    const serveEvolution = buildDashboardEvolution(matches, context, 'averageServeSpeed')
+    const details = buildDashboardDetails(matches, context)
     const point = evolution.points.at(-1)
     const row = point && matches.find(match => match.id === point.matchId
       && match.orgId === orgId && match.playerId === playerId
@@ -19,11 +22,11 @@ function summarizeDashboard(rows, context) {
       result: row.result,
       measuredShots: normalizeDashboardStatistics(decodeStatistics(row, { playerId }), playerId)?.shots?.sampleCount,
     } : null
-    return { ...overview, evolution, latestMatch }
+    return { ...overview, metrics: { ...overview.metrics, distanceMeters: details.movement.distanceMeters }, evolution, serveEvolution, details, latestMatch }
   }
   return {
     ...summarize(rows),
-    periods: buildDashboardPeriods(rows, summarize, matches => buildDashboardOverview(matches, context)),
+    periods: buildDashboardPeriods(rows, summarize, summarize),
   }
 }
 

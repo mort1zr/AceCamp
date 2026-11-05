@@ -1,6 +1,6 @@
 import { KpiCard } from '../ui'
 import { useUnidades } from '../../hooks/useUnidades.js'
-import { dashboardMetricDefinitions, isDashboardMetricValue } from '../../lib/dashboardOverview.js'
+import { completeDashboardMetricDefinitions, isDashboardMetricValue } from '../../lib/dashboardOverview.js'
 import { convertirVelocidad, etiquetaVelocidad } from '../../lib/unidades.js'
 
 const numberFormat = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
@@ -9,7 +9,7 @@ function trendLabel(metric, value, previous, unidades) {
   if (!isDashboardMetricValue(metric, previous)) return 'Sin datos para comparar'
   const difference = value - previous
   const displayed = metric.speed ? convertirVelocidad(difference, unidades) : difference
-  const unit = metric.speed ? ` ${etiquetaVelocidad(unidades)}` : metric.unit === '%' ? ' p. p.' : ''
+  const unit = metric.speed ? ` ${etiquetaVelocidad(unidades)}` : metric.unit === '%' ? ' p. p.' : metric.unit ? ` ${metric.unit}` : ''
   return `${changeFormat.format(displayed)}${unit} vs. periodo anterior`
 }
 
@@ -17,7 +17,7 @@ export default function DashboardMetrics({ metrics, previousMetrics, compare = f
   const unidades = useUnidades()
   return (
     <div className="dashboard-metrics">
-      {dashboardMetricDefinitions.filter(metric => !metric.optional || Object.hasOwn(metrics ?? {}, metric.key)).map(metric => {
+      {completeDashboardMetricDefinitions.map(metric => {
         const raw = metrics?.[metric.key]
         const valid = isDashboardMetricValue(metric, raw)
         return (

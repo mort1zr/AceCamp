@@ -3,11 +3,13 @@ import { EmptyState, ErrorState, LoadingState } from '../components/ui'
 import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
 import DashboardLatestMatch from '../components/dashboard/DashboardLatestMatch.jsx'
 import EvolutionPanel from '../components/dashboard/EvolutionPanel.jsx'
+import DashboardDetails from '../components/dashboard/DashboardDetails.jsx'
 import BloqueVacio from '../components/layout/BloqueVacio.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { useDashboardOverview } from '../hooks/useDashboardOverview.js'
 import { playerAge } from '../lib/players.js'
 import { dashboardPeriods } from '../lib/dashboardPeriods.js'
+import { completeDashboardMetricDefinitions } from '../lib/dashboardOverview.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import { createFirestoreDashboardService } from '../lib/services/firestoreDashboardService.js'
 import './jugadores.css'
@@ -70,10 +72,10 @@ const secciones = [
   },
   {
     clave: 'radar',
-    titulo: 'Perfil del jugador',
-    nota: 'Escala 0–100',
-    vacio: 'Perfil en construcción',
-    texto: 'Saque, derecha, revés, consistencia, movimiento y resistencia en una sola figura.',
+    titulo: 'Radar del jugador',
+    nota: 'Perfil normalizado',
+    vacio: 'Sin datos',
+    texto: 'El modelo aún no entrega puntuaciones comparables de 0–100. No se convierten velocidades o distancias en calificaciones inventadas.',
   },
   {
     clave: 'saque',
@@ -85,8 +87,8 @@ const secciones = [
   {
     clave: 'golpes',
     titulo: 'Derecha vs. revés',
-    vacio: 'Sin golpes comparados',
-    texto: 'Velocidad y efectividad de cada golpe, lado a lado.',
+    vacio: 'Sin datos',
+    texto: 'El modelo todavía no clasifica los golpes como derecha o revés. Los golpes medidos no se asignan a un lado sin evidencia.',
   },
   {
     clave: 'peloteos',
@@ -104,12 +106,7 @@ const secciones = [
   },
 ]
 
-const indicadores = [
-  'Partidos analizados',
-  'Velocidad media de saque',
-  'Primer saque dentro',
-  'Dobles faltas',
-]
+const indicadores = completeDashboardMetricDefinitions.map(metric => metric.label)
 
 function iniciales(nombre) {
   return nombre
@@ -137,8 +134,8 @@ function SeccionVacia({ seccion }) {
   )
 }
 
-function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = false }) {
-  const [partido, radar, saque, ...resto] = secciones
+function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = false, details, serveEvolution, playerId, sample }) {
+  const [partido, radar] = secciones
   return (
     <>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
@@ -161,13 +158,9 @@ function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = fals
             }}
           />
         )}
-        <SeccionVacia seccion={saque} />
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-4">
-        {resto.map((seccion) => (
-          <SeccionVacia key={seccion.clave} seccion={seccion} />
-        ))}
-      </div>
+      <DashboardDetails details={details} serveEvolution={serveEvolution} playerId={playerId} sample={sample} />
+      <SeccionVacia seccion={secciones.find(section => section.clave === 'golpes')} />
     </>
   )
 }
@@ -178,8 +171,8 @@ function IndicadoresVacios() {
       {indicadores.map((nombre) => (
         <div key={nombre} className={`${tarjeta} flex flex-col gap-2 p-4`}>
           <p className={etiqueta}>{nombre}</p>
-          <p className="font-display text-4xl leading-none font-bold text-line3">0</p>
-          <p className="text-[13px] text-muted">Sin análisis todavía</p>
+          <p className="font-display text-4xl leading-none font-bold text-line3">—</p>
+          <p className="text-[13px] text-muted">Sin datos</p>
         </div>
       ))}
     </div>
@@ -428,6 +421,10 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
               <SeccionesDashboard
                 latestMatch={report?.latestMatch?.playerId === selected.id ? report.latestMatch : null}
                 filtered={period !== 'all'}
+                details={report?.details}
+                serveEvolution={report?.serveEvolution}
+                playerId={selected.id}
+                sample={sample}
               />
             </>
           )}
