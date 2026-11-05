@@ -10,7 +10,13 @@ from court import CourtTracker
 from court_line_detector import CourtLineDetector
 from events import detect_bounce_events, detect_hits, detect_points, detect_serves, locate_bounces
 from mini_court import MiniCourt
-from stats import build_frame_states, build_model_statistics, measure_shots, renumber_far_near, serve_and_point_stats
+from stats import (
+    add_serve_and_rally_stats,
+    build_frame_states,
+    build_model_statistics,
+    measure_shots,
+    renumber_far_near,
+)
 from trackers import BallTracker, PlayerTracker
 from utils import VideoWriter, get_video_info, iter_frames
 from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
@@ -171,29 +177,32 @@ def run_pipeline(config, render=True):
                                                                              ball_detections,
                                                                              homography)
 
-    # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
+    # Golpes (TA-22a) y saques (TA-18). Los saques se detectan por el lanzamiento y cuentan como
+    # golpes para los botes: si no, el raquetazo del saque parece un bote.
     hits = detect_hits(ball_detections, player_detections, homography, video_info.fps)
-    bounces = detect_bounce_events(ball_detections, player_detections, homography, video_info.fps,
-                                   main_camera=main_camera, hits=hits)
-    bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=hits,
-                             court_keypoints=court_keypoints)
-
-    # Saques (TA-18) y división en puntos (TA-17).
     serves = detect_serves(ball_detections, player_detections, homography, video_info.fps,
                            main_camera=main_camera, hits=hits)
+    all_hits = sorted(set(hits) | {s["frame"] for s in serves})
+
+    # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
+    bounces = detect_bounce_events(ball_detections, player_detections, homography, video_info.fps,
+                                   main_camera=main_camera, hits=all_hits)
+    bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=all_hits,
+                             court_keypoints=court_keypoints)
+
+    # División en puntos (TA-17).
     points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
                            main_camera=main_camera, serves=serves)
 
     # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
     # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
     # muy seguidos, con velocidades imposibles.
-    shot_frames = sorted(set(hits) | {s["frame"] for s in serves})
-    shots = measure_shots(shot_frames, ball_detections, player_detections, player_court_positions,
+    shots = measure_shots(all_hits, ball_detections, player_detections, player_court_positions,
                           video_info.fps, main_camera=main_camera, hitters={s["frame"]: s["player"] for s in serves})
 
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
-    model_statistics.update(serve_and_point_stats(serves, points))
+    add_serve_and_rally_stats(model_statistics, points)
     result = {
         "model_statistics": model_statistics,
         "shots": stats_shots,

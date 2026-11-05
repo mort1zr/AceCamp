@@ -74,7 +74,8 @@ def homography_error_px(homography, keypoints):
 
 
 def locate_bounces(bounce_events, ball_detections, homography, fps, hits=(), court_keypoints=None):
-    """Añade a cada bote x_m, y_m (posición en la pista) e uncertainty_cm. Devuelve una lista nueva.
+    """Añade a cada bote x_m, y_m (posición en la pista), contact_frame (instante del contacto,
+    con fracción de fotograma) e uncertainty_cm. Devuelve una lista nueva.
 
     bounce_events: los de events.detect_bounce_events(). Si en un bote visto se puede
     afinar el contacto con las curvas, x_px e y_px pasan a ser ese punto.
@@ -90,11 +91,12 @@ def locate_bounces(bounce_events, ball_detections, homography, fps, hits=(), cou
         if h is None:
             continue
         point = (event["x_px"], event["y_px"])
+        contact_frame = float(frame)
         residual_px, time_frames = 1.0, TIME_UNCERTAINTY_INFERRED_FRAMES
         if not event.get("inferred"):
             refined = contact_point(centers, frame, hits, fit_frames)
             if refined is not None:
-                point, residual_px, _ = refined
+                point, residual_px, contact_frame = refined
             time_frames = TIME_UNCERTAINTY_FRAMES
         x_m, y_m = h.image_to_court(point)
 
@@ -108,6 +110,7 @@ def locate_bounces(bounce_events, ball_detections, homography, fps, hits=(), cou
         spatial = m_per_px * np.hypot(residual_px, homography_error_px(h, keypoints[frame]))
         temporal = speed_m * time_frames * 0.5  # el error medio es la mitad del intervalo
         located.append({**event, "x_px": round(float(point[0]), 1), "y_px": round(float(point[1]), 1),
+                        "contact_frame": round(contact_frame, 2),
                         "x_m": round(float(x_m), 2), "y_m": round(float(y_m), 2),
                         "uncertainty_cm": round(100 * float(np.hypot(spatial, temporal)), 0)})
     return located

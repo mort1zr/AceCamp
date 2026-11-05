@@ -24,10 +24,17 @@ Con lo que ya detecta el modelo (pelota, golpes, botes y cortes de cámara):
    otro saque del mismo jugador, es el mismo punto: se juntan y el punto lleva los dos
    saques. Sin bote del saque no se juntan (podría ser un ace).
 
-Salida: [{"start", "end", "server", "serve_frames", "shots", "end_reason"}].
+Cada saque del punto (serve_attempts) lleva si fue falta: el saque debe botar en el cuadro
+de saque cruzado del rival (con SERVICE_BOX_MARGIN_M por la incertidumbre del bote). Si no
+se ve su bote pero el rival lo devolvió, entró; si no se ve ni hay resto, no se sabe (None).
+Con el bote también se estima su velocidad: distancia del sacador al bote entre el tiempo.
+
+Salida: [{"start", "end", "server", "serve_frames", "serve_attempts", "shots", "end_reason"}].
 """
 
 from __future__ import annotations
+
+import numpy as np
 
 from court import COURT_LENGTH, DOUBLES_WIDTH, NET_Y
 from court.court_model import ALLEY_WIDTH, SERVICE_LINE_FROM_NET
@@ -73,6 +80,56 @@ def _segments(visible, pause):
 def _out_clearly(bounce):
     return (bounce["x_m"] < -OUT_MARGIN_M or bounce["x_m"] > DOUBLES_WIDTH + OUT_MARGIN_M
             or bounce["y_m"] < -OUT_MARGIN_M or bounce["y_m"] > COURT_LENGTH + OUT_MARGIN_M)
+
+
+MIN_SERVE_SPEED_KMH, MAX_SERVE_SPEED_KMH = 50.0, 260.0
+MIN_SERVE_FLIGHT_SECONDS = 0.25  # el bote del saque no puede llegar antes
+
+
+def serve_box_contains(bounce, server, side, margin=SERVICE_BOX_MARGIN_M):
+    """Si el bote cae en el cuadro de saque cruzado del rival (el que corresponde a ese saque).
+
+    server: 1 (fondo lejano) o 2 (cercano); side: 'derecha' o 'izquierda' del sacador.
+    """
+    x, y = bounce["x_m"], bounce["y_m"]
+    if server == 2:  # saca desde el fondo cercano: el cuadro está en la mitad lejana
+        inside_y = NET_Y - SERVICE_LINE_FROM_NET - margin <= y <= NET_Y + margin
+    else:
+        inside_y = NET_Y - margin <= y <= NET_Y + SERVICE_LINE_FROM_NET + margin
+    # Lado de la imagen desde el que saca (el del fondo mira a la cámara) y cuadro cruzado.
+    server_on_right = (side == "derecha") == (server == 2)
+    center = DOUBLES_WIDTH / 2
+    if server_on_right:
+        inside_x = ALLEY_WIDTH - margin <= x <= center + margin
+    else:
+        inside_x = center - margin <= x <= DOUBLES_WIDTH - ALLEY_WIDTH + margin
+    return inside_x and inside_y
+
+
+def _serve_attempt(serve, next_hit, bounces, fps):
+    """Resultado de un saque: bote, falta (True/False/None) y velocidad estimada."""
+    min_flight = MIN_SERVE_FLIGHT_SECONDS * fps
+
+    def receiver_half(b):
+        return b["y_m"] < NET_Y if serve["player"] == 2 else b["y_m"] > NET_Y
+
+    after = [b for b in bounces if b["frame"] - serve["frame"] >= min_flight and "x_m" in b and receiver_half(b)
+             and (next_hit is None or b["frame"] < next_hit)]
+    bounce = after[0] if after else None
+    attempt = {"frame": serve["frame"], "player": serve["player"], "side": serve["side"],
+               "fault": None, "bounce_frame": None, "speedKmh": None}
+    if bounce is not None:
+        attempt["bounce_frame"] = bounce["frame"]
+        attempt["fault"] = not serve_box_contains(bounce, serve["player"], serve["side"])
+        if "x_m" in serve and bounce["frame"] > serve["frame"]:
+            meters = float(np.hypot(bounce["x_m"] - serve["x_m"], bounce["y_m"] - serve["y_m"]))
+            flight = (bounce.get("contact_frame", bounce["frame"]) - serve["frame"]) / fps
+            speed = meters / flight * 3.6 if flight > 0 else 0.0
+            if MIN_SERVE_SPEED_KMH <= speed <= MAX_SERVE_SPEED_KMH:
+                attempt["speedKmh"] = round(speed, 1)
+    elif next_hit is not None:
+        attempt["fault"] = False  # sin bote visto, pero el rival lo devolvió: entró
+    return attempt
 
 
 def in_service_area(bounce, margin=SERVICE_BOX_MARGIN_M):
@@ -133,6 +190,11 @@ def detect_points(ball_detections, player_detections, hits, bounces, fps, main_c
         seg_hits = [h for h in hits if seg_start <= h <= seg_end]
         if not seg_hits:
             continue
+        # Si hay un saque al principio del tramo, el punto empieza en él (lo anterior son golpes
+        # falsos mientras el jugador bota la pelota o la lanza).
+        opening = [h for h in seg_hits if h in serve_at and h - seg_start <= toss + pause]
+        if opening:
+            seg_hits = [h for h in seg_hits if h >= opening[0]]
         first_hit = seg_hits[0]
         serve = serve_at.get(first_hit)
         if serve is not None:
@@ -141,14 +203,18 @@ def detect_points(ball_detections, player_detections, hits, bounces, fps, main_c
             start = next((i for i in range(max(seg_start, first_hit - toss), first_hit + 1) if visible[i]),
                          first_hit)
         end, reason = _end_of_play(start, seg_end, seg_hits, bounces, fps)
-        after_serve = [b for b in bounces if first_hit < b["frame"] <= end and "x_m" in b]
-        if len(seg_hits) > 1:
-            after_serve = [b for b in after_serve if b["frame"] < seg_hits[1]]
-        serve_bounce = after_serve[0] if after_serve else None
+        next_hit = seg_hits[1] if len(seg_hits) > 1 else None
+        attempts = [_serve_attempt(serve, next_hit, [b for b in bounces if b["frame"] <= end], fps)] if serve else []
+        if attempts:
+            fault = attempts[0]["fault"] is True
+        else:  # sin saque detectado: falta si el primer bote cae fuera de los cuadros
+            after_first = [b for b in bounces if first_hit < b["frame"] <= end and "x_m" in b
+                           and (next_hit is None or b["frame"] < next_hit)]
+            fault = bool(after_first) and not in_service_area(after_first[0])
         server = serve["player"] if serve is not None else hitter(first_hit, ball_detections, player_detections)
         plays.append({"start": start, "end": end, "server": server,
-                      "serve_frames": [first_hit], "shots": len(seg_hits), "end_reason": reason,
-                      "fault": serve_bounce is not None and not in_service_area(serve_bounce)})
+                      "serve_frames": [first_hit], "serve_attempts": attempts, "shots": len(seg_hits),
+                      "end_reason": reason, "fault": fault})
 
     # Primera falta + segundo saque del mismo jugador = un solo punto.
     points = []
@@ -159,6 +225,7 @@ def detect_points(ball_detections, player_detections, hits, bounces, fps, main_c
                 and last["server"] is not None and play["server"] == last["server"]
                 and play["start"] - last["end"] <= second_serve):
             last.update(end=play["end"], serve_frames=last["serve_frames"] + play["serve_frames"],
+                        serve_attempts=last["serve_attempts"] + play["serve_attempts"],
                         shots=last["shots"] + play["shots"], end_reason=play["end_reason"])
             continue
         points.append(dict(play))

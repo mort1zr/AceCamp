@@ -23,7 +23,8 @@ por el lanzamiento:
    El jugador del fondo mira hacia la cámara, así que su derecha es la izquierda de la
    imagen.
 
-Salida: [{"frame", "player", "side", "toss_start"}], con 1 = fondo lejano, 2 = cercano.
+Salida: [{"frame", "player", "side", "toss_start", "x_m", "y_m"}], con 1 = fondo lejano y
+2 = cercano; x_m, y_m es la posición del sacador en la pista.
 """
 
 from __future__ import annotations
@@ -129,8 +130,8 @@ def detect_serves(ball_detections, player_detections, homography, fps, main_came
                 and (not serves or start - serves[-1]["frame"] >= min_between)):
             hit = _hit_frame(ball_detections, start, last, fps)
             box = player_detections[hit][player]
-            x_m, _ = homographies[hit].image_to_court(_feet(box))
+            x_m, y_m = homographies[hit].image_to_court(_feet(box))
             serves.append({"frame": hit, "player": player, "side": serve_side(player, float(x_m)),
-                           "toss_start": start})
+                           "toss_start": start, "x_m": round(float(x_m), 2), "y_m": round(float(y_m), 2)})
         i = last + 1
     return serves

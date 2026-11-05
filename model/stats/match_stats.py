@@ -127,19 +127,56 @@ def build_model_statistics(shots, player_positions, fps, num_frames):
     }
 
 
-def serve_and_point_stats(serves, points):
-    """Saques de cada jugador por lado y número de puntos (TA-17, TA-18).
+RALLY_SHORT_MAX, RALLY_MEDIUM_MAX = 4, 8  # peloteo corto: 0-4 golpes; medio: 5-8; largo: 9 o más
 
-    Va en las estadísticas del modelo; todavía no en matches.statistics (pendiente de
-    acordar con Axel cómo encaja con la clave serve del esquema).
+
+def serve_stats(points, player):
+    """Saques de un jugador a partir de los puntos (events.detect_points). Ver docs del esquema.
+
+    Solo cuentan los puntos en que se detectó el saque. Las métricas que dependen de saber si
+    un saque entró se omiten si en algún punto no se pudo saber (regla del esquema: nunca 0
+    en lugar de desconocido).
     """
-    by_player = {}
+    attempts = [a for p in points for a in p.get("serve_attempts", []) if a["player"] == player]
+    speeds = [a["speedKmh"] for a in attempts if a["speedKmh"] is not None]
+    stats = {
+        "count": len(attempts),
+        "fromRight": sum(a["side"] == "derecha" for a in attempts),
+        "fromLeft": sum(a["side"] == "izquierda" for a in attempts),
+        "sumSpeedKmh": _round(sum(speeds)),
+        "sampleCount": len(speeds),
+    }
+    if speeds:
+        stats["maxSpeedKmh"] = _round(max(speeds))
+    served = [p["serve_attempts"] for p in points if p.get("serve_attempts") and p["serve_attempts"][0]["player"] == player]
+    if served and all(s[0]["fault"] is not None for s in served):
+        stats["firstServeAttempts"] = len(served)
+        stats["firstServeIn"] = sum(s[0]["fault"] is False for s in served)
+        after_fault = [s for s in served if s[0]["fault"]]
+        if all(len(s) > 1 and s[1]["fault"] is not None for s in after_fault):
+            stats["doubleFaults"] = sum(s[1]["fault"] is True for s in after_fault)
+    return stats
+
+
+def rally_stats(points):
+    """Peloteos del partido: cuántos, golpes totales, el más largo y por longitud (opción A)."""
+    lengths = [p["shots"] - max(0, len(p.get("serve_attempts", [])) - 1) for p in points]
+    return {
+        "count": len(lengths),
+        "sumShots": sum(lengths),
+        "longestShots": max(lengths) if lengths else 0,
+        "short": sum(n <= RALLY_SHORT_MAX for n in lengths),
+        "medium": sum(RALLY_SHORT_MAX < n <= RALLY_MEDIUM_MAX for n in lengths),
+        "long": sum(n > RALLY_MEDIUM_MAX for n in lengths),
+    }
+
+
+def add_serve_and_rally_stats(model_statistics, points):
+    """Añade serve a cada jugador y rallies al partido (TA-17, TA-18). Devuelve el mismo objeto."""
     for player in (FAR_PLAYER, NEAR_PLAYER):
-        own = [s for s in serves if s["player"] == player]
-        by_player[str(player)] = {"count": len(own),
-                                  "derecha": sum(s["side"] == "derecha" for s in own),
-                                  "izquierda": sum(s["side"] == "izquierda" for s in own)}
-    return {"serves": by_player, "points": {"count": len(points)}}
+        model_statistics["players"][str(player)]["serve"] = serve_stats(points, player)
+    model_statistics["rallies"] = rally_stats(points)
+    return model_statistics
 
 
 def renumber_far_near(shots, player_positions):
@@ -169,9 +206,12 @@ def to_match_statistics(model_statistics, player_position):
         raise ValueError(f"playerPosition debe ser 'arriba' o 'abajo', llegó {player_position!r}")
     player = POSITION_TO_PLAYER[player_position]
     opponent = NEAR_PLAYER if player == FAR_PLAYER else FAR_PLAYER
-    return {
+    statistics = {
         "schemaVersion": MATCH_STATS_VERSION,
         "durationSeconds": model_statistics["durationSeconds"],
         "player": model_statistics["players"][str(player)],
         "opponent": model_statistics["players"][str(opponent)],
     }
+    if "rallies" in model_statistics:
+        statistics["rallies"] = model_statistics["rallies"]
+    return statistics
