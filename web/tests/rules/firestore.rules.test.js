@@ -24,6 +24,7 @@ import {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createFirestorePlayersService } from '../../src/panel/lib/services/firestorePlayersService.js'
 import { createFirestoreMatchesService } from '../../src/panel/lib/services/firestoreMatchesService.js'
+import { createFirestoreMatchNotesService } from '../../src/panel/lib/services/firestoreMatchNotesService.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -169,6 +170,49 @@ describe('aislamiento por organización', () => {
 
   it('consultar un documento que no existe no revela nada y se permite', async () => {
     await assertSucceeds(getDoc(doc(coachDb(), 'matches', 'no-existe')))
+  })
+})
+
+describe('notas privadas de partidos', () => {
+  it('guarda, actualiza y borra la nota propia sin sobrescribir un cambio concurrente', async () => {
+    const service = createFirestoreMatchNotesService({ db: coachDb(), actorId: COACH })
+    expect(await service.load('m-ready')).toBe('')
+    expect(await service.save('m-ready', ' Devolución ', '')).toBe('Devolución')
+    const otherSession = createFirestoreMatchNotesService({ db: coachDb(), actorId: COACH })
+    expect(await otherSession.load('m-ready')).toBe('Devolución')
+    await otherSession.save('m-ready', 'Profundidad', 'Devolución')
+    await expect(service.save('m-ready', 'Texto anterior', 'Devolución')).rejects.toMatchObject({ code: 'notes/conflict' })
+    expect(await service.load('m-ready')).toBe('Profundidad')
+    expect(await service.save('m-ready', '', 'Profundidad')).toBe('')
+    expect(await otherSession.load('m-ready')).toBe('')
+  })
+
+  it('limita las notas al autor y a partidos listos que puede anotar', async () => {
+    const teammate = 'coach-teammate'
+    const admin = 'admin-demo'
+    await env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore()
+      await setDoc(doc(db, 'users', teammate), { orgId: ORG, role: 'coach' })
+      await setDoc(doc(db, 'users', admin), { orgId: ORG, role: 'admin' })
+    })
+    const coach = coachDb()
+    const teammateDb = env.authenticatedContext(teammate).firestore()
+    const adminDb = env.authenticatedContext(admin).firestore()
+    const outsideDb = env.authenticatedContext(OTHER_COACH).firestore()
+    const path = ['matches', 'm-ready', 'coachNotes']
+    const payload = { text: 'Nota de prueba', updatedAt: serverTimestamp() }
+    await assertSucceeds(setDoc(doc(coach, ...path, COACH), payload))
+    for (const db of [teammateDb, adminDb, outsideDb, anonDb()]) {
+      await assertFails(getDoc(doc(db, ...path, COACH)))
+    }
+    await assertFails(getDocs(collection(coach, ...path)))
+    await assertFails(setDoc(doc(teammateDb, ...path, teammate), payload))
+    await assertFails(setDoc(doc(outsideDb, ...path, OTHER_COACH), payload))
+    await assertFails(setDoc(doc(coach, 'matches', 'm-processing', 'coachNotes', COACH), payload))
+    await assertFails(setDoc(doc(coach, ...path, COACH), { ...payload, text: 'x'.repeat(2001) }))
+    await assertFails(setDoc(doc(coach, ...path, COACH), { ...payload, orgId: ORG }))
+    await assertSucceeds(setDoc(doc(adminDb, ...path, admin), payload))
+    await assertFails(getDoc(doc(coach, ...path, admin)))
   })
 })
 

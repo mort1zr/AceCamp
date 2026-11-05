@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { KpiCard } from '../ui'
+import MatchNotes from './MatchNotes.jsx'
 import { useUnidades } from '../../hooks/useUnidades.js'
 import { formatMatchDate } from '../../lib/dashboardEvolution.js'
 import { convertirVelocidad, etiquetaVelocidad } from '../../lib/unidades.js'
@@ -17,7 +18,7 @@ function Speed({ label, value, units }) {
   )
 }
 
-export default function MatchReport({ match, playerName, onBack }) {
+export default function MatchReport({ match, playerName, notesService, onBack }) {
   const units = useUnidades()
   const title = useRef(null)
   useEffect(() => { title.current?.focus() }, [])
@@ -54,6 +55,7 @@ export default function MatchReport({ match, playerName, onBack }) {
           <p className="mt-2 text-sm text-muted">Sin datos del desglose por set.</p>
         </section>
       </div>
+      <MatchNotes matchId={match.id} service={notesService} />
     </section>
   )
 }

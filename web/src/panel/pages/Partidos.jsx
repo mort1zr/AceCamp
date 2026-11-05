@@ -5,6 +5,7 @@ import { useAnalysisQueue } from '../hooks/useAnalysisQueue.js'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { formatMatchDate } from '../lib/dashboardEvolution.js'
 import { createFirestoreMatchesService } from '../lib/services/firestoreMatchesService.js'
+import { createFirestoreMatchNotesService } from '../lib/services/firestoreMatchNotesService.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
 
@@ -15,7 +16,7 @@ function matchesErrorMessage(error) {
   return 'No pudimos cargar los partidos. Revisa tu conexión y vuelve a intentarlo.'
 }
 
-function MatchesList({ matchesService, playersService }) {
+function MatchesList({ matchesService, playersService, notesService }) {
   const matches = useAnalysisQueue(matchesService, matchesErrorMessage)
   const players = usePlayers(playersService)
   const [playerId, setPlayerId] = useState('')
@@ -72,8 +73,10 @@ function MatchesList({ matchesService, playersService }) {
 
   if (selectedMatch) return (
     <MatchReport
+      key={selectedMatch.id}
       match={selectedMatch}
       playerName={playerNames.get(selectedMatch.playerId) || 'Jugador no disponible'}
+      notesService={notesService}
       onBack={() => setMatchId('')}
     />
   )
@@ -132,6 +135,7 @@ export default function Partidos({ db, session }) {
     return {
       playersService: createFirestorePlayersService({ ...identity, onlyOwned: role === 'coach' }),
       matchesService: createFirestoreMatchesService(identity),
+      notesService: createFirestoreMatchNotesService(identity),
     }
   }, [db, uid, orgId, role])
 

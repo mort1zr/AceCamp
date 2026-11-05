@@ -14,6 +14,7 @@ Si cambias un campo, actualiza los dos archivos y avisa en Jira.
 | `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó | No |
 | `players` | De su organización | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Datos del jugador; nunca `orgId`, `createdBy` ni `consent` | De su organización |
 | `matches` | De su organización | En `'en cola'`, sin estadísticas, con un jugador de su organización y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola` (Reintentar) | De su organización, salvo si está `procesando` |
+| `matches/{matchId}/coachNotes/{uid}` | Nota propia por ID, en un partido Listo accesible | Nota propia con texto y fecha de servidor | Solo su propia nota | Solo su propia nota |
 | `applications` | De su organización | Por ahora solo con sesión (el formulario público llega en PCIT-54) | Estado y notas | De su organización |
 
 El worker usa el Admin SDK, que no pasa por las reglas: es el único que escribe
@@ -22,9 +23,9 @@ deben filtrar por `orgId`; sin ese filtro, Firestore las rechaza.
 
 ## Decisiones
 
-- **Colecciones en la raíz con un campo `orgId`** (`players`, `matches`, `applications`),
-  no subcolecciones. Así ya las consulta el código de Fabián
-  (`where('orgId', '==', orgId)`) y las reglas de PCIT-23 filtran por ese campo.
+- **Colecciones principales en la raíz con un campo `orgId`** (`players`, `matches`, `applications`).
+  La web las consulta con `where('orgId', '==', orgId)`. Las notas privadas usan una subcolección
+  de cada partido para separar sus permisos de los del reporte.
 - **Nombres de campos en inglés, en camelCase. Valores que ve el usuario en español.**
   Los estados coinciden con `StatusBadge` (PCIT-25).
 - **Se usa `applications` y el estado de procesamiento vive dentro de `matches`**,
@@ -179,6 +180,28 @@ statistics: {
   Hasta entonces esas claves no existen y el Dashboard las muestra como "sin dato".
 - Promedios: se guardan **sumas y cantidades**, no promedios, para que el Dashboard
   pueda combinar partidos sin error (como pide PCIT-28).
+
+### `matches/{matchId}/coachNotes/{uid}` (PCIT-44)
+
+Cada cuenta puede guardar una nota privada por partido Listo. El entrenador
+puede anotarla en los partidos que registró. El administrador puede escribir su
+propia nota en cualquier partido Listo de su organización. Las reglas permiten
+leer la nota por su ID cuando el UID de sesión coincide con el autor. Las
+consultas de la subcolección se rechazan.
+
+| Campo | Tipo | Requisito |
+| --- | --- | --- |
+| `text` | string | De 1 a 2000 caracteres |
+| `updatedAt` | Timestamp | `serverTimestamp()` de la escritura |
+
+Al guardar, la app compara en una transacción el texto actual con el que la
+sesión abrió. Si otro dispositivo guardó cambios, se conserva el borrador y se
+avisa del conflicto. Guardar un texto vacío borra la nota.
+
+Desde `web/`, ejecuta `npm run test:rules` para verificar la persistencia,
+el conflicto de escritura y los rechazos de acceso en Firebase Emulator Suite.
+En el emulador, abre **Partidos → Ver reporte → Tu nota** con una cuenta de
+prueba y un partido Listo accesible.
 
 ## `applications/{appId}`
 

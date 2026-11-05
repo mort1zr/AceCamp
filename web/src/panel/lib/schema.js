@@ -14,6 +14,7 @@ export const COLLECTIONS = Object.freeze({
 })
 
 export const ROLES = Object.freeze(['coach', 'admin'])
+export const MATCH_NOTES = Object.freeze({ collection: 'coachNotes', maxLength: 2000 })
 
 /** Estados de un partido. Los escribe la web ('en cola') y el worker (el resto). */
 export const MATCH_STATUS = Object.freeze({

@@ -229,6 +229,23 @@ service cloud.firestore {
 
       // No se borra un partido mientras el worker lo procesa.
       allow delete: if inOrg(resource.data.orgId) && resource.data.status != 'procesando';
+
+      match /coachNotes/{authorId} {
+        function canUseOwnNote() {
+          let parent = get(/databases/$(database)/documents/matches/$(matchId)).data;
+          let profile = get(userPath(request.auth.uid)).data;
+          return request.auth.uid == authorId
+            && parent.orgId is string && profile.orgId == parent.orgId
+            && parent.status == 'listo'
+            && (profile.role == 'admin' || (profile.role == 'coach' && parent.createdBy == authorId));
+        }
+
+        allow get, delete: if signedIn() && canUseOwnNote();
+        allow create, update: if signedIn() && canUseOwnNote()
+          && request.resource.data.keys().hasOnly(['text', 'updatedAt'])
+          && isText(request.resource.data.text, 1, 2000)
+          && request.resource.data.updatedAt == request.time;
+      }
     }
 
     // ---------- applications/{applicationId} ----------

@@ -2,12 +2,13 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, doc, getDocFromServer, onSnapshot, query, runTransaction, where } from 'firebase/firestore'
 import Partidos from './Partidos.jsx'
 import { CLAVE_UNIDADES, guardarUnidades } from '../lib/unidades.js'
 
 vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(), onSnapshot: vi.fn(), query: vi.fn(), where: vi.fn(),
+  collection: vi.fn(), doc: vi.fn(), getDocFromServer: vi.fn(), onSnapshot: vi.fn(), query: vi.fn(),
+  runTransaction: vi.fn(), serverTimestamp: vi.fn(), where: vi.fn(),
 }))
 
 const db = { app: { options: { projectId: 'prueba' } } }
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   collection.mockImplementation((_, name) => name)
   query.mockImplementation(name => name)
+  getDocFromServer.mockResolvedValue({ exists: () => false })
 })
 afterEach(() => {
   cleanup()
@@ -138,4 +140,29 @@ it('abre el reporte con el contrato del worker y mantiene los filtros al volver'
   expect(onSnapshot).toHaveBeenCalledTimes(2)
   rerender(<Partidos db={db} />)
   expect(screen.queryByText(/Rival sin medición/)).toBeNull()
+})
+
+it('conserva el borrador si falla el guardado y confirma la nota escrita', async () => {
+  onSnapshot.mockImplementation((name, receive) => {
+    receive({ docs: name === 'players' ? [] : [record('m-1', { status: 'listo', opponent: 'Rival' })] })
+    return stop
+  })
+  const set = vi.fn()
+  runTransaction.mockRejectedValueOnce({ code: 'unavailable' })
+    .mockImplementationOnce((_, action) => action({ get: async () => ({ exists: () => false }), set }))
+
+  const user = userEvent.setup()
+  render(<Partidos db={db} session={session} />)
+  await user.click(await screen.findByRole('button', { name: /Ver reporte del partido con Rival/ }))
+  const note = await screen.findByLabelText('Tu nota')
+  await user.type(note, 'Practicar devolución')
+  const save = screen.getByRole('button', { name: 'Guardar nota' })
+  await user.click(save)
+  expect(await screen.findByRole('alert')).toBeTruthy()
+  expect(note.value).toBe('Practicar devolución')
+  await user.click(save)
+  expect(await screen.findByText('Nota guardada.')).toBeTruthy()
+  expect(doc).toHaveBeenCalledWith(db, 'matches', 'm-1', 'coachNotes', session.uid)
+  expect(set.mock.calls[0][1].text).toBe('Practicar devolución')
+  expect(save.disabled).toBe(true)
 })
