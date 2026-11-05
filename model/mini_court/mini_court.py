@@ -109,6 +109,15 @@ class MiniCourt:
             cv2.circle(frame, self.meters_to_mini(position), self.point_radius, color, -1)
         return frame
 
+    def draw_bounces(self, frame, positions_m, color=(255, 0, 255)):
+        """Marca botes (x_m, y_m) en la mini-pista con una cruz; el último, más grande."""
+        for k, position in enumerate(positions_m):
+            x, y = self.meters_to_mini(position)
+            size = self.point_radius + (2 if k == len(positions_m) - 1 else 0)
+            cv2.line(frame, (x - size, y - size), (x + size, y + size), color, self.line_thickness)
+            cv2.line(frame, (x - size, y + size), (x + size, y - size), color, self.line_thickness)
+        return frame
+
     def draw_frame(self, frame, player_positions, ball_positions):
         """Mini-pista completa de un fotograma: fondo, líneas, jugadores (verde) y pelota (amarillo)."""
         frame = self.draw_court(self.draw_background_rectangle(frame))

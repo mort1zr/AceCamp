@@ -8,7 +8,7 @@ from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
-from events import detect_bounce_events
+from events import detect_bounce_events, detect_hits, locate_bounces
 from mini_court import MiniCourt
 from stats import build_frame_states, build_model_statistics, measure_shots, renumber_far_near
 from trackers import BallTracker, PlayerTracker
@@ -16,6 +16,8 @@ from utils import VideoWriter, get_video_info, iter_frames
 from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
 from utils.player_stats_drawer_utils import StatsBox
 from utils.progress import report_progress
+
+MINI_COURT_BOUNCES = 6  # botes que se ven a la vez en la mini-pista
 
 
 @dataclass
@@ -159,9 +161,12 @@ def run_pipeline(config, render=True):
                                                                              ball_detections,
                                                                              homography)
 
-    # Botes (TA-22a): fotograma y posición de la pelota en la imagen en ese momento.
+    # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
+    hits = detect_hits(ball_detections, player_detections, homography, video_info.fps)
     bounces = detect_bounce_events(ball_detections, player_detections, homography, video_info.fps,
-                                   main_camera=main_camera)
+                                   main_camera=main_camera, hits=hits)
+    bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=hits,
+                             court_keypoints=court_keypoints)
 
     shots = measure_shots(ball_shot_frames, ball_detections, player_detections, player_court_positions,
                           video_info.fps, main_camera=main_camera)
@@ -209,6 +214,9 @@ def run_pipeline(config, render=True):
                 cv2.putText(frame, "Otra camara: no se analiza", (int(10 * text_scale), int(70 * text_scale)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 165, 255), max(1, int(round(2 * text_scale))))
             frame = mini_court.draw_frame(frame, player_court_positions[i], ball_court_positions[i])
+            # Los últimos botes, en su posición de la pista (TA-23).
+            recent = [b for b in bounces if b["frame"] <= i][-MINI_COURT_BOUNCES:]
+            frame = mini_court.draw_bounces(frame, [(b["x_m"], b["y_m"]) for b in recent])
             for bounce in bounces:  # marca cada bote durante medio segundo
                 if 0 <= i - bounce["frame"] < bounce_marker_frames:
                     center = (int(bounce["x_px"]), int(bounce["y_px"]))

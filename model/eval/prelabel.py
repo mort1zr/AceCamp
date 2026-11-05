@@ -58,7 +58,8 @@ def build_prelabels(result, video_file, ball_every=BALL_EVERY_FRAMES, keypoints_
         },
         "ball": {str(i): _ball_center(result["ball_detections"][i]) for i in range(0, num_frames, ball_every)},
         "shots": [{"frame": s["frame"], "player": s["player"]} for s in result["shots"]],
-        "bounces": [{"frame": b["frame"], "x_px": b["x_px"], "y_px": b["y_px"]} for b in result.get("bounces", [])],
+        "bounces": [{k: b[k] for k in ("frame", "x_px", "y_px", "x_m", "y_m") if k in b}
+                    for b in result.get("bounces", [])],
         "serves": [],
         "cuts": list(result.get("cuts", [])),
         "points": [],
