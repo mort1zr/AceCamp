@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { analysisSignature, hashAnalysisSignature, normalizedMatch, throwIfAborted, validateAnalysis } from '../analysis.js'
+import { nextUsage, usageRef } from '../usage.js'
 import { isStorageVideoPath } from '../videoImportProtocol.js'
 
 /** Adapters uploadVideo/importVideo return a Storage path, not a public URL. */
@@ -50,6 +51,7 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coa
     throwIfAborted(signal)
     onProgress?.({ phase: 'saving', percent: 100 })
     const match = { ...normalizedMatch(input), orgId, createdBy: actorId, createdAt: serverTimestamp(), videoPath: video.videoPath, inputFingerprint: fingerprint, status: 'en cola' }
+    const usage = usageRef(db, orgId)
     const saved = await runTransaction(db, async transaction => {
       const current = await transaction.get(reference)
       if (current.exists()) {
@@ -57,7 +59,10 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coa
         if (data.orgId !== orgId || data.createdBy !== actorId || data.inputFingerprint !== fingerprint) throw new Error('Conflicting request')
         return data
       }
+      // El partido y el contador del mes se escriben juntos (PCIT-41).
+      const counter = await transaction.get(usage)
       transaction.set(reference, match)
+      transaction.set(usage, nextUsage(counter.exists() ? counter.data() : null, reference.id, serverTimestamp()))
       return match
     })
     uploaded.delete(requestId)

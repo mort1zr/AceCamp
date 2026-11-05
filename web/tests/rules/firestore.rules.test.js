@@ -27,6 +27,7 @@ import { createFirestoreMatchesService } from '../../src/panel/lib/services/fire
 import { createFirestoreMatchNotesService } from '../../src/panel/lib/services/firestoreMatchNotesService.js'
 import { createFirestoreDashboardService } from '../../src/panel/lib/services/firestoreDashboardService.js'
 import { buildPlayerComparisonHistory } from '../../src/panel/lib/comparisonHistory.js'
+import { usagePeriod } from '../../src/panel/lib/usage.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -94,6 +95,16 @@ const newMatch = (matchId, overrides = {}) => ({
   result: '', videoPath: `orgs/${ORG}/matches/${matchId}/video.mp4`, inputFingerprint: 'abc',
   createdBy: COACH, createdAt: serverTimestamp(), status: 'en cola', ...overrides,
 })
+
+// Alta de un partido como la hace la web: partido y contador del mes juntos (PCIT-41).
+const usageDoc = (db, orgId = ORG) => doc(db, 'orgs', orgId, 'usage', usagePeriod())
+const createMatch = async (db, matchId, overrides = {}, usageOverrides = {}) => {
+  const current = await getDoc(usageDoc(db, overrides.orgId ?? ORG))
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'matches', matchId), newMatch(matchId, overrides))
+  batch.set(usageDoc(db, overrides.orgId ?? ORG), { analyses: (current.data()?.analyses ?? 0) + 1, lastMatchId: matchId, updatedAt: serverTimestamp(), ...usageOverrides })
+  return batch.commit()
+}
 
 describe('sin sesión', () => {
   it('no puede leer ni escribir nada', async () => {
@@ -325,7 +336,7 @@ describe('players', () => {
 
 describe('matches', () => {
   it('crea un partido en cola con su video en la carpeta correcta', async () => {
-    await assertSucceeds(setDoc(doc(coachDb(), 'matches', 'm-nuevo'), newMatch('m-nuevo')))
+    await assertSucceeds(createMatch(coachDb(), 'm-nuevo'))
   })
 
   it('no puede crear un partido ya procesado ni con estadísticas', async () => {
@@ -362,6 +373,43 @@ describe('matches', () => {
   it('no borra un partido mientras se procesa', async () => {
     await assertFails(deleteDoc(doc(coachDb(), 'matches', 'm-processing')))
     await assertSucceeds(deleteDoc(doc(coachDb(), 'matches', 'm-ready')))
+  })
+})
+
+describe('uso mensual de análisis (PCIT-41)', () => {
+  it('cada partido nuevo suma uno al contador del mes de la organización', async () => {
+    const db = coachDb()
+    await assertSucceeds(createMatch(db, 'm-uso-1'))
+    await assertSucceeds(createMatch(db, 'm-uso-2'))
+    const usage = await assertSucceeds(getDoc(usageDoc(db)))
+    expect(usage.data()).toMatchObject({ analyses: 2, lastMatchId: 'm-uso-2' })
+  })
+
+  it('no se crea un partido sin contarlo ni se cuenta sin un partido nuevo', async () => {
+    const db = coachDb()
+    await assertFails(setDoc(doc(db, 'matches', 'm-sin-contar'), newMatch('m-sin-contar')))
+    await assertFails(setDoc(usageDoc(db), { analyses: 1, lastMatchId: 'm-fantasma', updatedAt: serverTimestamp() }))
+    await assertFails(setDoc(usageDoc(db), { analyses: 1, lastMatchId: 'm-ready', updatedAt: serverTimestamp() }))
+  })
+
+  it('no permite saltos, bajar el contador, otro mes ni otro partido', async () => {
+    const db = coachDb()
+    await assertFails(createMatch(db, 'm-salto', {}, { analyses: 3 }))
+    await assertFails(createMatch(db, 'm-otro', {}, { lastMatchId: 'm-ready' }))
+    await assertFails(createMatch(db, 'm-campo', {}, { plan: 'ultra' }))
+    await assertSucceeds(createMatch(db, 'm-ok'))
+    await assertFails(updateDoc(usageDoc(db), { analyses: 0, updatedAt: serverTimestamp() }))
+    await assertFails(deleteDoc(usageDoc(db)))
+    const batch = writeBatch(db)
+    batch.set(doc(db, 'matches', 'm-mes'), newMatch('m-mes'))
+    batch.set(doc(db, 'orgs', ORG, 'usage', '2020-01'), { analyses: 1, lastMatchId: 'm-mes', updatedAt: serverTimestamp() })
+    await assertFails(batch.commit())
+  })
+
+  it('solo la organización lee su contador', async () => {
+    await assertSucceeds(createMatch(coachDb(), 'm-lectura'))
+    await assertFails(getDoc(usageDoc(env.authenticatedContext(OTHER_COACH, { email: 'coach2@acecam.test' }).firestore())))
+    await assertFails(getDoc(usageDoc(anonDb())))
   })
 })
 

@@ -43,6 +43,29 @@ service cloud.firestore {
       return inOrg(data.orgId) && (isAdmin() || data.createdBy == request.auth.uid);
     }
 
+    // ---------- Uso mensual (PCIT-41) ----------
+    // Contador en orgs/{orgId}/usage/{YYYY-MM}, con el mes en UTC como request.time.
+
+    function currentPeriod() {
+      return string(request.time.year()) + '-'
+        + (request.time.month() < 10 ? '0' : '') + string(request.time.month());
+    }
+
+    function usagePath(orgId) {
+      return /databases/$(database)/documents/orgs/$(orgId)/usage/$(currentPeriod());
+    }
+
+    function matchPath(matchId) {
+      return /databases/$(database)/documents/matches/$(matchId);
+    }
+
+    // El partido nuevo suma exactamente uno al contador del mes, en la misma escritura.
+    function countsAsAnalysis(orgId, matchId) {
+      let after = getAfter(usagePath(orgId)).data;
+      let before = exists(usagePath(orgId)) ? get(usagePath(orgId)).data.analyses : 0;
+      return after.lastMatchId == matchId && after.analyses == before + 1;
+    }
+
     function isText(value, min, max) {
       return value is string && value.size() >= min && value.size() <= max;
     }
@@ -136,6 +159,23 @@ service cloud.firestore {
         && optionalText(request.resource.data, 'program', 120);
 
       allow delete: if false;
+
+      // Contador de análisis del mes (PCIT-41). Solo sube de uno en uno y junto con
+      // el alta de un partido nuevo; borrar un partido no devuelve el análisis.
+      match /usage/{period} {
+        allow get, list: if inOrg(orgId);
+
+        allow create, update: if inOrg(orgId)
+          && period == currentPeriod()
+          && request.resource.data.keys().hasOnly(['analyses', 'lastMatchId', 'updatedAt'])
+          && request.resource.data.analyses == (resource == null ? 0 : resource.data.analyses) + 1
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.lastMatchId is string
+          && !exists(matchPath(request.resource.data.lastMatchId))
+          && getAfter(matchPath(request.resource.data.lastMatchId)).data.orgId == orgId;
+
+        allow delete: if false;
+      }
     }
 
     // ---------- players/{playerId} ----------
@@ -256,7 +296,9 @@ service cloud.firestore {
         // El video tiene que estar en la carpeta de este partido y de esta organización (PCIT-24).
         && request.resource.data.videoPath is string
         && request.resource.data.videoPath.matches(
-             '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$');
+             '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$')
+        // Cada partido nuevo cuenta como un análisis del mes (PCIT-41).
+        && countsAsAnalysis(request.resource.data.orgId, matchId);
 
       // La web puede corregir los datos del partido…
       allow update: if canManage(resource.data)

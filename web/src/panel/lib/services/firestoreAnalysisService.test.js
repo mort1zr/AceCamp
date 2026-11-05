@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { createFirestoreAnalysisService } from './firestoreAnalysisService.js'
+import { analysisSignature, hashAnalysisSignature } from '../analysis.js'
 import { createHttpVideoImporter } from './httpVideoImportService.js'
 import { createVideoImportHttpHandler } from '../../../../server/video-import/http.js'
 
@@ -24,6 +25,8 @@ beforeEach(() => {
 })
 
 const make = options => createFirestoreAnalysisService({ db, orgId: 'org-a', actorId: 'coach-a', uploadVideo: upload, maxBytes: 100, ...options })
+const matchWrites = () => tx.set.mock.calls.filter(([ref]) => ref.kind === 'match')
+const usageWrites = () => tx.set.mock.calls.filter(([ref]) => ref.kind === 'orgs')
 
 describe('Cola Firestore (SDK y transferencias simulados)', () => {
   it('exige capacidad explícita del adaptador antes de aceptar YouTube y no guarda su URL', async () => {
@@ -89,6 +92,22 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     expect(tx.set.mock.calls[0][1]).not.toHaveProperty('file')
   })
 
+  it('suma el partido nuevo al contador del mes en la misma transacción (PCIT-41)', async () => {
+    tx.get.mockImplementation(ref => Promise.resolve(ref.kind === 'orgs' ? { exists: () => true, data: () => ({ analyses: 4, lastMatchId: 'previo' }) } : absent))
+    await make().enqueue(input, { requestId: 'r-uso' })
+    expect(doc).toHaveBeenCalledWith(db, 'orgs', 'org-a', 'usage', expect.stringMatching(/^\d{4}-\d{2}$/))
+    expect(usageWrites()).toEqual([[{ kind: 'orgs', id: 'org-a' }, { analyses: 5, lastMatchId: 'r-uso', updatedAt: 'server-time' }]])
+  })
+
+  it('un partido que ya existe no vuelve a contar', async () => {
+    const fingerprint = await hashAnalysisSignature(analysisSignature(input))
+    tx.get.mockImplementation(ref => Promise.resolve(ref.kind === 'match'
+      ? { exists: () => true, data: () => ({ orgId: 'org-a', createdBy: 'coach-a', inputFingerprint: fingerprint }) }
+      : absent))
+    await make().enqueue(input, { requestId: 'r-existente' })
+    expect(tx.set).not.toHaveBeenCalled()
+  })
+
   it('no encola una ruta de otro partido u organización y permite reintentar', async () => {
     const service = make()
     const options = { requestId: 'r1' }
@@ -97,7 +116,7 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     await expect(service.enqueue(input, options)).rejects.toMatchObject({ code: 'analysis/video-path' })
     expect(runTransaction).not.toHaveBeenCalled()
     await expect(service.enqueue(input, options)).resolves.toMatchObject({ videoPath: matchPath('r1') })
-    expect(tx.set).toHaveBeenCalledOnce()
+    expect(matchWrites()).toHaveLength(1)
   })
 
   it('rechaza jugadores de otra organización antes de transferir el video', async () => {
@@ -116,7 +135,7 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     expect(first).toBe(second)
     await first
     expect(upload).toHaveBeenCalledTimes(1)
-    expect(tx.set).toHaveBeenCalledTimes(1)
+    expect(matchWrites()).toHaveLength(1)
   })
 
   it('una cancelación al finalizar la transferencia no crea un partido', async () => {

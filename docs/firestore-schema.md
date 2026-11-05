@@ -26,6 +26,7 @@ procesado sigue siendo de escritura exclusiva del worker. Ver
 | --- | --- | --- | --- | --- |
 | `users` | La propia y las de su organización | Solo la propia, en el registro, con rol `coach` y en una organización que crea él mismo | Solo nombre y cargo | No |
 | `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó | No |
+| `orgs/{orgId}/usage/{YYYY-MM}` | Miembros de la organización | Solo junto con el alta de un partido nuevo, sumando 1 (PCIT-41) | Igual: +1 por partido nuevo | No |
 | `players` | Admin: su organización; coach: propios | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Admin: su organización; coach: propios. Nunca `orgId`, `createdBy` ni `consent` | Admin: su organización; coach: propios |
 | `matches` | Admin: su organización; coach: propios | En `'en cola'`, sin estadísticas, con un jugador accesible por rol y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola`, dentro del alcance por rol | Dentro del alcance por rol, salvo si está `procesando` |
 | `matches/{matchId}/coachNotes/{uid}` | Nota propia por ID, en un partido Listo accesible | Nota propia con texto y fecha de servidor | Solo su propia nota | Solo su propia nota |
@@ -57,6 +58,7 @@ deben filtrar por `orgId`; sin ese filtro, Firestore las rechaza.
 ```
 users/{uid}                 Perfil de cada persona que inicia sesión
 orgs/{orgId}                Universidad, club o academia
+  usage/{YYYY-MM}           Análisis usados en el mes (PCIT-41)
 players/{playerId}          Jugadores de una organización          · orgId
 matches/{matchId}           Partidos subidos y sus estadísticas    · orgId, playerId
 applications/{appId}        Postulaciones de reclutamiento         · orgId
@@ -92,6 +94,24 @@ Se crea en el registro, junto con el usuario (PCIT-21).
 | `plan` | string | sí | `'free'` por ahora. PCIT-41 agrega límites por plan |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
+
+### `orgs/{orgId}/usage/{YYYY-MM}` (PCIT-41)
+
+Contador de análisis de la organización en un mes. El ID es el mes en **UTC**
+(`2026-11`), el mismo que calcula la regla con `request.time`; en Lima el mes
+nuevo empieza a las 19:00 del último día. Cada mes arranca un documento nuevo,
+así que no hay que reiniciar nada.
+
+| Campo | Tipo | Notas |
+| --- | --- | --- |
+| `analyses` | number | Partidos creados en el mes. Solo sube de uno en uno |
+| `lastMatchId` | string | Partido que sumó la última unidad |
+| `updatedAt` | Timestamp | `serverTimestamp()` |
+
+La web lo escribe en la misma transacción que crea el partido
+(`firestoreAnalysisService` → `usage.js`). Las reglas exigen las dos escrituras
+juntas: no se crea un partido sin contarlo, ni se suma sin un partido nuevo.
+Reintentar un partido con `error` no suma; borrar un partido no resta.
 
 ## `players/{playerId}`
 
