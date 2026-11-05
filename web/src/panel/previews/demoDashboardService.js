@@ -35,8 +35,14 @@ export function createDemoDashboardService({ scopeKey, scenario = 'data' }) {
             metrics: { analyzedMatches: rows.length },
             coverage: { compatibleMatches: rows.length },
             evolution: { playerId, points: rows.map(row => row.point) },
+            latestMatch: rows.at(-1)?.point ?? null,
           }))
-          onData({ ...(scenario === 'empty' ? { metrics: null } : structuredClone(examples[playerId] ?? { metrics: null })), evolution, periods })
+          onData({
+            ...(scenario === 'empty' ? { metrics: null } : structuredClone(examples[playerId] ?? { metrics: null })),
+            evolution,
+            latestMatch: evolution.points.at(-1) ?? null,
+            periods,
+          })
         }
       })
       return () => { active = false }

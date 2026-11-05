@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { EmptyState, ErrorState, LoadingState } from '../components/ui'
 import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
+import DashboardLatestMatch from '../components/dashboard/DashboardLatestMatch.jsx'
 import EvolutionPanel from '../components/dashboard/EvolutionPanel.jsx'
 import BloqueVacio from '../components/layout/BloqueVacio.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
@@ -136,12 +137,16 @@ function SeccionVacia({ seccion }) {
   )
 }
 
-function SeccionesVacias({ conEvolucion = false }) {
+function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = false }) {
   const [partido, radar, saque, ...resto] = secciones
   return (
     <>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
-        <SeccionVacia seccion={partido} />
+        {latestMatch ? <DashboardLatestMatch match={latestMatch} /> : (
+          <SeccionVacia seccion={filtered
+            ? { ...partido, vacio: 'No hay partidos analizados en este periodo', texto: 'Elige otro periodo para consultar sus partidos.' }
+            : partido} />
+        )}
         <SeccionVacia seccion={radar} />
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
@@ -353,7 +358,7 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
             )}
           </PerfilVacio>
           <IndicadoresVacios />
-          <SeccionesVacias conEvolucion />
+          <SeccionesDashboard conEvolucion />
         </>
       ) : (
         <>
@@ -412,7 +417,10 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                 sample={sample}
                 renderEvolution={ready ? renderEvolution : undefined}
               />
-              <SeccionesVacias />
+              <SeccionesDashboard
+                latestMatch={report?.latestMatch?.playerId === selected.id ? report.latestMatch : null}
+                filtered={period !== 'all'}
+              />
             </>
           )}
         </>
@@ -441,7 +449,7 @@ function DashboardSinConexion() {
         </p>
       </PerfilVacio>
       <IndicadoresVacios />
-      <SeccionesVacias conEvolucion />
+      <SeccionesDashboard conEvolucion />
     </section>
   )
 }

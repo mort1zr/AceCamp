@@ -5,10 +5,12 @@ import { collection, getDoc, onSnapshot, query } from 'firebase/firestore'
 import userEvent from '@testing-library/user-event'
 import Dashboard from './Dashboard.jsx'
 import { buildDashboardOverview } from '../lib/dashboardOverview.js'
+import { CLAVE_UNIDADES, guardarUnidades } from '../lib/unidades.js'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
 
 afterEach(() => {
   cleanup()
+  localStorage.removeItem(CLAVE_UNIDADES)
   vi.useRealTimers()
 })
 
@@ -81,7 +83,7 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
   const orgId = 'org-a'
   const playerId = 'p1'
   const player = { orgId, fullName: 'Jugador de periodos' }
-  const match = (matchDate, speed) => ({
+  const match = (matchDate, speed, overrides = {}) => ({
     id: `m-${speed}`,
     data: () => ({
       orgId, playerId, status: 'listo', matchDate, playerPosition: 'abajo', opponent: `Rival ${speed}`,
@@ -90,10 +92,14 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
         player: { shots: { count: 1, sumSpeedKmh: speed, maxSpeedKmh: speed } },
         opponent: { shots: { count: 1, sumSpeedKmh: speed, maxSpeedKmh: speed } },
       },
+      ...overrides,
     }),
   })
   const dates = [match('2026-02-27', 110), match('2026-02-28', 90), match('2026-05-31', 60),
-    match('2026-07-31', 40), match('2026-08-31', 20), match(undefined, 200)]
+    match('2026-07-31', 40), match('2026-08-31', 20, { tournament: 'Copa Demo', result: '6-4 6-2' }), match(undefined, 200),
+    match('2026-08-31', 900, { status: 'procesando' }),
+    match('2026-08-31', 901, { orgId: 'org-b' }),
+    match('2026-08-31', 902, { playerId: 'another-player' })]
   let publish
   collection.mockImplementation((_, name) => name)
   query.mockImplementation(name => name)
@@ -111,6 +117,15 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
   const kpi = name => within(screen.getByRole('heading', { name, exact: true }).closest('article'))
   await screen.findByRole('heading', { name: 'Partidos analizados', exact: true })
   expect(kpi('Partidos analizados').getByText('6')).toBeTruthy()
+  const latest = () => within(screen.getByRole('region', { name: 'Último partido' }))
+  expect(latest().getByText('31/08/2026')).toBeTruthy()
+  expect(latest().getByText('Rival · Rival 20')).toBeTruthy()
+  expect(latest().getByText('Copa Demo')).toBeTruthy()
+  expect(latest().getByText('6-4 6-2')).toBeTruthy()
+  expect(latest().getByText('20 km/h')).toBeTruthy()
+  act(() => guardarUnidades('mph'))
+  expect(latest().getByText(/12[.,]4 mph/)).toBeTruthy()
+  act(() => guardarUnidades('kmh'))
 
   const period = screen.getByLabelText('Periodo')
   await user.selectOptions(period, '1')
@@ -130,7 +145,10 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
   expect(kpi('Partidos analizados').getByText('4')).toBeTruthy()
   act(() => publish({ docs: [dates[0], dates[5]] }))
   expect(screen.getByText('No hay estadísticas en este periodo')).toBeTruthy()
+  expect(screen.getByText('No hay partidos analizados en este periodo')).toBeTruthy()
   await user.selectOptions(period, 'all')
   expect(kpi('Partidos analizados').getByText('2')).toBeTruthy()
+  expect(latest().getByText('Rival · Rival 110')).toBeTruthy()
+  expect(latest().getAllByText('Sin datos')).toHaveLength(2)
   expect(onSnapshot).toHaveBeenCalledTimes(2)
 })

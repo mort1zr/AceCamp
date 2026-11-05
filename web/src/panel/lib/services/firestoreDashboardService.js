@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
-import { buildDashboardOverview } from '../dashboardOverview.js'
+import { buildDashboardOverview, normalizeDashboardStatistics } from '../dashboardOverview.js'
 import { buildDashboardEvolution } from '../dashboardEvolution.js'
 import { buildDashboardPeriods } from '../dashboardPeriods.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
@@ -41,10 +41,21 @@ export function createFirestoreDashboardService({ db, orgId, actorId, decodeStat
                 if (!decoded.has(match)) decoded.set(match, decodeStatistics(match, identity))
                 return decoded.get(match)
               } }
-              const summarize = matches => ({
-                ...buildDashboardOverview(matches, context),
-                evolution: buildDashboardEvolution(matches, context),
-              })
+              const summarize = matches => {
+                const overview = buildDashboardOverview(matches, context)
+                const evolution = buildDashboardEvolution(matches, context)
+                const point = evolution.points.at(-1)
+                const row = point && matches.find(match => match.id === point.matchId
+                  && match.orgId === orgId && match.playerId === playerId
+                  && match.status === 'listo' && match.matchDate === point.date)
+                const latestMatch = row ? {
+                  ...point,
+                  tournament: row.tournament,
+                  result: row.result,
+                  measuredShots: normalizeDashboardStatistics(decoded.get(row), playerId)?.shots?.sampleCount,
+                } : null
+                return { ...overview, evolution, latestMatch }
+              }
               onData({ ...summarize(rows), periods: buildDashboardPeriods(rows, summarize) })
             } catch (error) { fail(error) }
           }, fail)
