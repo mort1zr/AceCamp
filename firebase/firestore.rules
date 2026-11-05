@@ -104,6 +104,19 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
 
+    // ---------- Invitaciones (PCIT-40) ----------
+
+    function invitePath(email) {
+      return /databases/$(database)/documents/invites/$(email);
+    }
+
+    // Invitan el dueño de la organización y sus administradores.
+    function canInvite(orgId) {
+      return inOrg(orgId)
+        && (isAdmin()
+          || get(/databases/$(database)/documents/orgs/$(orgId)).data.ownerId == request.auth.uid);
+    }
+
     function validConsent(consent, recordedBy) {
       return consent is map
         && consent.accepted == true
@@ -131,6 +144,21 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         // Solo puede unirse a una organización que esté creando él mismo.
         && getAfter(/databases/$(database)/documents/orgs/$(request.resource.data.orgId)).data.ownerId == uid;
+
+      // O se une a una organización que lo invitó (PCIT-40): mismo orgId y rol que la
+      // invitación a su correo, que en el mismo lote pasa a 'aceptada'.
+      allow create: if signedIn()
+        && uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['email', 'displayName', 'orgId', 'role', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['email', 'displayName', 'orgId', 'role', 'jobTitle', 'createdAt'])
+        && request.resource.data.email == request.auth.token.email
+        && isText(request.resource.data.displayName, 2, 120)
+        && optionalText(request.resource.data, 'jobTitle', 120)
+        && request.resource.data.createdAt == request.time
+        && get(invitePath(request.auth.token.email)).data.status == 'pendiente'
+        && get(invitePath(request.auth.token.email)).data.orgId == request.resource.data.orgId
+        && get(invitePath(request.auth.token.email)).data.role == request.resource.data.role
+        && getAfter(invitePath(request.auth.token.email)).data.status == 'aceptada';
 
       // Cada uno edita su nombre y cargo. orgId y role no cambian (PCIT-39 y PCIT-40).
       allow update: if signedIn()
@@ -198,6 +226,39 @@ service cloud.firestore {
 
         allow delete: if false;
       }
+    }
+
+    // ---------- invites/{email} (PCIT-40) ----------
+    // El ID es el correo invitado en minúsculas. Quien invita las ve y las anula;
+    // la persona invitada solo lee la suya y la acepta al registrarse.
+
+    match /invites/{email} {
+      allow get: if signedIn()
+        && (email == request.auth.token.email || (resource != null && canInvite(resource.data.orgId)));
+      allow list: if canInvite(resource.data.orgId);
+
+      allow create: if canInvite(request.resource.data.orgId)
+        && request.resource.data.keys().hasOnly(['email', 'orgId', 'role', 'status', 'invitedBy', 'createdAt'])
+        && request.resource.data.email == email
+        && email.matches('^[^@ A-Z]+@[^@ A-Z]+[.][^@ A-Z]+$')
+        && email != request.auth.token.email
+        && request.resource.data.role in ['coach', 'admin']
+        && request.resource.data.status == 'pendiente'
+        && request.resource.data.invitedBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+
+      // Aceptar: solo la persona invitada, en el mismo lote que crea su ficha en users.
+      allow update: if signedIn()
+        && email == request.auth.token.email
+        && resource.data.status == 'pendiente'
+        && onlyChanges(['status', 'acceptedBy', 'acceptedAt'])
+        && request.resource.data.status == 'aceptada'
+        && request.resource.data.acceptedBy == request.auth.uid
+        && request.resource.data.acceptedAt == request.time
+        && getAfter(userPath(request.auth.uid)).data.orgId == resource.data.orgId;
+
+      // Anular una invitación que todavía no se usó.
+      allow delete: if canInvite(resource.data.orgId) && resource.data.status == 'pendiente';
     }
 
     // ---------- players/{playerId} ----------
