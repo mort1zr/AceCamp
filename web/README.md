@@ -3,9 +3,14 @@
 Frontend de AceCam: plataforma que analiza videos de partidos de tenis con IA y muestra
 estadísticas por jugador para entrenadores y reclutadores universitarios.
 
+**[Guía de encendido en Windows: web, emuladores, modelo y apagado](../docs/GUIA-ENCENDIDO-WINDOWS.md)**
+incluye el arranque para subir archivos locales, los puertos de Fabián y la
+configuración estándar del equipo. Para analizar videos deben estar encendidos
+los tres componentes; el servidor web por sí solo no ejecuta el modelo.
+
 ## Requisitos
 
-- Node.js 20 o superior
+- Node.js compatible con las dependencias del repositorio (entorno verificado: Node.js 24)
 - npm 10 o superior
 
 ## Instalación
@@ -53,28 +58,28 @@ ACECAM_FFPROBE=C:/herramientas/ffmpeg/bin/ffprobe.exe
 ACECAM_YT_DLP=C:/herramientas/yt-dlp.exe
 ```
 
-Desde la raíz del repositorio, prepara el código de `ModeloAI` en una copia aparte:
-
-```bash
-git fetch origin ModeloAI
-git worktree add --detach ../acecam-worker 6c17537
-```
-
-Desde `../acecam-worker/model`, activa un entorno virtual de Python, instala
-`python -m pip install -r requirements-worker.txt lap==0.5.14` y ejecuta
-`python scripts/download_models.py --no-video`. En la primera ejecución,
-TorchVision también necesita los pesos oficiales de ResNet50.
+El modelo actualizado ya está integrado en `panel_web/conexiones/model`.
+No se debe crear una copia de trabajo del commit antiguo `6c17537` para el
+arranque actual. Prepara el entorno Python y descarga los pesos como indica la
+[guía de encendido](../docs/GUIA-ENCENDIDO-WINDOWS.md). Conserva las versiones de
+requisitos del equipo y revisa allí la nota sobre `lap` en Windows.
 
 Desde `web` de la rama de integración, corre `npm ci`. Usa tres terminales:
 
 1. `npm run emulators` para Auth, Firestore y Storage.
 2. `npm run demo` y abre **http://127.0.0.1:5176**.
 3. Con el entorno Python del worker activado,
-   `npm run demo:worker -- "/ruta/a/la/copia/ModeloAI/model"`.
+   `npm run demo:worker -- "/ruta/a/Proyecto_Carrera_III_Tenis/model"`.
    Agrega `--once` para procesar un partido ya en cola y terminar.
    Si tu ejecutable no está en PATH, configura `ACECAM_PYTHON` con su ruta.
 
-En la app, registra un entrenador de prueba, da de alta un jugador y abre
+Esta sección opcional usa los puertos estándar (Firestore 8080); no se mezcla
+con el ensayo de Fabián en 62810. El comando `npm run demo` necesita los binarios
+de enlaces configurados arriba. Para subir archivos locales no se necesitan:
+usa el arranque de la guía principal.
+
+En la app, inicia sesión con un entrenador de prueba con plan ficticio local,
+da de alta un jugador y abre
 **Analizar video**. La opción **Usar enlace** admite un MP4/MOV público directo
 alojado en `raw.githubusercontent.com` o un enlace público de YouTube que
 ofrezca un MP4 HTTPS compatible. El límite local para enlaces es de 24 MiB y 30 s,
@@ -84,6 +89,9 @@ para verificar el Dashboard es
 [el video de ejemplo del modelo](https://raw.githubusercontent.com/abdullahtarek/tennis_analysis/main/input_videos/input_video.mp4).
 Si usas un clip ajeno al tenis, puedes comprobar la importación y la cola, y el
 worker puede devolver Error al intentar analizarlo.
+
+El checkout sigue simulado y no activa un plan persistente. La guía principal
+explica el plan ficticio del emulador para las cuentas que aparecen Sin plan.
 
 Cada integrante puede ejecutar su propia copia. Mantén la demo y los emuladores
 en loopback. El servidor rechaza configuración de emuladores externos. Los videos,
