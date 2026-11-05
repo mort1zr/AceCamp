@@ -22,7 +22,7 @@ export default function AppLayout() {
   const { user, profile, logout } = useAuth()
   const usuario = { nombre: profile?.displayName ?? user?.email, correo: user?.email }
   const entrada = useEntrada()
-  const { plan: planReal, usados } = usePlanOrganizacion(db, profile?.orgId, user?.uid, profile?.role)
+  const { plan: planReal, usados } = usePlanOrganizacion(db, profile?.orgId)
 
   const [menu, setMenu] = useState(false)
 

@@ -9,13 +9,10 @@ import {
   where,
 } from 'firebase/firestore'
 
-export const PLANES = {
-  free: { id: 'ninguno', prueba: false, limite: 0 },
-  prueba: { id: 'basico', prueba: true, limite: 15 },
-  basico: { id: 'basico', prueba: false, limite: 30 },
-  pro: { id: 'pro', prueba: false, limite: 150 },
-  ultra: { id: 'ultra', prueba: false, limite: null },
-}
+import { PLANES } from '../planes.js'
+import { usagePeriod, usageRef } from '../usage.js'
+
+export { PLANES }
 
 const PREFERENCIAS = { units: 'kmh', notifications: {} }
 
@@ -25,17 +22,6 @@ function leerPreferencias(clave) {
   } catch {
     return PREFERENCIAS
   }
-}
-
-function inicioDelMes(ahora) {
-  return new Date(ahora.getFullYear(), ahora.getMonth(), 1).getTime()
-}
-
-function milisegundos(valor) {
-  if (!valor) return null
-  if (typeof valor.toMillis === 'function') return valor.toMillis()
-  const fecha = new Date(valor)
-  return Number.isNaN(fecha.getTime()) ? null : fecha.getTime()
 }
 
 export function createFirestoreConfiguracionService({
@@ -63,15 +49,13 @@ export function createFirestoreConfiguracionService({
         organizacion: null,
         miembros: [],
         jugadores: [],
-        partidos: [],
+        uso: {},
       }
       const emitir = () => {
         if (!estado.usuario || !estado.organizacion) return
         const plan = PLANES[estado.organizacion.plan] ?? PLANES.free
-        const desde = inicioDelMes(ahora())
-        const usados = estado.partidos.filter(
-          (partido) => (milisegundos(partido.createdAt) ?? 0) >= desde,
-        ).length
+        // Contador de la organización en el mes (PCIT-41), igual para admin y coach.
+        const usados = estado.uso.analyses ?? 0
         const esOrganizacion = plan.id === 'ultra'
         onData({
           isOrganization: esOrganizacion,
@@ -122,7 +106,7 @@ export function createFirestoreConfiguracionService({
 
       const detener = [
         escuchar(usuario, 'usuario'),
-        escuchar(porOrganizacion('matches'), 'partidos', true),
+        escuchar(usageRef(db, orgId, usagePeriod(ahora())), 'uso'),
         escuchar(organizacion, 'organizacion'),
         escuchar(porOrganizacion('users'), 'miembros', true),
         escuchar(porOrganizacion('players'), 'jugadores', true),

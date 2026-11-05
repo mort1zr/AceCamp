@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { PLANES } from '../lib/services/firestoreConfiguracionService.js'
+import { PLANES } from '../lib/planes.js'
 import { PLANES_VISTA, PlanVistaContexto } from './PlanVistaContext.js'
 
 const CLAVE = 'acecam-plan-vista'

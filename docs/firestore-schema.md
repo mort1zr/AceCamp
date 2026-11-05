@@ -91,7 +91,7 @@ Se crea en el registro, junto con el usuario (PCIT-21).
 | `name` | string | sí | "Universidad …", 2–120 caracteres |
 | `ownerId` | string | sí | `uid` de quien la creó. PCIT-23 lo usa para validar el alta |
 | `program` | string \| null | no | Ej. "Tenis varones" |
-| `plan` | string | sí | `'free'` por ahora. PCIT-41 agrega límites por plan |
+| `plan` | string | sí | `'free'` (sin plan) al registrarse. `'prueba'`, `'basico'`, `'pro'` o `'ultra'` fijan los análisis por mes (PCIT-41, `docs/PCIT-41-limite-de-analisis.md`) |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
 
