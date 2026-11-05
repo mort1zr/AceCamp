@@ -120,6 +120,21 @@ describe('Registro', () => {
   })
 })
 
+describe('Registro con invitación (PCIT-40)', () => {
+  it('trae el correo invitado, no pide organización y se registra como invitado', async () => {
+    const registerCoach = vi.fn().mockResolvedValue({ joined: true })
+    renderApp('/registro?invitacion=ana%40club.pe', session({ registerCoach }))
+    const user = userEvent.setup()
+    expect(screen.queryByLabelText('Organización')).toBeNull()
+    expect(screen.getByLabelText('Correo').value).toBe('ana@club.pe')
+    await user.type(screen.getByLabelText('Nombre y apellido'), 'Ana Torres')
+    await user.type(screen.getByLabelText('Contraseña'), 'acecam123')
+    await user.type(screen.getByLabelText('Repite la contraseña'), 'acecam123')
+    await user.click(screen.getByRole('button', { name: 'Crear cuenta' }))
+    expect(registerCoach).toHaveBeenCalledWith(expect.objectContaining({ email: 'ana@club.pe', invited: true }))
+  })
+})
+
 describe('Acceso', () => {
   it('el switch alterna entre iniciar sesión y crear cuenta', async () => {
     renderApp('/login', session())
