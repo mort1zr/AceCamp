@@ -166,13 +166,6 @@ def run_pipeline(config, render=True):
     # La selección interpola las cajas en los huecos; fuera de la cámara principal no hay jugadores.
     player_detections = [d if main else {} for d, main in zip(player_detections, main_camera)]
 
-    # Detect ball shots
-    ball_shot_frames= ball_tracker.get_ball_shot_frames(
-        ball_detections,
-        minimum_change_frames_for_hit=config["shots"]["min_change_frames_for_hit"],
-        rolling_window=config["shots"]["rolling_window"],
-    )
-
     # Posiciones en metros sobre la pista
     player_court_positions, ball_court_positions = MiniCourt.court_positions(player_detections,
                                                                              ball_detections,
@@ -191,8 +184,12 @@ def run_pipeline(config, render=True):
     points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
                            main_camera=main_camera, serves=serves)
 
-    shots = measure_shots(ball_shot_frames, ball_detections, player_detections, player_court_positions,
-                          video_info.fps, main_camera=main_camera)
+    # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
+    # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
+    # muy seguidos, con velocidades imposibles.
+    shot_frames = sorted(set(hits) | {s["frame"] for s in serves})
+    shots = measure_shots(shot_frames, ball_detections, player_detections, player_court_positions,
+                          video_info.fps, main_camera=main_camera, hitters={s["frame"]: s["player"] for s in serves})
 
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)

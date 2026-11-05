@@ -120,3 +120,18 @@ def test_drawing_the_stats_box_before_any_shot_works():
     region = frame[box.start_y:box.end_y, box.start_x:box.end_x]
     assert region.any()  # se dibujaron los textos
     assert not frame[:, :box.start_x - 1].any()  # nada fuera de la caja
+
+
+def test_impossible_speeds_and_shots_without_the_opponent_returning_are_not_measured():
+    """Con el contador original, a 50 fps salían golpes falsos muy seguidos y velocidades de ~975 km/h."""
+    fps = 50
+    players = [{1: box_at(500, 100), 2: box_at(500, 800)} for _ in range(200)]
+    positions = [{1: (5.0, -1.0), 2: (5.0, 25.0)} for _ in range(200)]
+    ball = [{1: [495, 95, 505, 105]} if i < 100 else {1: [495, 795, 505, 805]} for i in range(200)]
+
+    too_fast = measure_shots([0, 3], ball, players, positions, fps, hitters={0: 1, 3: 2})  # 26 m en 0,06 s
+    same_player = measure_shots([0, 50], ball, players, positions, fps, hitters={0: 1, 50: 1})
+    fine = measure_shots([0, 50], ball, players, positions, fps, hitters={0: 1, 50: 2})
+
+    assert too_fast == [] and same_player == []
+    assert fine[0]["speedKmh"] == pytest.approx(math.hypot(0, 26.0) / 1.0 * 3.6)
