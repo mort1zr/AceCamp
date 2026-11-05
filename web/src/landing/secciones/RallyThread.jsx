@@ -315,7 +315,6 @@ export default function RallyThread() {
         const point = localPath.pointAt(length)
         const box = local.ownerSVGElement.getBoundingClientRect()
         return {
-          settled: true,
           x: box.left + point.x - host.left,
           y: box.top + point.y - host.top,
           local: true,
@@ -329,7 +328,6 @@ export default function RallyThread() {
 
       const point = sampler.pointAt(total * progress)
       return {
-        settled: true,
         x: point.x,
         y: point.y,
         local: false,
@@ -355,8 +353,6 @@ export default function RallyThread() {
       arrived = nowArrived
       bubbleRef.current.dataset.active = String(arrived)
       bubbleAnchorRef.current.setAttribute('transform', `translate(${target.x - BUBBLE_SHIFT} ${target.y - BUBBLE_LIFT})`)
-
-      return target.settled
     }
 
     const tick = (time) => {
@@ -366,9 +362,9 @@ export default function RallyThread() {
       const target = readTarget()
       progress += (target - progress) * (1 - (1 - SMOOTHING) ** steps)
       if (Math.abs(target - progress) < 0.00005) progress = target
-      const ballSettled = render()
+      render()
 
-      frame = progress === target && ballSettled ? null : requestAnimationFrame(tick)
+      frame = progress === target ? null : requestAnimationFrame(tick)
     }
 
     const request = () => {

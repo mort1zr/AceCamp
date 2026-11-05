@@ -5,6 +5,7 @@ import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
 import FooterGrande from '../components/FooterGrande.jsx'
 import Logo from '../../compartido/components/Logo.jsx'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
+import { inclinar } from '../lib/inclinar.js'
 
 const INCLINACION = 8
 
@@ -424,18 +425,12 @@ function Comparar({ anual }) {
                     key={plan.nombre}
                     className={`px-1.5 py-5 sm:px-6 sm:py-8 ${plan.popular ? `rounded-b-2xl ${columnaPro}` : ''}`}
                   >
-                    {plan.accion.to ? (
-                      <LinkDeslizante
-                        to={`${plan.accion.to}${anual ? '&ciclo=anual' : ''}`}
-                        className={clases}
-                      >
-                        {plan.accion.label}
-                      </LinkDeslizante>
-                    ) : (
-                      <a href={plan.accion.href} className={clases}>
-                        {plan.accion.label}
-                      </a>
-                    )}
+                    <LinkDeslizante
+                      to={`${plan.accion.to}${anual ? '&ciclo=anual' : ''}`}
+                      className={clases}
+                    >
+                      {plan.accion.label}
+                    </LinkDeslizante>
                   </td>
                 )
               })}
@@ -532,7 +527,7 @@ function useColorBarra(referencia) {
   useEffect(() => {
     const meta = document.querySelector('meta[name="theme-color"]')
     const elemento = referencia.current
-    if (!meta || !elemento || typeof IntersectionObserver === 'undefined') return undefined
+    if (!meta || !elemento) return undefined
     const original = meta.getAttribute('content')
     const observador = new IntersectionObserver(
       ([entrada]) => {
@@ -574,12 +569,8 @@ function Preguntas() {
       >
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
-            backgroundSize: '22px 22px',
-            maskImage: 'linear-gradient(to bottom, black, transparent 70%)',
-          }}
+          className="puntos pointer-events-none absolute inset-0"
+          style={{ maskImage: 'linear-gradient(to bottom, black, transparent 70%)' }}
         />
         <div
           aria-hidden="true"
@@ -698,32 +689,21 @@ function Plan({ plan, anual, oculto = false }) {
   const t = useTextos(textos)
   const tono = tonos[plan.tono ?? 'basico']
   const boton = `mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 font-semibold transition ${tono.boton}`
-  const tarjetaRef = useRef(null)
 
-  const inclinar = (evento) => {
-    const tarjeta = tarjetaRef.current
-    if (
-      evento.pointerType !== 'mouse' ||
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    )
-      return
-    const rect = tarjeta.getBoundingClientRect()
-    const x = (evento.clientX - rect.left) / rect.width - 0.5
-    const y = (evento.clientY - rect.top) / rect.height - 0.5
-    tarjeta.style.transform = `perspective(900px) rotateX(${-y * INCLINACION}deg) rotateY(${
-      x * INCLINACION
-    }deg) translateY(-6px)`
-  }
-
-  const soltar = () => {
-    tarjetaRef.current.style.transform = ''
-  }
+  const inclinacion = inclinar(
+    (tarjeta, x, y) => {
+      tarjeta.style.transform = `perspective(900px) rotateX(${-y * INCLINACION}deg) rotateY(${
+        x * INCLINACION
+      }deg) translateY(-6px)`
+    },
+    (tarjeta) => {
+      tarjeta.style.transform = ''
+    },
+  )
 
   return (
     <article
-      ref={tarjetaRef}
-      onPointerMove={inclinar}
-      onPointerLeave={soltar}
+      {...inclinacion}
       className={`relative flex flex-col rounded-[24px] border bg-surface p-6 shadow-tile sm:p-7 ${oculto ? 'max-md:hidden' : ''} transition-[transform,border-color,box-shadow] duration-300 ease-out will-change-transform hover:ring-1 ${tono.tarjeta}`}
     >
       {tono.brillo ? (
@@ -777,17 +757,10 @@ function Plan({ plan, anual, oculto = false }) {
       </ul>
 
       <div className="mt-auto">
-        {plan.accion.to ? (
-          <LinkDeslizante to={`${plan.accion.to}${anual ? '&ciclo=anual' : ''}`} className={boton}>
-            {plan.accion.label}
-            <Icon name="arrow" size={18} strokeWidth={2.2} />
-          </LinkDeslizante>
-        ) : (
-          <a href={plan.accion.href} className={boton}>
-            {plan.accion.label}
-            <Icon name="arrow" size={18} strokeWidth={2.2} />
-          </a>
-        )}
+        <LinkDeslizante to={`${plan.accion.to}${anual ? '&ciclo=anual' : ''}`} className={boton}>
+          {plan.accion.label}
+          <Icon name="arrow" size={18} strokeWidth={2.2} />
+        </LinkDeslizante>
       </div>
     </article>
   )
@@ -803,12 +776,8 @@ export default function Precios() {
     <div className="precios-pagina relative overflow-clip bg-bg pt-[calc(env(safe-area-inset-top)+4.75rem)] sm:pt-6">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
-          backgroundSize: '22px 22px',
-          maskImage: 'radial-gradient(ellipse 70% 60% at 50% 30%, black, transparent 80%)',
-        }}
+        className="puntos pointer-events-none absolute inset-0"
+        style={{ maskImage: 'radial-gradient(ellipse 70% 60% at 50% 30%, black, transparent 80%)' }}
       />
 
       <div className="relative mx-auto max-w-6xl px-5 sm:px-6">

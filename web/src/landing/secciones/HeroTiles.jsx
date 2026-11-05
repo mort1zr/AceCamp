@@ -3,6 +3,7 @@ import { useScrollSpring } from '../hooks/useScrollSpring.js'
 import {
   BallTile,
   CourtTile,
+  Ficha,
   HeatTile,
   LensTile,
   ScoreTile,
@@ -49,21 +50,17 @@ export default function HeroTiles() {
       className="pointer-events-none absolute inset-0 z-10 hidden min-[1200px]:block"
     >
       {tiles.map(({ Content, place, delay, to: [x, y] }) => (
-        <div
+        <Ficha
           key={place}
-          className={`absolute will-change-transform ${place}`}
-          style={{
+          Contenido={Content}
+          lugar={place}
+          demora={delay}
+          className="size-full"
+          estilo={{
             translate: `calc(var(--scroll-progress, 0) * ${x}px) calc(var(--scroll-progress, 0) * ${y}px)`,
             scale: 'calc(1 - var(--scroll-progress, 0) * 0.5)',
           }}
-        >
-          <div
-            style={{ animationDelay: `${delay}ms` }}
-            className="grid size-full place-content-center rounded-3xl border border-line2 bg-surface shadow-tile motion-safe:animate-float"
-          >
-            <Content />
-          </div>
-        </div>
+        />
       ))}
     </div>
   )

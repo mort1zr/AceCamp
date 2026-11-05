@@ -7,6 +7,7 @@ import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
 import {
   BallTile,
   CourtTile,
+  Ficha,
   HeatTile,
   LensTile,
   ScoreTile,
@@ -120,12 +121,8 @@ export default function CierreFinal() {
     <section className="relative overflow-hidden px-5 py-14 sm:px-6 sm:py-40">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
-          backgroundSize: '22px 22px',
-          maskImage: 'radial-gradient(ellipse 60% 55% at center, black, transparent 75%)',
-        }}
+        className="puntos pointer-events-none absolute inset-0"
+        style={{ maskImage: 'radial-gradient(ellipse 60% 55% at center, black, transparent 75%)' }}
       />
       {anillos.map((tamano) => (
         <span
@@ -141,21 +138,17 @@ export default function CierreFinal() {
         className="pointer-events-none absolute inset-0 hidden lg:block"
       >
         {flotantes.map(({ Contenido, lugar, demora, desde: [x, y] }) => (
-          <div
+          <Ficha
             key={lugar}
-            className={`absolute will-change-transform ${lugar}`}
-            style={{
+            Contenido={Contenido}
+            lugar={lugar}
+            demora={demora}
+            className="size-24 [&>*]:scale-[0.85]"
+            estilo={{
               translate: `calc((1 - var(--salida, 1)) * ${x}px) calc((1 - var(--salida, 1)) * ${y}px)`,
               scale: 'calc(0.5 + var(--salida, 1) * 0.5)',
             }}
-          >
-            <div
-              style={{ animationDelay: `${demora}ms` }}
-              className="grid size-24 place-content-center rounded-3xl border border-line2 bg-surface shadow-tile motion-safe:animate-float [&>*]:scale-[0.85]"
-            >
-              <Contenido />
-            </div>
-          </div>
+          />
         ))}
       </div>
 

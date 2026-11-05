@@ -70,3 +70,16 @@ export function LensTile() {
     </span>
   )
 }
+
+export function Ficha({ Contenido, lugar, demora, estilo, className }) {
+  return (
+    <div className={`absolute will-change-transform ${lugar}`} style={estilo}>
+      <div
+        style={{ animationDelay: `${demora}ms` }}
+        className={`grid place-content-center rounded-3xl border border-line2 bg-surface shadow-tile motion-safe:animate-float ${className}`}
+      >
+        <Contenido />
+      </div>
+    </div>
+  )
+}

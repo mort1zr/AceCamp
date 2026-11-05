@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link } from 'react-router'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
 import { irAlInicio } from '../../compartido/lib/smoothScroll.js'
 import Icon from './Icon.jsx'
@@ -34,7 +34,6 @@ const textos = {
 }
 
 export default function FloatingNav({ onExpandir }) {
-  const { pathname } = useLocation()
   const t = useTextos(textos)
   const [visible, setVisible] = useState(false)
   const [expandido, setExpandido] = useState(false)
@@ -135,7 +134,7 @@ export default function FloatingNav({ onExpandir }) {
                 <Enlace
                   to={enlace.to}
                   onClick={
-                    alInicio && pathname === '/'
+                    alInicio
                       ? (evento) => {
                           evento.preventDefault()
                           irAlInicio()
