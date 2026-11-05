@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from 'react'
-import { Navigate, useOutletContext, useNavigate } from 'react-router'
+import { Navigate, useLocation, useOutletContext, useNavigate } from 'react-router'
 import { AuthHeader, Field, FormError } from '../components/AuthForm.jsx'
 import Button from '../../compartido/components/Button.jsx'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
@@ -46,13 +46,15 @@ export default function Registro() {
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const acceso = useOutletContext()
+  const from = useLocation().state?.from
+  const destino = from ? `${from.pathname}${from.search ?? ''}` : '/inicio'
   const etiqueta = submitting ? t.cargando : t.boton
 
   useLayoutEffect(() => {
     acceso?.setBoton({ label: etiqueta, disabled: submitting })
   }, [acceso, etiqueta, submitting])
 
-  if (user && profile && !submitting) return <Navigate to="/inicio" replace />
+  if (user && profile && !submitting) return <Navigate to={destino} replace />
 
   const change = event => setValues(current => ({ ...current, [event.target.name]: event.target.value }))
 
@@ -65,8 +67,8 @@ export default function Registro() {
     setSubmitting(true)
     try {
       await registerCoach(values)
-      if (acceso?.entrar) await acceso.entrar('/inicio')
-      else navigate('/inicio', { replace: true })
+      if (acceso?.entrar) await acceso.entrar(destino)
+      else navigate(destino, { replace: true })
     } catch (error) {
       setFormError(authErrorMessage(error))
       setSubmitting(false)

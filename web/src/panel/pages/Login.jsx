@@ -42,7 +42,8 @@ export default function Login() {
   }, [acceso, etiqueta, submitting])
 
   // Vuelve a la página privada que pidió, o al Inicio.
-  const destination = location.state?.from?.pathname ?? '/inicio'
+  const from = location.state?.from
+  const destination = from ? `${from.pathname}${from.search ?? ''}` : '/inicio'
 
   if (user && profile && !submitting) return <Navigate to={destination} replace />
 
