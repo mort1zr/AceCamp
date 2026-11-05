@@ -339,7 +339,10 @@ export default function Problema() {
           </h3>
 
           <ol className="relative mt-8 grid gap-8 text-left sm:grid-cols-3 sm:text-center">
-            <span className="absolute top-6 right-1/6 left-1/6 hidden h-px bg-line2 sm:block" />
+            <li
+              aria-hidden="true"
+              className="absolute top-6 right-1/6 left-1/6 hidden h-px bg-line2 sm:block"
+            />
             {d.pasos.map((paso) => {
               const tituloIndice = siguiente()
               const textoIndice = siguiente()
