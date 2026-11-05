@@ -54,7 +54,7 @@ class Rally:
     shots: list = field(default_factory=list)  # [{"frame", "player"}]
 
 
-def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False):
+def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derecha"):
     """Peloteo entre el jugador 1 (fondo lejano) y el 2 (fondo cercano). Empieza golpeando el 2."""
     rng = np.random.default_rng(seed)
     dt_sub = 1.0 / (fps * 20)
@@ -67,14 +67,19 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False):
     pos = np.array([players[2][0] + 0.3, players[2][1] - 0.4, start_height])
     if serve:
         players[2][1] = COURT_LENGTH + 0.3  # el saque se hace desde la línea de fondo
-        pos = np.array([DOUBLES_WIDTH / 2 + 0.8, COURT_LENGTH + 0.1, start_height])
+        # Visto desde la cámara (detrás del jugador 2), la derecha del sacador es x mayor.
+        serve_x = DOUBLES_WIDTH / 2 + (0.8 if serve_side == "derecha" else -0.8)
+        players[2][0] = serve_x
+        pos = np.array([serve_x, COURT_LENGTH + 0.1, start_height])
     rally = Rally(fps, [], [])
 
     for shot_index in range(num_shots):
         receiver = 1 if hitter == 2 else 2
         # Bote objetivo en la mitad del rival (en el saque, en el cuadro de saque).
         if serve and shot_index == 0:
-            target = np.array([rng.uniform(4.2, 5.2), rng.uniform(NET_Y - 6.0, NET_Y - 1.5)])
+            # Saque cruzado: al cuadro de saque del otro lado de la línea central.
+            box_x = (1.8, 5.0) if serve_side == "derecha" else (6.0, 9.2)
+            target = np.array([rng.uniform(*box_x), rng.uniform(NET_Y - 6.0, NET_Y - 1.5)])
         elif receiver == 1:
             target = np.array([rng.uniform(1.5, 9.5), rng.uniform(1.0, NET_Y - 2.0)])
         else:
@@ -145,3 +150,69 @@ def render_detections(rally, camera, noise_px=1.5, miss_rate=0.03, seed=0):
         cx, cy = camera.project(ball_3d)[0] + rng.normal(0, noise_px, 2)
         ball.append({1: [cx - 6, cy - 6, cx + 6, cy + 6]})
     return ball, players
+
+
+@dataclass
+class Match:
+    fps: float
+    ball_3d: list
+    players_m: list
+    bounces: list = field(default_factory=list)
+    shots: list = field(default_factory=list)
+    serves: list = field(default_factory=list)  # [{"frame", "player", "side"}]
+    points: list = field(default_factory=list)  # [{"start", "end", "server"}]
+
+
+def _mirror(rally):
+    """El mismo peloteo girado 180° sobre la pista: saca el jugador 1 (fondo lejano)."""
+    swap = {1: 2, 2: 1}
+    rally.ball_3d = [None if b is None else (DOUBLES_WIDTH - b[0], COURT_LENGTH - b[1], b[2]) for b in rally.ball_3d]
+    rally.players_m = [{swap[k]: (DOUBLES_WIDTH - x, COURT_LENGTH - y) for k, (x, y) in p.items()}
+                       for p in rally.players_m]
+    rally.bounces = [{**b, "x_m": DOUBLES_WIDTH - b["x_m"], "y_m": COURT_LENGTH - b["y_m"]} for b in rally.bounces]
+    rally.shots = [{**s, "player": swap[s["player"]]} for s in rally.shots]
+    return rally
+
+
+def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8):
+    """Varios puntos seguidos: pausa sin pelota, lanzamiento del saque y peloteo.
+
+    Saca el jugador 2 dos puntos y luego el 1 otros dos, desde la derecha y la izquierda
+    alternadamente (la derecha del sacador, mirando a la red). El
+    inicio de cada punto es el primer fotograma del lanzamiento de la pelota; el fin,
+    el último fotograma con la pelota en juego.
+    """
+    rng = np.random.default_rng(seed + 1000)
+    match = Match(fps, [], [])
+    for point in range(num_points):
+        server = 2 if point % 4 < 2 else 1
+        serve_side = "derecha" if point % 2 == 0 else "izquierda"
+        rally = simulate_rally(int(rng.integers(1, max_shots + 1)), fps=fps, seed=seed * 100 + point, serve=True,
+                               serve_side=serve_side)
+        if server == 1:
+            rally = _mirror(rally)
+        idle = {k: v for k, v in rally.players_m[0].items()}
+        pause = int(rng.uniform(3.0, 7.0) * fps)
+        for _ in range(pause):
+            match.ball_3d.append(None)
+            match.players_m.append(idle)
+        # Lanzamiento: la pelota sube desde la mano (1,2 m) hasta 2,9 m y baja a 2,6 m, donde la golpea.
+        hit_x, hit_y, _ = rally.ball_3d[0]
+        up = np.sqrt(2 * G * (2.9 - 1.2))
+        toss_time = up / G + np.sqrt(2 * (2.9 - 2.6) / G)
+        start = len(match.ball_3d)
+        for k in range(int(round(toss_time * fps))):
+            t = k / fps
+            match.ball_3d.append((hit_x, hit_y, 1.2 + up * t - 0.5 * G * t * t))
+            match.players_m.append(idle)
+        offset = len(match.ball_3d)
+        match.ball_3d += rally.ball_3d
+        match.players_m += rally.players_m
+        match.shots += [{**s, "frame": s["frame"] + offset} for s in rally.shots]
+        match.bounces += [{**b, "frame": b["frame"] + offset} for b in rally.bounces]
+        match.serves.append({"frame": offset, "player": server, "side": serve_side})
+        match.points.append({"start": start, "end": len(match.ball_3d) - 1, "server": server})
+    for _ in range(int(2 * fps)):
+        match.ball_3d.append(None)
+        match.players_m.append(match.players_m[-1])
+    return match

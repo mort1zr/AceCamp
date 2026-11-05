@@ -5,7 +5,7 @@ Ejecuta el modelo sobre el clip y escribe un JSON de etiquetas
 pista, posición de la pelota y golpes. Así el equipo solo revisa y corrige
 (python -m eval.review) en lugar de etiquetar desde cero.
 
-Lo que el modelo aún no detecta (saques y puntos)
+Lo que el modelo aún no detecta (saques y el ganador de cada punto)
 queda vacío: se etiqueta a mano en la revisión.
 
 Uso, desde la carpeta model/:
@@ -62,7 +62,7 @@ def build_prelabels(result, video_file, ball_every=BALL_EVERY_FRAMES, keypoints_
                     for b in result.get("bounces", [])],
         "serves": [],
         "cuts": list(result.get("cuts", [])),
-        "points": [],
+        "points": [{"start": p["start"], "end": p["end"]} for p in result.get("points", [])],
     }
 
 

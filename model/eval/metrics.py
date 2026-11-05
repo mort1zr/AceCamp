@@ -107,9 +107,18 @@ def bounce_position_error(predicted, actual, tolerance=EVENT_TOLERANCE_FRAMES):
     return sum(errors) / len(errors) if errors else None
 
 
+def point_boundaries(predicted, actual, fps, tolerance_seconds=1.0):
+    """Fracción de puntos reales con un punto predicho cuyo inicio y fin están a menos de la tolerancia (TA-17)."""
+    from events.points import point_boundaries_ok
+
+    return point_boundaries_ok(predicted, actual, fps, tolerance_seconds)
+
+
 def point_winner_accuracy(predicted, actual, tolerance_frames=30):
     """Fracción de puntos reales cuyo ganador acierta el modelo (emparejando por inicio del punto)."""
-    if not actual:
+    predicted = [p for p in predicted if "winner" in p]
+    actual = [a for a in actual if "winner" in a]
+    if not actual or not predicted:
         return None
     _, matched = match_events([p["start"] for p in predicted], [a["start"] for a in actual], tolerance_frames)
     correct = sum(predicted[i]["winner"] == actual[j]["winner"] for i, j in matched)
@@ -131,5 +140,7 @@ def evaluate(predicted: dict, actual: dict) -> dict:
     if "bounces" in actual and "bounces" in predicted:
         result["bounce_position_error_m"] = bounce_position_error(predicted["bounces"], actual["bounces"])
     if "points" in actual and "points" in predicted:
+        fps = actual.get("video", {}).get("fps") or 30.0
+        result["points_within_1s"] = point_boundaries(predicted["points"], actual["points"], fps)
         result["point_winner_accuracy"] = point_winner_accuracy(predicted["points"], actual["points"])
     return result

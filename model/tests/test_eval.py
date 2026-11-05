@@ -33,7 +33,7 @@ def test_the_documented_example_is_valid():
         labels(ball={"3": [1, 2, 3]}),
         labels(shots=[{"player": 1}]),
         labels(shots=[{"frame": "12"}]),
-        labels(points=[{"start": 1, "end": 2}]),
+        labels(points=[{"start": 1}]),
         labels(cuts=["12"]),
     ],
 )
@@ -131,3 +131,13 @@ def test_command_line_compares_folders_and_writes_json(tmp_path, capsys):
 def test_command_line_fails_clearly_without_labels(tmp_path):
     with pytest.raises(SystemExit, match="No hay etiquetas"):
         eval_main(["--labels", str(tmp_path), "--predictions", str(tmp_path)])
+
+
+def test_points_without_winner_are_valid_and_their_boundaries_are_measured():
+    actual = validate(labels(points=[{"start": 0, "end": 300}, {"start": 600, "end": 900}]))
+    predicted = validate(labels(points=[{"start": 10, "end": 310}, {"start": 650, "end": 900}]))
+
+    results = evaluate(predicted, actual)
+
+    assert results["points_within_1s"] == 0.5  # a 30 fps, el segundo empieza 50 fotogramas tarde
+    assert results["point_winner_accuracy"] is None

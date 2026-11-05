@@ -16,7 +16,7 @@ formato, así que el evaluador compara campo a campo. Todos los campos salvo
   "bounces": [{"frame": 140, "x_px": 812.0, "y_px": 640.5, "x_m": 3.2, "y_m": 20.1}],  # posición opcional
   "serves":  [{"frame": 100, "player": 1}],
   "cuts":    [312, 640],                       # fotogramas con cambio de plano
-  "points":  [{"start": 90, "end": 400, "winner": 2}]
+  "points":  [{"start": 90, "end": 400, "winner": 2}]   # winner opcional
 }
 
 Jugador 1 = lado lejano, 2 = lado cercano (como en el pipeline).
@@ -70,7 +70,7 @@ def validate(data: dict) -> dict:
     _check_frame_list(data, "shots", ("frame",))
     _check_frame_list(data, "bounces", ("frame",))
     _check_frame_list(data, "serves", ("frame",))
-    _check_frame_list(data, "points", ("start", "end", "winner"))
+    _check_frame_list(data, "points", ("start", "end"))  # winner es opcional (el modelo aún no lo sabe)
     if not all(isinstance(f, int) for f in data.get("cuts", [])):
         raise LabelError("cuts debe ser una lista de fotogramas enteros")
     return result

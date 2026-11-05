@@ -8,7 +8,7 @@ from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
-from events import detect_bounce_events, detect_hits, locate_bounces
+from events import detect_bounce_events, detect_hits, detect_points, locate_bounces
 from mini_court import MiniCourt
 from stats import build_frame_states, build_model_statistics, measure_shots, renumber_far_near
 from trackers import BallTracker, PlayerTracker
@@ -185,11 +185,16 @@ def run_pipeline(config, render=True):
     bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=hits,
                              court_keypoints=court_keypoints)
 
+    # División en puntos (TA-17).
+    points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
+                           main_camera=main_camera)
+
     shots = measure_shots(ball_shot_frames, ball_detections, player_detections, player_court_positions,
                           video_info.fps, main_camera=main_camera)
 
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
+    model_statistics["points"] = {"count": len(points)}
     result = {
         "model_statistics": model_statistics,
         "shots": stats_shots,
@@ -202,6 +207,7 @@ def run_pipeline(config, render=True):
         "player_detections": player_detections,
         "cuts": detections.cuts,
         "bounces": bounces,
+        "points": points,
         "main_camera_segments": main_segments,
     }
     if not render:
@@ -240,6 +246,10 @@ def run_pipeline(config, render=True):
                     cv2.circle(frame, center, int(18 * text_scale), (255, 0, 255), max(1, int(round(3 * text_scale))))
                     cv2.putText(frame, "BOTE", (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.7 * text_scale, (255, 0, 255), max(1, int(round(2 * text_scale))))
+            current = next((k for k, p in enumerate(points, start=1) if p["start"] <= i <= p["end"]), None)
+            if current is not None:
+                cv2.putText(frame, f"Punto {current}", (int(10 * text_scale), int(110 * text_scale)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 255, 255), max(1, int(round(2 * text_scale))))
             frame = stats_box.draw(frame, frame_states[i])
             cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
                         text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))
