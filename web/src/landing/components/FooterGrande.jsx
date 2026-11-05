@@ -77,9 +77,9 @@ export default function FooterGrande() {
   const t = useTextos(textos)
   return (
     <footer className="relative overflow-hidden">
-      <div className="relative z-10 mx-auto flex max-w-4xl flex-col gap-12 px-6 pt-24 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative z-10 mx-auto flex max-w-4xl flex-col gap-8 px-5 pt-14 sm:flex-row sm:items-center sm:justify-between sm:gap-12 sm:px-6 sm:pt-24">
         <div>
-          <p className="font-display text-4xl leading-tight sm:text-5xl">
+          <p className="font-display text-3xl leading-tight sm:text-5xl">
             {t.sigue}
             <br />
             {t.novedades}
@@ -103,7 +103,7 @@ export default function FooterGrande() {
 
         <nav
           aria-label={t.pie}
-          className="flex gap-16 border-l border-line3 pl-8 text-base font-medium"
+          className="flex gap-12 border-l border-line3 pl-6 text-base font-medium sm:gap-16 sm:pl-8"
         >
           {columnas.map((columna, indice) => (
             <ul key={indice} className="space-y-3">
@@ -119,7 +119,7 @@ export default function FooterGrande() {
 
       <div
         aria-hidden="true"
-        className="pointer-events-none mt-12 flex items-center justify-center gap-[2vw] whitespace-nowrap text-line2 select-none"
+        className="pointer-events-none mt-8 flex items-center justify-center gap-[2vw] whitespace-nowrap text-line2 select-none"
       >
         <svg viewBox="2 3.5 26 23" className="w-[24vw] shrink-0">
           <path d="M3 25h24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -137,7 +137,7 @@ export default function FooterGrande() {
         </span>
       </div>
 
-      <p className="py-6 text-center text-xs text-muted">
+      <p className="pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center text-xs text-muted sm:py-6">
         © {year} AceCam · {t.lugar}
       </p>
     </footer>

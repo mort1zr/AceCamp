@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
 
 const atributos = [
@@ -216,8 +217,30 @@ function Rendimiento() {
   )
 }
 
+const ANCHO = 880
+
 export default function HeroMock() {
   const t = useTextos(textos)
+  const caja = useRef(null)
+  const interior = useRef(null)
+  const [medida, setMedida] = useState(null)
+
+  useEffect(() => {
+    const elemento = caja.current
+    if (!elemento || typeof ResizeObserver === 'undefined') return undefined
+    const medir = () => {
+      const ancho = elemento.clientWidth
+      setMedida(
+        ancho < 760 ? { escala: ancho / ANCHO, alto: interior.current?.offsetHeight ?? 0 } : null,
+      )
+    }
+    const observador = new ResizeObserver(medir)
+    observador.observe(elemento)
+    if (interior.current) observador.observe(interior.current)
+    return () => observador.disconnect()
+  }, [])
+
+  const escala = medida?.escala
 
   return (
     <div
@@ -227,24 +250,40 @@ export default function HeroMock() {
     >
       <p className="px-3 pb-2 text-right text-xs text-muted">{t.ejemplo}</p>
 
-      <div className="rounded-t-[22px] border border-b-0 border-line bg-surface p-3 pb-24 sm:p-4 sm:pb-24">
-        <div className="mb-3 flex flex-wrap items-center gap-1 sm:mb-4">
-          {t.pestanas.map((pestana, indice) => (
-            <span
-              key={pestana}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                indice === 0 ? 'bg-chip text-text' : 'text-muted'
-              }`}
-            >
-              {pestana}
-            </span>
-          ))}
-        </div>
+      <div
+        ref={caja}
+        className="relative overflow-hidden rounded-t-[22px] border border-b-0 border-line bg-surface"
+        style={escala ? { height: medida.alto * escala } : undefined}
+      >
+        <div
+          ref={interior}
+          className={escala ? 'absolute top-0 left-0 p-4 pb-10' : 'p-3 pb-24 sm:p-4 sm:pb-24'}
+          style={
+            escala
+              ? { width: ANCHO, transform: `scale(${escala})`, transformOrigin: 'top left' }
+              : undefined
+          }
+        >
+          <div className="mb-3 flex flex-wrap items-center gap-1 sm:mb-4">
+            {t.pestanas.map((pestana, indice) => (
+              <span
+                key={pestana}
+                className={`rounded-full px-3 py-1 text-xs font-medium ${
+                  indice === 0 ? 'bg-chip text-text' : 'text-muted'
+                }`}
+              >
+                {pestana}
+              </span>
+            ))}
+          </div>
 
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-[17rem_1fr_1fr]">
-          <TarjetaJugador />
-          <Radar />
-          <Rendimiento />
+          <div
+            className={`grid gap-3 ${escala ? 'grid-cols-[17rem_1fr_1fr]' : 'md:grid-cols-2 lg:grid-cols-[17rem_1fr_1fr]'}`}
+          >
+            <TarjetaJugador />
+            <Radar />
+            <Rendimiento />
+          </div>
         </div>
       </div>
     </div>

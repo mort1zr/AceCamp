@@ -6,6 +6,28 @@ import { useTextos } from '../../compartido/lib/idioma.jsx'
 import HeroMock from './HeroMock.jsx'
 import HeroTiles from './HeroTiles.jsx'
 
+function CourtLinesMovil() {
+  return (
+    <svg
+      viewBox="0 0 640 1200"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 size-full text-electric opacity-55 lg:hidden"
+    >
+      <rect x="1" y="1" width="638" height="1198" vectorEffect="non-scaling-stroke" />
+      <path d="M70 1v1198M570 1v1198" vectorEffect="non-scaling-stroke" />
+      <path
+        d="M70 300h500M70 900h500M320 300v600M1 600h638"
+        opacity="0.35"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  )
+}
+
 function CourtLines() {
   return (
     <svg
@@ -54,7 +76,7 @@ const textos = {
 export default function Hero() {
   const t = useTextos(textos)
   return (
-    <section className="relative overflow-hidden px-6 pt-10">
+    <section className="relative overflow-hidden px-5 pt-[calc(env(safe-area-inset-top)+4.25rem)] sm:px-6 sm:pt-10">
       <div className="relative mx-auto max-w-6xl">
         <div className="flex flex-col items-center gap-4 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-0">
           <Logo size={52} wordmarkClassName="text-4xl" className="gap-3" rebota />
@@ -66,10 +88,11 @@ export default function Hero() {
           className="relative mt-4 flex flex-col justify-center lg:h-[calc(100dvh-19rem)] lg:max-h-[38rem] lg:min-h-[22rem]"
         >
           <CourtLines />
+          <CourtLinesMovil />
           <HeroTiles />
 
-          <div className="relative z-20 mx-auto max-w-3xl py-6 text-center">
-            <h1 className="text-5xl leading-[1.14] sm:text-6xl lg:text-[clamp(3.5rem,8vh,4.5rem)]">
+          <div className="relative z-20 mx-auto max-w-3xl px-7 py-12 text-center sm:px-0 sm:py-6">
+            <h1 className="text-[2.35rem] leading-[1.12] sm:text-6xl lg:text-[clamp(3.5rem,8vh,4.5rem)]">
               {t.antes}{' '}
               <span className="rounded-2xl bg-accent px-2.5 whitespace-nowrap text-on-accent">
                 {t.resaltado}
@@ -77,11 +100,11 @@ export default function Hero() {
               {t.despues}
             </h1>
 
-            <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-text2 sm:text-xl">
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-text2 sm:mt-5 sm:text-xl">
               {t.lead}
             </p>
 
-            <div className="mt-7 flex flex-col items-center gap-4">
+            <div className="mt-6 flex flex-col items-center gap-3 sm:mt-7 sm:gap-4">
               <Button to="/precios" desliza size="lg" data-nav-cta>
                 <span className="size-1.5 rounded-full bg-on-accent" />
                 {t.empezar}
@@ -99,9 +122,9 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="relative z-20 mx-auto mt-8 max-w-5xl">
+        <div className="relative z-20 mx-auto mt-6 max-w-5xl sm:mt-8">
           <HeroMock />
-          <div className="pointer-events-none absolute -inset-x-1 bottom-0 h-36 bg-linear-to-t from-bg to-transparent" />
+          <div className="pointer-events-none absolute -inset-x-1 bottom-0 h-16 bg-linear-to-t from-bg to-transparent sm:h-36" />
         </div>
       </div>
     </section>

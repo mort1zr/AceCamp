@@ -12,14 +12,17 @@ export default function PublicLayout() {
   const [navAbierto, setNavAbierto] = useState(false)
 
   return (
-    <div className="min-h-dvh bg-bg text-text">
+    <div className={`min-h-dvh text-text ${esPrecios ? '' : 'bg-bg'}`}>
       {esLanding ? (
         <>
           <FloatingNav onExpandir={setNavAbierto} />
-          <ControlsPill ocultarIngreso={navAbierto} />
+          <ControlsPill
+            ocultarIngreso={navAbierto}
+            className={navAbierto ? 'max-sm:pointer-events-none max-sm:opacity-0' : ''}
+          />
         </>
       ) : esPrecios ? (
-        <ControlsPill />
+        <ControlsPill className="max-sm:absolute" />
       ) : (
         <PublicHeader />
       )}

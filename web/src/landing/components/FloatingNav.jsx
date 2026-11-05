@@ -105,7 +105,12 @@ export default function FloatingNav({ onExpandir }) {
           ? 'border-line2 bg-surface2/90 shadow-tile backdrop-blur-lg'
           : 'border-transparent bg-transparent'
       } ${visible ? '' : 'pointer-events-none invisible'}`}
-      style={{ top: TOPE, left: '50%', translate: '-50% 0', padding: RELLENO }}
+      style={{
+        top: `max(${TOPE}px, env(safe-area-inset-top))`,
+        left: '50%',
+        translate: '-50% 0',
+        padding: RELLENO,
+      }}
     >
       <div
         className="overflow-hidden"
@@ -138,7 +143,7 @@ export default function FloatingNav({ onExpandir }) {
                       : undefined
                   }
                   tabIndex={expandido ? undefined : -1}
-                  className="block rounded-full px-3 py-2 text-[15px] font-medium whitespace-nowrap text-text2 transition-colors hover:text-text"
+                  className="block rounded-full px-2.5 py-2 text-[14px] font-medium whitespace-nowrap text-text2 transition-colors hover:text-text sm:px-3 sm:text-[15px]"
                 >
                   {t[enlace.clave]}
                 </Enlace>
@@ -151,7 +156,7 @@ export default function FloatingNav({ onExpandir }) {
       <LinkDeslizante
         to="/registro"
         tabIndex={visible ? undefined : -1}
-        className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-6 py-3 font-semibold whitespace-nowrap text-on-accent transition-opacity hover:opacity-90"
+        className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-4.5 py-2.5 text-[15px] font-semibold whitespace-nowrap text-on-accent transition-opacity hover:opacity-90 sm:px-6 sm:py-3 sm:text-base"
       >
         <span
           className="h-1.5 rounded-full bg-on-accent"
@@ -164,7 +169,7 @@ export default function FloatingNav({ onExpandir }) {
         />
         {t.empezar}
         <span
-          className="inline-flex overflow-hidden"
+          className="inline-flex overflow-hidden max-sm:hidden"
           style={{
             width: expandido ? 18 : 0,
             marginLeft: expandido ? 0 : -8,
