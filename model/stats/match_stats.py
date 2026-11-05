@@ -127,6 +127,21 @@ def build_model_statistics(shots, player_positions, fps, num_frames):
     }
 
 
+def serve_and_point_stats(serves, points):
+    """Saques de cada jugador por lado y número de puntos (TA-17, TA-18).
+
+    Va en las estadísticas del modelo; todavía no en matches.statistics (pendiente de
+    acordar con Axel cómo encaja con la clave serve del esquema).
+    """
+    by_player = {}
+    for player in (FAR_PLAYER, NEAR_PLAYER):
+        own = [s for s in serves if s["player"] == player]
+        by_player[str(player)] = {"count": len(own),
+                                  "derecha": sum(s["side"] == "derecha" for s in own),
+                                  "izquierda": sum(s["side"] == "izquierda" for s in own)}
+    return {"serves": by_player, "points": {"count": len(points)}}
+
+
 def renumber_far_near(shots, player_positions):
     """Numera a los jugadores como 1 = lado lejano y 2 = lado cercano.
 

@@ -5,6 +5,7 @@ from .match_stats import (
     build_model_statistics,
     movement_stats,
     renumber_far_near,
+    serve_and_point_stats,
     to_match_statistics,
 )
 from .shots import measure_shots
@@ -19,5 +20,6 @@ __all__ = [
     "measure_shots",
     "movement_stats",
     "renumber_far_near",
+    "serve_and_point_stats",
     "to_match_statistics",
 ]

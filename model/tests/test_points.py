@@ -3,7 +3,7 @@
 import numpy as np
 from ball_sim import BroadcastCamera, render_detections, simulate_match
 
-from events import detect_bounce_events, detect_hits, detect_points, locate_bounces
+from events import detect_bounce_events, detect_hits, detect_points, detect_serves, locate_bounces
 from events.points import point_boundaries_ok
 
 CAMERA = BroadcastCamera()
@@ -14,7 +14,8 @@ def analyze(ball, players, homography, fps):
     hits = detect_hits(ball, players, homography, fps)
     bounces = locate_bounces(detect_bounce_events(ball, players, homography, fps, hits=hits), ball, homography,
                              fps, hits=hits)
-    return [], detect_points(ball, players, hits, bounces, fps)
+    serves = detect_serves(ball, players, homography, fps, hits=hits)
+    return serves, detect_points(ball, players, hits, bounces, fps, serves=serves)
 
 
 def simulated(seeds, fps=30):
