@@ -7,6 +7,8 @@ import { createVideoImportHttpHandler } from '../../../../server/video-import/ht
 
 vi.mock('firebase/firestore', () => ({ collection: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), onSnapshot: vi.fn(), query: vi.fn(), runTransaction: vi.fn(), serverTimestamp: vi.fn(), where: vi.fn() }))
 const absent = { exists: () => false }
+const found = data => ({ exists: () => true, data: () => data })
+const proOrg = found({ plan: 'pro' })
 const db = { app: { options: { projectId: 'test' } } }
 const input = { sourceType: 'file', file: { name: 'video.mp4', type: 'video/mp4', size: 50, lastModified: 1 }, playerId: 'p1', playerPosition: 'arriba', opponent: 'Rival', matchDate: '2026-01-01', orgId: 'forged', status: 'listo' }
 let tx
@@ -16,9 +18,10 @@ const matchPath = (matchId, orgId = 'org-a') => `orgs/${orgId}/matches/${matchId
 beforeEach(() => {
   vi.resetAllMocks()
   collection.mockReturnValue({ kind: 'collection' })
-  doc.mockImplementation((first, second, third) => first === db ? { kind: second, id: third } : { kind: 'match', id: second ?? 'generated-id' })
-  getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? { exists: () => true, data: () => ({ orgId: 'org-a', createdBy: 'coach-a' }) } : absent))
-  tx = { get: vi.fn().mockResolvedValue(absent), set: vi.fn() }
+  // doc(db, 'orgs', id) → kind 'orgs'; doc(db, 'orgs', id, 'usage', mes) → kind 'usage'.
+  doc.mockImplementation((first, ...path) => first === db ? { kind: path.length > 2 ? path[2] : path[0], id: path.at(-1) } : { kind: 'match', id: path[0] ?? 'generated-id' })
+  getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? { exists: () => true, data: () => ({ orgId: 'org-a', createdBy: 'coach-a' }) } : ref.kind === 'orgs' ? proOrg : absent))
+  tx = { get: vi.fn(ref => Promise.resolve(ref.kind === 'orgs' ? proOrg : absent)), set: vi.fn() }
   runTransaction.mockImplementation((_, work) => work(tx))
   serverTimestamp.mockReturnValue('server-time')
   upload = vi.fn(async ({ matchId, orgId }) => matchPath(matchId, orgId))
@@ -26,7 +29,7 @@ beforeEach(() => {
 
 const make = options => createFirestoreAnalysisService({ db, orgId: 'org-a', actorId: 'coach-a', uploadVideo: upload, maxBytes: 100, ...options })
 const matchWrites = () => tx.set.mock.calls.filter(([ref]) => ref.kind === 'match')
-const usageWrites = () => tx.set.mock.calls.filter(([ref]) => ref.kind === 'orgs')
+const usageWrites = () => tx.set.mock.calls.filter(([ref]) => ref.kind === 'usage')
 
 describe('Cola Firestore (SDK y transferencias simulados)', () => {
   it('exige capacidad explícita del adaptador antes de aceptar YouTube y no guarda su URL', async () => {
@@ -93,10 +96,34 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
   })
 
   it('suma el partido nuevo al contador del mes en la misma transacción (PCIT-41)', async () => {
-    tx.get.mockImplementation(ref => Promise.resolve(ref.kind === 'orgs' ? { exists: () => true, data: () => ({ analyses: 4, lastMatchId: 'previo' }) } : absent))
+    tx.get.mockImplementation(ref => Promise.resolve(ref.kind === 'usage' ? found({ analyses: 4, lastMatchId: 'previo' }) : ref.kind === 'orgs' ? proOrg : absent))
     await make().enqueue(input, { requestId: 'r-uso' })
     expect(doc).toHaveBeenCalledWith(db, 'orgs', 'org-a', 'usage', expect.stringMatching(/^\d{4}-\d{2}$/))
-    expect(usageWrites()).toEqual([[{ kind: 'orgs', id: 'org-a' }, { analyses: 5, lastMatchId: 'r-uso', updatedAt: 'server-time' }]])
+    expect(usageWrites()).toEqual([[expect.objectContaining({ kind: 'usage' }), { analyses: 5, lastMatchId: 'r-uso', updatedAt: 'server-time' }]])
+  })
+
+  it('con el límite del plan alcanzado no sube el video ni crea el partido', async () => {
+    getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'prueba' }) : ref.kind === 'usage' ? found({ analyses: 15 }) : absent))
+    await expect(make().enqueue(input, { requestId: 'r-tope' })).rejects.toMatchObject({ code: 'analysis/limit', used: 15, limit: 15 })
+    expect(upload).not.toHaveBeenCalled()
+    expect(runTransaction).not.toHaveBeenCalled()
+  })
+
+  it('sin plan no se analiza; Ultra no tiene tope', async () => {
+    getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'free' }) : absent))
+    await expect(make().enqueue(input, { requestId: 'r-free' })).rejects.toMatchObject({ code: 'analysis/limit', limit: 0 })
+    const ultra = ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'ultra' }) : ref.kind === 'usage' ? found({ analyses: 900 }) : absent)
+    getDoc.mockImplementation(ultra)
+    tx.get.mockImplementation(ultra)
+    await make().enqueue(input, { requestId: 'r-ultra' })
+    expect(usageWrites()[0][1]).toMatchObject({ analyses: 901 })
+  })
+
+  it('si otro entrenador agotó el límite durante la subida, la transacción no crea el partido', async () => {
+    tx.get.mockImplementation(ref => Promise.resolve(ref.kind === 'usage' ? found({ analyses: 150 }) : ref.kind === 'orgs' ? proOrg : absent))
+    await expect(make().enqueue(input, { requestId: 'r-carrera' })).rejects.toMatchObject({ code: 'analysis/limit' })
+    expect(upload).toHaveBeenCalledOnce()
+    expect(tx.set).not.toHaveBeenCalled()
   })
 
   it('un partido que ya existe no vuelve a contar', async () => {

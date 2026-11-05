@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onSnapshot, where } from 'firebase/firestore'
+import { MemoryRouter } from 'react-router'
 import Analizar from './Analizar.jsx'
+import { PlanVistaContexto } from '../context/PlanVistaContext.js'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
 import { createDemoAnalysisService } from '../previews/demoAnalysisService.js'
 
@@ -150,5 +152,39 @@ describe('Analizar video v1', () => {
     await waitFor(() => expect(screen.queryByRole('form', { name: 'Registrar jugador' })).toBeNull())
     expect(screen.getByLabelText('Rival *').value).toBe('Rival guardado')
     expect(screen.getByRole('option', { name: 'Nuevo jugador de ejemplo' }).selected).toBe(true)
+  })
+})
+
+describe('Límite de análisis del plan (PCIT-41)', () => {
+  const live = uso => {
+    onSnapshot.mockImplementation((_, receive) => { receive({ docs: [] }); return vi.fn() })
+    const db = { app: { options: { projectId: 'prueba' } } }
+    return render(
+      <MemoryRouter>
+        <PlanVistaContexto value={{ plan: 'basico', uso }}>
+          <Analizar db={db} session={{ uid: 'coach-1', orgId: 'equipo-1' }} uploadVideo={vi.fn()} maxBytes={1024} />
+        </PlanVistaContexto>
+      </MemoryRouter>,
+    )
+  }
+
+  it('al llegar al límite avisa y desactiva el formulario', async () => {
+    live({ usados: 15, limite: 15 })
+    const alerta = await screen.findByRole('alert')
+    expect(alerta.textContent).toContain('Llegaste al límite de tu plan')
+    expect(alerta.textContent).toContain('15 de 15 análisis')
+    expect(within(alerta).getByRole('link', { name: 'Ver mi plan' }).getAttribute('href')).toBe('/configuracion')
+    expect(screen.getByLabelText('Rival *').closest('fieldset').disabled).toBe(true)
+  })
+
+  it('con análisis disponibles, o sin tope, no muestra el aviso', async () => {
+    live({ usados: 14, limite: 15 })
+    expect(await screen.findByText('El próximo análisis empieza aquí')).toBeTruthy()
+    expect(screen.queryByText('Llegaste al límite de tu plan')).toBeNull()
+    expect(screen.getByLabelText('Rival *').closest('fieldset').disabled).toBe(false)
+    cleanup()
+    live({ usados: 900, limite: null })
+    expect(await screen.findByText('El próximo análisis empieza aquí')).toBeTruthy()
+    expect(screen.queryByText('Llegaste al límite de tu plan')).toBeNull()
   })
 })

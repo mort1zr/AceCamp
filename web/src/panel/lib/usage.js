@@ -4,6 +4,23 @@
 
 import { doc } from 'firebase/firestore'
 import { COLLECTIONS, ORG_USAGE } from './schema.js'
+import { PLANES } from './services/firestoreConfiguracionService.js'
+
+/** Error que usa la web cuando el plan ya no permite más análisis este mes. */
+export const LIMIT_ERROR_CODE = 'analysis/limit'
+
+/** Análisis por mes del plan de la organización; null = sin tope. Igual que withinPlan en las reglas. */
+export function planLimit(plan) {
+  return (PLANES[plan] ?? PLANES.free).limite
+}
+
+export function quotaReached(used, limit) {
+  return limit != null && (used ?? 0) >= limit
+}
+
+export function limitError(used, limit) {
+  return Object.assign(new Error('Plan limit reached'), { code: LIMIT_ERROR_CODE, used, limit })
+}
 
 /** Mes del contador, en UTC como request.time en las reglas: '2026-11'. */
 export function usagePeriod(date = new Date()) {

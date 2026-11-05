@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { nextUsage, usagePeriod } from './usage.js'
+import { nextUsage, planLimit, quotaReached, usagePeriod } from './usage.js'
+import { analysisErrorMessage } from './analysis.js'
+
+describe('límite del plan', () => {
+  it('usa los mismos valores que las reglas', () => {
+    expect([planLimit('free'), planLimit('prueba'), planLimit('basico'), planLimit('pro'), planLimit('ultra')]).toEqual([0, 15, 30, 150, null])
+    expect(planLimit('inventado')).toBe(0)
+    expect(planLimit(undefined)).toBe(0)
+  })
+
+  it('se alcanza al llegar al tope; Ultra nunca', () => {
+    expect(quotaReached(14, 15)).toBe(false)
+    expect(quotaReached(15, 15)).toBe(true)
+    expect(quotaReached(null, 0)).toBe(true)
+    expect(quotaReached(5000, null)).toBe(false)
+  })
+
+  it('explica el límite con un mensaje para el usuario', () => {
+    expect(analysisErrorMessage({ code: 'analysis/limit', limit: 30 })).toContain('los 30 análisis de su plan este mes')
+    expect(analysisErrorMessage({ code: 'analysis/limit', limit: 0 })).toContain('Elige un plan en Configuración')
+  })
+})
 
 describe('usagePeriod', () => {
   it('usa el mes en UTC, como las reglas', () => {

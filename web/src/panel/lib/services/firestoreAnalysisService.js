@@ -1,12 +1,19 @@
 import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { analysisSignature, hashAnalysisSignature, normalizedMatch, throwIfAborted, validateAnalysis } from '../analysis.js'
-import { nextUsage, usageRef } from '../usage.js'
+import { limitError, nextUsage, planLimit, quotaReached, usageRef } from '../usage.js'
 import { isStorageVideoPath } from '../videoImportProtocol.js'
+
+function checkQuota(org, counter) {
+  const limit = planLimit(org.exists() ? org.data().plan : null)
+  const used = counter.exists() ? counter.data().analyses : 0
+  if (quotaReached(used, limit)) throw limitError(used, limit)
+}
 
 /** Adapters uploadVideo/importVideo return a Storage path, not a public URL. */
 export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coach', uploadVideo, importVideo, maxBytes }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof uploadVideo !== 'function' || !Number.isFinite(maxBytes) || maxBytes <= 0) throw new Error('Analysis requires database, identity, uploadVideo and maxBytes.')
   const matches = collection(db, 'matches')
+  const organization = doc(db, 'orgs', orgId)
   if (!['admin', 'coach'].includes(role)) throw new Error('Invalid analysis role.')
   const uploaded = new Map()
   const pending = new Map()
@@ -29,6 +36,9 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coa
     }
     const player = await getDoc(doc(db, 'players', input.playerId))
     if (!player.exists() || player.data().deletedAt != null || player.data().orgId !== orgId || (role !== 'admin' && player.data().createdBy !== actorId)) throw Object.assign(new Error('Player not available'), { code: 'analysis/player' })
+    // Antes de transferir el video: si el plan ya no tiene análisis este mes, no se sube nada (PCIT-41).
+    const [org, counter] = await Promise.all([getDoc(organization), getDoc(usageRef(db, orgId))])
+    checkQuota(org, counter)
     throwIfAborted(signal)
 
     let video = uploaded.get(requestId)
@@ -60,7 +70,9 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coa
         return data
       }
       // El partido y el contador del mes se escriben juntos (PCIT-41).
+      // Se vuelve a revisar el límite por si otro entrenador analizó mientras se subía el video.
       const counter = await transaction.get(usage)
+      checkQuota(await transaction.get(organization), counter)
       transaction.set(reference, match)
       transaction.set(usage, nextUsage(counter.exists() ? counter.data() : null, reference.id, serverTimestamp()))
       return match
