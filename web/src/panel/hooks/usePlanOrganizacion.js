@@ -9,19 +9,19 @@ function milisegundos(valor) {
   return Number.isNaN(fecha) ? 0 : fecha
 }
 
-export function usePlanOrganizacion(db, orgId) {
+export function usePlanOrganizacion(db, orgId, actorId, role = 'coach') {
   const [plan, setPlan] = useState(null)
   const [usados, setUsados] = useState(null)
 
   useEffect(() => {
-    if (!db || !orgId) return undefined
+    if (!db || !orgId || !actorId) return undefined
     const detenerPlan = onSnapshot(
       doc(db, 'orgs', orgId),
       (instantanea) => setPlan(PLANES[instantanea.data()?.plan] ?? PLANES.free),
       () => setPlan(null),
     )
     const detenerUso = onSnapshot(
-      query(collection(db, 'matches'), where('orgId', '==', orgId)),
+      query(collection(db, 'matches'), where('orgId', '==', orgId), ...(role !== 'admin' ? [where('createdBy', '==', actorId)] : [])),
       (instantanea) => {
         const ahora = new Date()
         const desde = new Date(ahora.getFullYear(), ahora.getMonth(), 1).getTime()
@@ -36,7 +36,7 @@ export function usePlanOrganizacion(db, orgId) {
       detenerPlan()
       detenerUso()
     }
-  }, [db, orgId])
+  }, [db, orgId, actorId, role])
 
   return { plan, usados }
 }

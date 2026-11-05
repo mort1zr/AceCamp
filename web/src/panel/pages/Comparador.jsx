@@ -233,7 +233,7 @@ export default function Comparador({ db, session }) {
   const services = useMemo(() => {
     if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()
       || !['coach', 'admin'].includes(role)) return null
-    const identity = { db, orgId, actorId: uid, onlyOwned: role === 'coach' }
+    const identity = { db, orgId, actorId: uid, role, onlyOwned: role === 'coach' }
     return {
       playersService: createFirestorePlayersService(identity),
       overviewService: createFirestoreDashboardService(identity),

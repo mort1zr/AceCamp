@@ -8,12 +8,26 @@ Si cambias un campo, actualiza los dos archivos y avisa en Jira.
 
 ## Qué permiten las reglas (PCIT-23)
 
+PCIT-39 añade el alcance por rol: en `players` y `matches`, un `admin` puede
+consultar y gestionar los documentos de su organización; un `coach`, solo los
+que tengan `createdBy` igual a su UID. Las consultas del entrenador incluyen
+`where('createdBy', '==', uid)` además de `orgId`. Firestore aplica esta regla
+también a lecturas directas, actualizaciones y borrados. La cola solo admite
+jugadores propios del entrenador, o de la organización para administradores.
+Los roles se leen del perfil de servidor y la web no puede modificar `role`.
+
+Las referencias de videos originales y procesados respetan el mismo propietario
+del partido en Storage. Antes de crear el partido, el video original solo se
+lee por quien lo subió o por un administrador de la organización. El resultado
+procesado sigue siendo de escritura exclusiva del worker. Ver
+`docs/PCIT-39-permisos-por-rol.md`.
+
 | Colección | Leer | Crear | Modificar | Borrar |
 | --- | --- | --- | --- | --- |
 | `users` | La propia y las de su organización | Solo la propia, en el registro, con rol `coach` y en una organización que crea él mismo | Solo nombre y cargo | No |
 | `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó | No |
-| `players` | De su organización | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Datos del jugador; nunca `orgId`, `createdBy` ni `consent` | De su organización |
-| `matches` | De su organización | En `'en cola'`, sin estadísticas, con un jugador de su organización y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola` (Reintentar) | De su organización, salvo si está `procesando` |
+| `players` | Admin: su organización; coach: propios | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Admin: su organización; coach: propios. Nunca `orgId`, `createdBy` ni `consent` | Admin: su organización; coach: propios |
+| `matches` | Admin: su organización; coach: propios | En `'en cola'`, sin estadísticas, con un jugador accesible por rol y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola`, dentro del alcance por rol | Dentro del alcance por rol, salvo si está `procesando` |
 | `matches/{matchId}/coachNotes/{uid}` | Nota propia por ID, en un partido Listo accesible | Nota propia con texto y fecha de servidor | Solo su propia nota | Solo su propia nota |
 | `applications` | De su organización | Por ahora solo con sesión (el formulario público llega en PCIT-54) | Estado y notas | De su organización |
 

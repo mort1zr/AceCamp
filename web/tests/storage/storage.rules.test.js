@@ -25,7 +25,7 @@ beforeAll(async () => {
   env = await initializeTestEnvironment({
     projectId: process.env.ACECAM_RULES_PROJECT || 'demo-acecam',
     firestore: { rules: read('../../../firebase/firestore.rules'), host: '127.0.0.1', port: Number(process.env.FIRESTORE_EMULATOR_HOST?.split(':').at(-1) || 8080) },
-    storage: { rules: read('../../../firebase/storage.rules'), host: '127.0.0.1', port: 9199 },
+    storage: { rules: read('../../../firebase/storage.rules'), host: '127.0.0.1', port: Number(process.env.STORAGE_EMULATOR_HOST?.split(':').at(-1) || 9199) },
   })
 })
 
@@ -49,7 +49,10 @@ const coachStorage = () => env.authenticatedContext(COACH, { email: 'coach@aceca
 describe('reglas de Storage', () => {
   it('el resultado del worker es privado por organización y no se puede falsificar ni borrar desde la web', async () => {
     const output = path(ORG, 'processed.mp4')
-    await env.withSecurityRulesDisabled(context => uploadBytes(ref(context.storage(), output), bytes(), { contentType: 'video/mp4' }))
+    await env.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'matches', 'm-nuevo'), { orgId: ORG, createdBy: COACH })
+      await uploadBytes(ref(context.storage(), output), bytes(), { contentType: 'video/mp4' })
+    })
     await assertSucceeds(getBytes(ref(coachStorage(), output)))
     await assertFails(getBytes(ref(env.unauthenticatedContext().storage(), output)))
     await assertFails(getBytes(ref(env.authenticatedContext(OTHER_COACH).storage(), output)))

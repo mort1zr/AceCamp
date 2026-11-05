@@ -921,11 +921,12 @@ function Contenido({ seccion, t, datos, service, bloqueado, locale, esOrganizaci
 export default function Configuracion({ service: inyectado, db, auth, session }) {
   const uid = session?.uid
   const orgId = session?.orgId
+  const role = session?.role ?? 'coach'
   const service = useMemo(() => {
     if (inyectado) return inyectado
-    if (!db || !auth || !uid || !orgId) return undefined
-    return createFirestoreConfiguracionService({ db, auth, uid, orgId })
-  }, [inyectado, db, auth, uid, orgId])
+    if (!db || !auth || !uid || !orgId || !['coach', 'admin'].includes(role)) return undefined
+    return createFirestoreConfiguracionService({ db, auth, uid, orgId, role })
+  }, [inyectado, db, auth, uid, orgId, role])
   const { idioma } = useIdioma()
   const t = textos[idioma]
   const [parametros, setParametros] = useSearchParams()

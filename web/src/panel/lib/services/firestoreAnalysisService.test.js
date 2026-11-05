@@ -16,7 +16,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   collection.mockReturnValue({ kind: 'collection' })
   doc.mockImplementation((first, second, third) => first === db ? { kind: second, id: third } : { kind: 'match', id: second ?? 'generated-id' })
-  getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? { exists: () => true, data: () => ({ orgId: 'org-a' }) } : absent))
+  getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? { exists: () => true, data: () => ({ orgId: 'org-a', createdBy: 'coach-a' }) } : absent))
   tx = { get: vi.fn().mockResolvedValue(absent), set: vi.fn() }
   runTransaction.mockImplementation((_, work) => work(tx))
   serverTimestamp.mockReturnValue('server-time')

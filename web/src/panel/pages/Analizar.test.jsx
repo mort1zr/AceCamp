@@ -38,7 +38,7 @@ describe('Analizar video v1', () => {
     expect(onSnapshot).not.toHaveBeenCalled()
     rerender(<Analizar db={db} session={session} uploadVideo={uploadVideo} maxBytes={1024} />)
     expect(await screen.findByText('El próximo análisis empieza aquí')).toBeTruthy()
-    expect(where.mock.calls).toEqual([['orgId', '==', 'equipo-1'], ['orgId', '==', 'equipo-1']])
+    expect(where.mock.calls).toEqual([['orgId', '==', 'equipo-1'], ['createdBy', '==', 'coach-1'], ['orgId', '==', 'equipo-1'], ['createdBy', '==', 'coach-1']])
     expect(screen.queryByText('Modo demostración')).toBeNull()
     rerender(<Analizar db={db} uploadVideo={uploadVideo} maxBytes={1024} />)
     expect(stop).toHaveBeenCalledTimes(2)

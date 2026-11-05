@@ -43,6 +43,7 @@ export function createFirestoreConfiguracionService({
   auth,
   uid,
   orgId,
+  role = 'coach',
   ahora = () => new Date(),
 }) {
   if (!db || !auth || !uid || !orgId) {
@@ -116,7 +117,8 @@ export function createFirestoreConfiguracionService({
           onError,
         )
 
-      const porOrganizacion = (nombre) => query(collection(db, nombre), where('orgId', '==', orgId))
+      const porOrganizacion = nombre => query(collection(db, nombre), where('orgId', '==', orgId),
+        ...(['players', 'matches'].includes(nombre) && role !== 'admin' ? [where('createdBy', '==', uid)] : []))
 
       const detener = [
         escuchar(usuario, 'usuario'),

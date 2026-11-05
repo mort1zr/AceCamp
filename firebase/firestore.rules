@@ -10,7 +10,7 @@ rules_version = '2';
 // - orgId, createdBy y el consentimiento salen de la sesión y no se pueden cambiar.
 // - El worker del modelo (PCIT-35) usa el Admin SDK, que no pasa por estas reglas:
 //   por eso la web no puede escribir statistics ni los estados procesando/listo.
-// - Los permisos por rol (administrador / entrenador) llegan en PCIT-39.
+// - PCIT-39: admin ve su organización; coach solo sus jugadores y partidos.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,7 +31,16 @@ service cloud.firestore {
     }
 
     function inOrg(orgId) {
-      return signedIn() && orgId is string && myOrgId() == orgId;
+      return signedIn() && orgId is string && myOrgId() == orgId
+        && get(userPath(request.auth.uid)).data.role in ['admin', 'coach'];
+    }
+
+    function isAdmin() {
+      return signedIn() && get(userPath(request.auth.uid)).data.role == 'admin';
+    }
+
+    function canManage(data) {
+      return inOrg(data.orgId) && (isAdmin() || data.createdBy == request.auth.uid);
     }
 
     function isText(value, min, max) {
@@ -148,8 +157,8 @@ service cloud.firestore {
 
     match /players/{playerId} {
       // get de un documento inexistente se permite: no revela nada y lo usa el alta de partidos.
-      allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
-      allow list: if inOrg(resource.data.orgId);
+      allow get: if signedIn() && (resource == null || canManage(resource.data));
+      allow list: if canManage(resource.data);
 
       allow create: if inOrg(request.resource.data.orgId)
         && request.resource.data.keys().hasAll(['orgId', 'fullName', 'birthDate', 'consent', 'createdBy', 'createdAt'])
@@ -162,22 +171,22 @@ service cloud.firestore {
         && validConsent(request.resource.data.consent, request.auth.uid)
         && validPlayer(request.resource.data);
 
-      allow update: if inOrg(resource.data.orgId)
+      allow update: if canManage(resource.data)
         && unchanged(['orgId', 'createdBy', 'createdAt', 'consent'])
         && onlyChanges([
              'fullName', 'birthDate', 'academy', 'category', 'dominantHand', 'backhand', 'utr',
              'nationalRanking', 'nationality', 'graduationYear', 'coachName', 'guardian', 'updatedAt'])
         && validPlayer(request.resource.data);
 
-      allow delete: if inOrg(resource.data.orgId);
+      allow delete: if canManage(resource.data);
     }
 
     // ---------- matches/{matchId} ----------
     // La web crea el partido 'en cola'; el worker (Admin SDK) lo procesa.
 
     match /matches/{matchId} {
-      allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
-      allow list: if inOrg(resource.data.orgId);
+      allow get: if signedIn() && (resource == null || canManage(resource.data));
+      allow list: if canManage(resource.data);
 
       allow create: if inOrg(request.resource.data.orgId)
         && request.resource.data.keys().hasAll([
@@ -199,6 +208,7 @@ service cloud.firestore {
         // El jugador tiene que ser de la misma organización.
         && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.orgId
              == request.resource.data.orgId
+        && (isAdmin() || get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.createdBy == request.auth.uid)
         && request.resource.data.playerPosition in ['arriba', 'abajo']
         && isText(request.resource.data.opponent, 2, 120)
         && isIsoDate(request.resource.data.matchDate)
@@ -211,7 +221,7 @@ service cloud.firestore {
              '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$');
 
       // La web puede corregir los datos del partido…
-      allow update: if inOrg(resource.data.orgId)
+      allow update: if canManage(resource.data)
         && onlyChanges(['opponent', 'tournament', 'result', 'surface', 'matchDate', 'updatedAt'])
         && isText(request.resource.data.opponent, 2, 120)
         && isIsoDate(request.resource.data.matchDate)
@@ -220,7 +230,7 @@ service cloud.firestore {
         && optionalIn(request.resource.data, 'surface', ['arcilla', 'dura', 'césped', 'otra']);
 
       // …o reintentar un partido con error (botón Reintentar).
-      allow update: if inOrg(resource.data.orgId)
+      allow update: if canManage(resource.data)
         && resource.data.status == 'error'
         && request.resource.data.status == 'en cola'
         && request.resource.data.get('errorMessage', null) == null
@@ -228,7 +238,7 @@ service cloud.firestore {
         && onlyChanges(['status', 'errorMessage', 'startedAt', 'finishedAt', 'updatedAt']);
 
       // No se borra un partido mientras el worker lo procesa.
-      allow delete: if inOrg(resource.data.orgId) && resource.data.status != 'procesando';
+      allow delete: if canManage(resource.data) && resource.data.status != 'procesando';
 
       match /coachNotes/{authorId} {
         function canUseOwnNote() {

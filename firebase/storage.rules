@@ -27,11 +27,21 @@ service firebase.storage {
         && request.resource.metadata.uploadedBy == request.auth.uid;
     }
 
+    function canAccess(orgId, matchId, beforeCreate) {
+      let user = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+      let path = /databases/(default)/documents/matches/$(matchId);
+      return inOrg(orgId) && user.role in ['admin', 'coach']
+        && (user.role == 'admin' || (firestore.exists(path)
+          ? firestore.get(path).data.orgId == orgId && firestore.get(path).data.createdBy == request.auth.uid
+          : beforeCreate));
+    }
+
     match /orgs/{orgId}/matches/{matchId}/{fileName} {
-      allow read: if inOrg(orgId);
+      allow read: if request.auth != null && canAccess(orgId, matchId, resource.metadata.get('uploadedBy', '') == request.auth.uid);
       // Se permite reemplazar el archivo para reintentar una subida.
-      allow create, update: if inOrg(orgId) && validVideo(fileName);
-      allow delete: if inOrg(orgId) && fileName != 'processed.mp4';
+      allow create, update: if request.auth != null && canAccess(orgId, matchId, true) && validVideo(fileName);
+      allow delete: if request.auth != null && fileName != 'processed.mp4'
+        && canAccess(orgId, matchId, resource.metadata.get('uploadedBy', '') == request.auth.uid);
     }
 
     // Todo lo demás queda cerrado.

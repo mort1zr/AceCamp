@@ -468,23 +468,24 @@ export default function Dashboard({
 }) {
   const uid = session?.uid
   const orgId = session?.orgId
+  const role = session?.role ?? 'coach'
   const hasInjectedServices = playersService != null || overviewService != null
   const liveServices = useMemo(() => {
     if (
       hasInjectedServices ||
-      !db ||
+      !db || !['coach', 'admin'].includes(role) ||
       typeof uid !== 'string' ||
       !uid.trim() ||
       typeof orgId !== 'string' ||
       !orgId.trim()
     )
       return null
-    const identity = { db, orgId, actorId: uid }
+    const identity = { db, orgId, actorId: uid, role }
     return {
       players: createFirestorePlayersService(identity),
       overview: createFirestoreDashboardService(identity),
     }
-  }, [hasInjectedServices, db, uid, orgId])
+  }, [hasInjectedServices, db, uid, orgId, role])
   const players = playersService ?? liveServices?.players
   const overview = overviewService ?? liveServices?.overview
   const mixedScopes =

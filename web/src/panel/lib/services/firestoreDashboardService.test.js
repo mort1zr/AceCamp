@@ -12,7 +12,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   doc.mockReturnValue('player-ref')
   collection.mockReturnValue('matches-ref')
-  getDoc.mockResolvedValue({ exists: () => true, data: () => ({ orgId: 'org-a' }) })
+  getDoc.mockResolvedValue({ exists: () => true, data: () => ({ orgId: 'org-a', createdBy: 'coach-a' }) })
   where.mockImplementation((field, op, value) => ({ field, op, value }))
   query.mockReturnValue('query-ref')
   stop = vi.fn()
@@ -20,7 +20,7 @@ beforeEach(() => {
 })
 
 function snapshot(id = 'actual-id', overrides = {}) {
-  return { docs: [{ id, data: () => ({ id: 'forged-id', orgId: 'org-a', playerId: 'p1', status: 'listo', statistics: { schemaVersion: DASHBOARD_STATISTICS_SCHEMA, playerId: 'p1', doubleFaults: 0 }, ...overrides }) }] }
+  return { docs: [{ id, data: () => ({ id: 'forged-id', orgId: 'org-a', createdBy: 'coach-a', playerId: 'p1', status: 'listo', statistics: { schemaVersion: DASHBOARD_STATISTICS_SCHEMA, playerId: 'p1', doubleFaults: 0 }, ...overrides }) }] }
 }
 
 describe('Consulta Dashboard (SDK simulado)', () => {
@@ -38,7 +38,7 @@ describe('Consulta Dashboard (SDK simulado)', () => {
     const unsubscribe = make().subscribePlayer('p1', receive, fail)
     await vi.waitFor(() => expect(onSnapshot).toHaveBeenCalledTimes(1))
     expect(doc).toHaveBeenCalledWith(db, 'players', 'p1')
-    expect(where.mock.calls).toEqual([['orgId', '==', 'org-a'], ['playerId', '==', 'p1']])
+    expect(where.mock.calls).toEqual([['orgId', '==', 'org-a'], ['playerId', '==', 'p1'], ['createdBy', '==', 'coach-a']])
     onSnapshot.mock.calls[0][1](snapshot())
     expect(receive.mock.calls[0][0].metrics).toMatchObject({ analyzedMatches: 1, doubleFaults: 0 })
     expect(fail).not.toHaveBeenCalled()

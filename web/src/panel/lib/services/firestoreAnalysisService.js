@@ -3,9 +3,10 @@ import { analysisSignature, hashAnalysisSignature, normalizedMatch, throwIfAbort
 import { isStorageVideoPath } from '../videoImportProtocol.js'
 
 /** Adapters uploadVideo/importVideo return a Storage path, not a public URL. */
-export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo, importVideo, maxBytes }) {
+export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coach', uploadVideo, importVideo, maxBytes }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof uploadVideo !== 'function' || !Number.isFinite(maxBytes) || maxBytes <= 0) throw new Error('Analysis requires database, identity, uploadVideo and maxBytes.')
   const matches = collection(db, 'matches')
+  if (!['admin', 'coach'].includes(role)) throw new Error('Invalid analysis role.')
   const uploaded = new Map()
   const pending = new Map()
   const capabilities = { maxBytes, supportsLinks: typeof importVideo === 'function', supportsYouTube: typeof importVideo === 'function' && importVideo.supportsYouTube === true }
@@ -26,7 +27,7 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
       return { ...data, id: reference.id }
     }
     const player = await getDoc(doc(db, 'players', input.playerId))
-    if (!player.exists() || player.data().orgId !== orgId) throw Object.assign(new Error('Player not available'), { code: 'analysis/player' })
+    if (!player.exists() || player.data().orgId !== orgId || (role !== 'admin' && player.data().createdBy !== actorId)) throw Object.assign(new Error('Player not available'), { code: 'analysis/player' })
     throwIfAborted(signal)
 
     let video = uploaded.get(requestId)
@@ -69,8 +70,10 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
     ...capabilities,
     createRequestId: () => doc(matches).id,
     subscribe(onMatches, onError) {
-      return onSnapshot(query(matches, where('orgId', '==', orgId)), snapshot => {
-        onMatches(snapshot.docs.map(item => ({ ...item.data(), id: item.id })).sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)))
+      const filters = [where('orgId', '==', orgId)]
+      if (role !== 'admin') filters.push(where('createdBy', '==', actorId))
+      return onSnapshot(query(matches, ...filters), snapshot => {
+        onMatches(snapshot.docs.map(item => ({ ...item.data(), id: item.id })).filter(row => row.orgId === orgId && (role === 'admin' || row.createdBy === actorId)).sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)))
       }, onError)
     },
     enqueue(input, options) {

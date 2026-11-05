@@ -183,11 +183,12 @@ export default function Analizar({
 }) {
   const uid = session?.uid
   const orgId = session?.orgId
+  const role = session?.role ?? 'coach'
   const hasInjectedServices = service != null || playersService != null
   const liveServices = useMemo(() => {
     if (
       hasInjectedServices ||
-      !db ||
+      !db || !['coach', 'admin'].includes(role) ||
       typeof uid !== 'string' ||
       !uid.trim() ||
       typeof orgId !== 'string' ||
@@ -198,12 +199,12 @@ export default function Analizar({
     )
       return null
 
-    const identity = { db, orgId, actorId: uid }
+    const identity = { db, orgId, actorId: uid, role }
     return {
       analysis: createFirestoreAnalysisService({ ...identity, uploadVideo, importVideo, maxBytes }),
       players: createFirestorePlayersService(identity),
     }
-  }, [hasInjectedServices, db, uid, orgId, uploadVideo, importVideo, maxBytes])
+  }, [hasInjectedServices, db, uid, orgId, role, uploadVideo, importVideo, maxBytes])
 
   const analysis = service ?? liveServices?.analysis
   const players = playersService ?? liveServices?.players

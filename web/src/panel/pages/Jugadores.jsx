@@ -133,9 +133,9 @@ export default function Jugadores({ service, db, session }) {
   // The authentication provider supplies uid and orgId together from the same verified session.
   const uid = session?.uid
   const orgId = session?.orgId
-  const role = session?.role
+  const role = session?.role ?? 'coach'
   const liveService = useMemo(() => {
-    if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()) {
+    if (!db || !['coach', 'admin'].includes(role) || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()) {
       return null
     }
     return createFirestorePlayersService({ db, actorId: uid, orgId, role })

@@ -32,9 +32,11 @@ function summarizeDashboard(rows, context) {
 
 /** No Firebase initialization and no guessed statistics path or player mapping. */
 export function createFirestoreDashboardService({
-  db, orgId, actorId, onlyOwned = false, decodeStatistics = decodeWorkerDashboardStatistics, summarizePlayer = summarizeDashboard,
+  db, orgId, actorId, role = 'coach', onlyOwned = false, decodeStatistics = decodeWorkerDashboardStatistics, summarizePlayer = summarizeDashboard,
 }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof decodeStatistics !== 'function') throw new TypeError('Dashboard requires database, organization, user and an agreed statistics decoder.')
+  if (!['admin', 'coach'].includes(role)) throw new TypeError('Invalid dashboard role.')
+  const restrictOwner = role !== 'admin' || onlyOwned
 
   return {
     scopeKey: `firestore:${db.app?.options?.projectId ?? ''}:${orgId}:${actorId}`,
@@ -56,18 +58,18 @@ export function createFirestoreDashboardService({
           const player = await getDoc(doc(db, 'players', playerId))
           if (!active) return
           const data = player.exists() ? player.data() : null
-          if (data?.orgId !== orgId || (onlyOwned && data.createdBy !== actorId)) {
+          if (data?.orgId !== orgId || (restrictOwner && data.createdBy !== actorId)) {
             fail(Object.assign(new Error('Player not available to this organization.'), { code: 'permission-denied' }))
             return
           }
           const filters = [where('orgId', '==', orgId), where('playerId', '==', playerId)]
-          if (onlyOwned) filters.push(where('createdBy', '==', actorId))
+          if (restrictOwner) filters.push(where('createdBy', '==', actorId))
           const matches = query(collection(db, 'matches'), ...filters)
           unsubscribe = onSnapshot(matches, snapshot => {
             if (!active) return
             try {
               const rows = snapshot.docs.map(item => ({ ...item.data(), id: item.id }))
-                .filter(match => !onlyOwned || match.createdBy === actorId)
+                .filter(match => !restrictOwner || match.createdBy === actorId)
               const decoded = new Map()
               const context = { orgId, playerId, decodeStatistics: (match, identity) => {
                 if (!decoded.has(match)) decoded.set(match, decodeStatistics(match, identity))

@@ -20,13 +20,13 @@ it('completa siete KPIs y gráficos de saque/peloteos con el mismo periodo y lim
   vi.setSystemTime(new Date(2026, 10, 5, 12))
   const orgId = 'org-a'
   const playerId = 'p1'
-  const player = { orgId, fullName: 'Jugador de gráficos' }
+  const player = { orgId, fullName: 'Jugador de gráficos', createdBy: 'coach' }
   const stats = () => ({ schemaVersion: 'acecam.match-stats.v1', player: {
     shots: { count: 1, sumSpeedKmh: 50 },
     serve: { sampleCount: 2, sumSpeedKmh: 200, firstServeAttempts: 4, firstServeIn: 3, doubleFaults: 0 },
     movement: { distanceMeters: 10, maxSpeedKmh: 12 },
   }, rallies: { count: 2, sumShots: 10, longestShots: 7, short: 1, medium: 1, long: 0 } })
-  const rows = ['2026-09-10', '2026-11-01', '2026-11-02'].map((matchDate, i) => ({ id: `advanced-${i}`, data: () => ({ orgId, playerId, status: 'listo', matchDate, statistics: stats() }) }))
+  const rows = ['2026-09-10', '2026-11-01', '2026-11-02'].map((matchDate, i) => ({ id: `advanced-${i}`, data: () => ({ orgId, playerId, createdBy: 'coach', status: 'listo', matchDate, statistics: stats() }) }))
   collection.mockImplementation((_, name) => name)
   query.mockImplementation(name => name)
   getDoc.mockResolvedValue({ exists: () => true, data: () => player })
@@ -69,9 +69,9 @@ it('muestra en la ruta autenticada la salida de PCIT-35 sin inventar datos de sa
   const orgId = 'org-a'
   const playerId = 'p1'
   const records = {
-    players: { orgId, fullName: 'Jugador del equipo' },
+    players: { orgId, fullName: 'Jugador del equipo', createdBy: 'coach-a' },
     matches: {
-      orgId, playerId, status: 'listo', matchDate: '2026-01-01', playerPosition: 'abajo',
+      orgId, playerId, createdBy: 'coach-a', status: 'listo', matchDate: '2026-01-01', playerPosition: 'abajo',
       statistics: {
         schemaVersion: 'acecam.match-stats.v1', durationSeconds: 4,
         player: { shots: { count: 1, sumSpeedKmh: 62.5, maxSpeedKmh: 62.5 } },
@@ -134,11 +134,11 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
   vi.setSystemTime(new Date(2026, 7, 31, 12))
   const orgId = 'org-a'
   const playerId = 'p1'
-  const player = { orgId, fullName: 'Jugador de periodos' }
+  const player = { orgId, fullName: 'Jugador de periodos', createdBy: 'coach-a' }
   const match = (matchDate, speed, overrides = {}) => ({
     id: `m-${speed}`,
     data: () => ({
-      orgId, playerId, status: 'listo', matchDate, playerPosition: 'abajo', opponent: `Rival ${speed}`,
+      orgId, playerId, createdBy: 'coach-a', status: 'listo', matchDate, playerPosition: 'abajo', opponent: `Rival ${speed}`,
       statistics: {
         schemaVersion: 'acecam.match-stats.v1', durationSeconds: 4,
         player: { shots: { count: 1, sumSpeedKmh: speed, maxSpeedKmh: speed } },

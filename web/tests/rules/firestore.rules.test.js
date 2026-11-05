@@ -37,7 +37,7 @@ let env
 
 beforeAll(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'demo-acecam',
+    projectId: process.env.ACECAM_RULES_PROJECT || 'demo-acecam',
     firestore: {
       rules: readFileSync(fileURLToPath(new URL('../../../firebase/firestore.rules', import.meta.url)), 'utf8'),
       host: '127.0.0.1',
@@ -112,8 +112,8 @@ describe('aislamiento por organización', () => {
     await assertSucceeds(getDoc(doc(db, 'players', 'p-demo')))
     await assertSucceeds(getDoc(doc(db, 'matches', 'm-ready')))
     await assertSucceeds(getDoc(doc(db, 'applications', 'a-demo')))
-    await assertSucceeds(getDocs(query(collection(db, 'players'), where('orgId', '==', ORG))))
-    await assertSucceeds(getDocs(query(collection(db, 'matches'), where('orgId', '==', ORG), where('playerId', '==', 'p-demo'))))
+    await assertSucceeds(getDocs(query(collection(db, 'players'), where('orgId', '==', ORG), where('createdBy', '==', COACH))))
+    await assertSucceeds(getDocs(query(collection(db, 'matches'), where('orgId', '==', ORG), where('playerId', '==', 'p-demo'), where('createdBy', '==', COACH))))
   })
 
   it('no lee datos de otra organización', async () => {

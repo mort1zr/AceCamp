@@ -13,6 +13,22 @@ vi.mock('firebase/firestore', () => ({
 
 afterEach(cleanup)
 
+it.each(['coach', 'admin'])('oculta perfiles no permitidos al rol %s aunque el SDK entregue filas ajenas', async role => {
+  const rows = [
+    { id: 'own', fullName: 'Jugador propio', orgId: 'org-a', createdBy: 'coach-a' },
+    { id: 'teammate', fullName: 'Jugador de colega', orgId: 'org-a', createdBy: 'coach-b' },
+    { id: 'foreign', fullName: 'Jugador de otra organización', orgId: 'org-b', createdBy: 'coach-a' },
+  ]
+  onSnapshot.mockImplementation((_, receive) => {
+    receive({ docs: rows.map(({ id, ...data }) => ({ id, data: () => data })) })
+    return () => {}
+  })
+  render(<Jugadores db={{ app: { options: { projectId: 'roles-test' } } }} session={{ uid: 'coach-a', orgId: 'org-a', role }} />)
+  expect(await screen.findByRole('button', { name: 'Ver perfil de Jugador propio' })).toBeTruthy()
+  expect(Boolean(screen.queryByRole('button', { name: 'Ver perfil de Jugador de colega' }))).toBe(role === 'admin')
+  expect(screen.queryByText('Jugador de otra organización')).toBeNull()
+})
+
 async function fillPlayer(user, name = 'Jugador de prueba') {
   await user.type(screen.getByLabelText('Nombre completo *'), name)
   await user.type(screen.getByLabelText('Fecha de nacimiento *'), '2004-03-10')
@@ -183,7 +199,7 @@ describe('Jugadores v1', () => {
   it('abre la consulta con la sesión completa y la cierra al salir', async () => {
     const unsubscribe = vi.fn()
     onSnapshot.mockImplementationOnce((_, receive) => {
-      receive({ docs: [{ id: 'p1', data: () => ({ fullName: 'Jugador del equipo' }) }] })
+      receive({ docs: [{ id: 'p1', data: () => ({ fullName: 'Jugador del equipo', orgId: 'equipo-1', createdBy: 'coach-1' }) }] })
       return unsubscribe
     })
     const db = { app: { options: { projectId: 'prueba' } } }

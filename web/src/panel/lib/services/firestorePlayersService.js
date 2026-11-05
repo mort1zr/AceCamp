@@ -2,12 +2,13 @@ import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from 'f
 import { normalizePlayer, PLAYER_CONSENT_VERSION } from '../players.js'
 
 /** db and identity come from Axel's authenticated app, never from form fields. */
-export function createFirestorePlayersService({ db, orgId, actorId, role, onlyOwned = false }) {
+export function createFirestorePlayersService({ db, orgId, actorId, role = 'coach', onlyOwned = false }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim()) {
     throw new Error('Players service requires a database, organization and authenticated user.')
   }
   const players = collection(db, 'players')
   const isAdmin = role === 'admin'
+  if (!['coach', 'admin'].includes(role)) throw new Error('Invalid player role.')
   const canViewProfile = player => player.orgId === orgId && (isAdmin || (role === 'coach' && player.createdBy === actorId))
 
   return {
@@ -16,9 +17,9 @@ export function createFirestorePlayersService({ db, orgId, actorId, role, onlyOw
     canViewProfile,
     subscribe(onPlayers, onError) {
       const filters = [where('orgId', '==', orgId)]
-      if (onlyOwned) filters.push(where('createdBy', '==', actorId))
+      if (!isAdmin || onlyOwned) filters.push(where('createdBy', '==', actorId))
       return onSnapshot(query(players, ...filters), snapshot => {
-        const rows = snapshot.docs.map(document => ({ ...document.data(), id: document.id }))
+        const rows = snapshot.docs.map(document => ({ ...document.data(), id: document.id })).filter(canViewProfile)
         onPlayers(rows.sort((a, b) => (a.fullName ?? '').localeCompare(b.fullName ?? '', 'es')))
       }, onError)
     },
