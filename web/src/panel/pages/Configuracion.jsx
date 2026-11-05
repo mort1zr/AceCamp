@@ -73,6 +73,8 @@ const textos = {
     copiarEnlace: 'Copiar enlace',
     enlaceCopiado: 'Enlace copiado',
     invitacionExiste: 'Ese correo ya tiene una invitación o no se puede invitar.',
+    yaEsMiembro: 'Esa persona ya es parte de tu equipo.',
+    yaInvitado: 'Ese correo ya tiene una invitación pendiente. Anúlala para invitarlo con otro rol.',
     anular: 'Anular',
     anularInvitacion: (correo) => `Anular la invitación a ${correo}`,
     invitacionAnulada: 'Invitación anulada.',
@@ -183,6 +185,8 @@ const textos = {
     copiarEnlace: 'Copy link',
     enlaceCopiado: 'Link copied',
     invitacionExiste: 'That email already has an invitation or cannot be invited.',
+    yaEsMiembro: 'That person is already on your team.',
+    yaInvitado: 'That email already has a pending invitation. Cancel it to invite them with another role.',
     anular: 'Cancel',
     anularInvitacion: (correo) => `Cancel the invitation to ${correo}`,
     invitacionAnulada: 'Invitation cancelled.',
@@ -588,6 +592,12 @@ function Equipo({ t, miembros, service, bloqueado, puedeInvitar = true }) {
     const invitado = correo.trim()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitado)) {
       return setEstado({ tipo: 'error', texto: t.correoInvalido })
+    }
+    // Antes de escribir: ¿ya está en el equipo o ya tiene invitación? (PCIT-40)
+    const existente = miembros.find((miembro) => miembro.email?.toLowerCase() === invitado.toLowerCase())
+    if (existente) {
+      setEnlace('')
+      return setEstado({ tipo: 'error', texto: existente.status === 'invitado' ? t.yaInvitado : t.yaEsMiembro })
     }
     setEnlace('')
     setCopiado(false)
