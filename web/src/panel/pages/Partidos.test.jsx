@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import Partidos from './Partidos.jsx'
+import { CLAVE_UNIDADES, guardarUnidades } from '../lib/unidades.js'
 
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(), onSnapshot: vi.fn(), query: vi.fn(), where: vi.fn(),
@@ -21,7 +22,10 @@ beforeEach(() => {
   collection.mockImplementation((_, name) => name)
   query.mockImplementation(name => name)
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  localStorage.removeItem(CLAVE_UNIDADES)
+})
 
 it('muestra partidos listos, filtra ambos extremos y conserva la consulta de sesión', async () => {
   const players = [record('p-a', { fullName: 'Valeria Torres' }), record('p-b', { fullName: 'Mateo Ríos' })]
@@ -89,4 +93,49 @@ it('permite reintentar y descarta resultados de una sesión anterior', async () 
   expect(screen.queryByText('Dato privado')).toBeNull()
   expect(screen.queryByText('Dato tardío')).toBeNull()
   expect(stop).toHaveBeenCalledTimes(3)
+})
+
+it('abre el reporte con el contrato del worker y mantiene los filtros al volver', async () => {
+  const player = record('p-a', { fullName: 'Valeria Torres' })
+  const fields = { playerId: 'p-a', matchDate: '2026-10-23', status: 'listo', tournament: 'Copa', result: '6-4' }
+  const matches = [
+    record('m-ready', {
+      ...fields,
+      opponent: 'Rival de prueba',
+      statistics: {
+        schemaVersion: 'acecam.match-stats.v1',
+        player: { shots: { count: 2, sumSpeedKmh: 100, maxSpeedKmh: 70 } },
+      },
+    }),
+    record('m-unknown', { ...fields, opponent: 'Rival sin medición', statistics: { schemaVersion: 'anterior' } }),
+  ]
+  onSnapshot.mockImplementation((name, receive) => {
+    receive({ docs: name === 'players' ? [player] : matches })
+    return stop
+  })
+  const user = userEvent.setup()
+  const { rerender } = render(<Partidos db={db} session={session} />)
+  await user.selectOptions(await screen.findByLabelText('Jugador'), 'p-a')
+  fireEvent.change(screen.getByLabelText('Desde'), { target: { value: '2026-10-23' } })
+  await user.click(screen.getByRole('button', { name: /Ver reporte del partido con Rival de prueba/ }))
+  const title = screen.getByRole('heading', { name: 'Valeria Torres · Rival de prueba' })
+  expect(document.activeElement).toBe(title)
+  const report = within(screen.getByRole('region', { name: title.textContent.trim() }))
+  const card = label => within(report.getByRole('heading', { name: label }).closest('article'))
+  expect(card('Golpes medidos').getByText('2')).toBeTruthy()
+  expect(card('Velocidad media de golpe').getByText('50')).toBeTruthy()
+  expect(card('Velocidad máxima de golpe').getByText('70')).toBeTruthy()
+  act(() => guardarUnidades('mph'))
+  expect(card('Velocidad máxima de golpe').getByText(/43[.,]5/)).toBeTruthy()
+  expect(report.getByText('Video procesado no disponible.')).toBeTruthy()
+  expect(report.getByText('Sin datos del desglose por set.')).toBeTruthy()
+  await user.click(report.getByRole('button', { name: 'Volver al listado' }))
+  expect(screen.getByLabelText('Jugador').value).toBe('p-a')
+  expect(screen.getByLabelText('Desde').value).toBe('2026-10-23')
+  expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Historial de partidos' }))
+  await user.click(screen.getByRole('button', { name: /Ver reporte del partido con Rival sin medición/ }))
+  expect(screen.getAllByText('Sin datos')).toHaveLength(3)
+  expect(onSnapshot).toHaveBeenCalledTimes(2)
+  rerender(<Partidos db={db} />)
+  expect(screen.queryByText(/Rival sin medición/)).toBeNull()
 })

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { DataTable, EmptyState } from '../components/ui'
+import MatchReport from '../components/analysis/MatchReport.jsx'
 import { useAnalysisQueue } from '../hooks/useAnalysisQueue.js'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { formatMatchDate } from '../lib/dashboardEvolution.js'
@@ -20,6 +21,9 @@ function MatchesList({ matchesService, playersService }) {
   const [playerId, setPlayerId] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
+  const [matchId, setMatchId] = useState('')
+  const historySection = useRef(null)
+  const reportWasOpen = useRef(false)
   const playerNames = new Map(players.rows.map(player => [player.id, player.fullName]))
   const columns = [
     { key: 'matchDate', label: 'Fecha', render: value => formatMatchDate(value) },
@@ -27,6 +31,17 @@ function MatchesList({ matchesService, playersService }) {
     { key: 'opponent', label: 'Rival', render: value => value || '—' },
     { key: 'tournament', label: 'Torneo', render: value => value || '—' },
     { key: 'result', label: 'Marcador', render: value => value || '—' },
+    {
+      key: 'report', label: 'Reporte',
+      render: (_, match) => (
+        <button
+          type="button"
+          className="players-button-secondary"
+          aria-label={`Ver reporte del partido con ${match.opponent || 'rival sin registrar'}, ${formatMatchDate(match.matchDate)}`}
+          onClick={() => setMatchId(match.id)}
+        >Ver reporte</button>
+      ),
+    },
   ]
   const loading = players.loading || matches.loading
   const error = players.error || matches.error
@@ -36,6 +51,13 @@ function MatchesList({ matchesService, playersService }) {
   const rows = matches.rows.filter(match => (!playerId || match.playerId === playerId)
     && (!(start || end) || (match.matchDate && (!start || match.matchDate >= start) && (!end || match.matchDate <= end))))
   const noMatches = filtered && matches.rows.length > 0
+  const selectedMatch = !loading && !error && matches.rows.find(match => match.id === matchId)
+  const reportOpen = Boolean(selectedMatch)
+
+  useEffect(() => {
+    if (!reportOpen && reportWasOpen.current) historySection.current?.focus()
+    reportWasOpen.current = reportOpen
+  }, [reportOpen])
 
   function clearFilters() {
     setPlayerId('')
@@ -47,6 +69,14 @@ function MatchesList({ matchesService, playersService }) {
     if (players.error) players.retry()
     if (matches.error) matches.retry()
   }
+
+  if (selectedMatch) return (
+    <MatchReport
+      match={selectedMatch}
+      playerName={playerNames.get(selectedMatch.playerId) || 'Jugador no disponible'}
+      onBack={() => setMatchId('')}
+    />
+  )
 
   return (
     <>
@@ -75,7 +105,7 @@ function MatchesList({ matchesService, playersService }) {
         </>
       )}
       {!showRangeError && (
-        <section className="mt-5" aria-label="Historial de partidos">
+        <section className="mt-5" aria-label="Historial de partidos" ref={historySection} tabIndex={-1}>
           {!loading && !error && <p className="mb-3 text-sm text-muted" role="status">{rows.length} {rows.length === 1 ? 'partido' : 'partidos'}</p>}
           <DataTable
             caption="Partidos analizados"

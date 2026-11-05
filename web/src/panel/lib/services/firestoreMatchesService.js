@@ -1,5 +1,19 @@
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { normalizeDashboardStatistics } from '../dashboardOverview.js'
 import { isValidBirthDate } from '../players.js'
+import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
+
+function reportMetrics(match) {
+  const { playerId } = match
+  const statistics = normalizeDashboardStatistics(decodeWorkerDashboardStatistics(match, { playerId }), playerId)
+  const shots = statistics?.shots
+  const max = shots && match.statistics.player.shots.maxSpeedKmh
+  return {
+    measuredShots: shots?.sampleCount ?? null,
+    averageShotSpeed: shots?.sampleCount > 0 ? shots.sumKmh / shots.sampleCount : null,
+    maxShotSpeed: shots?.sampleCount > 0 && Number.isFinite(max) && max >= 0 ? max : null,
+  }
+}
 
 export function createFirestoreMatchesService({ db, orgId, actorId, role }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string'
@@ -23,6 +37,7 @@ export function createFirestoreMatchesService({ db, orgId, actorId, role }) {
             opponent: row.opponent,
             tournament: row.tournament,
             result: row.result,
+            ...reportMetrics(row),
           }]
         })
         rows.sort((a, b) => b.matchDate.localeCompare(a.matchDate) || a.id.localeCompare(b.id))
