@@ -113,6 +113,38 @@ describe('Jugadores v1', () => {
     await waitFor(() => expect(screen.getByText('Tu equipo empieza aquí')).toBeTruthy())
   })
 
+  it('pagina y combina la búsqueda sin acentos con el filtro de academia', async () => {
+    const initialPlayers = Array.from({ length: 11 }, (_, index) => ({
+      id: `p-${index}`,
+      fullName: `Camila Ríos ${String(index + 1).padStart(2, '0')}`,
+      academy: 'Club Central',
+    }))
+    initialPlayers.push({ id: 'p-last', fullName: 'Zoe Sánchez' })
+    const user = userEvent.setup()
+    render(<Jugadores service={createDemoPlayersService({ initialPlayers })} />)
+
+    const table = await screen.findByRole('table', { name: 'Jugadores registrados' })
+    expect(within(table).getAllByRole('row')).toHaveLength(11)
+    expect(screen.getByText('Página 1 de 2')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(screen.getByText('Página 2 de 2')).toBeTruthy()
+    expect(within(table).getByText('Camila Ríos 11')).toBeTruthy()
+
+    const search = screen.getByRole('searchbox', { name: 'Buscar por nombre' })
+    await user.type(search, 'RIOS')
+    expect(screen.getByText('Página 1 de 2')).toBeTruthy()
+    expect(within(table).getByText('Camila Ríos 01')).toBeTruthy()
+    const academy = screen.getByLabelText('Filtrar por academia')
+    await user.selectOptions(academy, within(academy).getByRole('option', { name: 'Sin academia' }))
+    expect(screen.getByText('No se encontraron jugadores')).toBeTruthy()
+    await user.clear(search)
+    expect(screen.getByText('Zoe Sánchez')).toBeTruthy()
+    expect(screen.getByText('1 de 12 jugadores')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
+    expect(screen.getByText('Página 1 de 2')).toBeTruthy()
+    expect(screen.getByText('12 jugadores')).toBeTruthy()
+  })
+
   it('no usa ejemplos como respaldo cuando la sesión real no está disponible', () => {
     render(<Jugadores />)
     expect(screen.getByText('Los jugadores aún no están disponibles')).toBeTruthy()
