@@ -117,7 +117,7 @@ export default function CierreFinal() {
   })
 
   return (
-    <section className="relative overflow-hidden px-6 py-28 sm:py-40">
+    <section className="relative overflow-hidden px-5 py-14 sm:px-6 sm:py-40">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -159,9 +159,14 @@ export default function CierreFinal() {
         ))}
       </div>
 
-      <div className="relative mx-auto max-w-xl rounded-[28px] border border-line2 bg-surface px-6 py-12 text-center shadow-tile sm:px-12">
-        <Logo size={68} withWordmark={false} className="justify-center" rebota />
-        <div className="mt-6">
+      <div className="relative mx-auto max-w-xl rounded-[28px] border border-line2 bg-surface px-5 py-8 text-center shadow-tile sm:px-12 sm:py-12">
+        <Logo
+          size={68}
+          withWordmark={false}
+          className="justify-center max-sm:[&_svg]:size-14"
+          rebota
+        />
+        <div className="mt-4 sm:mt-6">
           <Invitacion />
         </div>
       </div>

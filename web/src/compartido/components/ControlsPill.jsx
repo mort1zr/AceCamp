@@ -33,7 +33,7 @@ export default function ControlsPill({ ocultarIngreso = false, className = '' })
 
   return (
     <div
-      className={`fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-50 flex items-center gap-0.5 rounded-full border border-line2 bg-surface2/80 p-1 shadow-tile backdrop-blur-lg sm:right-6 ${className}`}
+      className={`fixed top-[max(1rem,env(safe-area-inset-top))] right-4 z-50 flex items-center gap-0.5 rounded-full border border-line2 bg-surface2/80 p-1 shadow-tile backdrop-blur-lg transition-opacity duration-300 sm:right-6 ${className}`}
     >
       <button
         type="button"

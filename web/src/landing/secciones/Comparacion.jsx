@@ -17,6 +17,7 @@ const textos = {
   es: {
     titulo: 'Por qué no basta con lo que existe',
     columnas: ['AceCam', 'Análisis manual', 'Apps de celular'],
+    cortas: ['AceCam', 'Manual', 'Apps'],
     filas: [
       'Sin smartwatch ni hardware especial',
       'Graba con cualquier cámara, no solo desde la app',
@@ -34,6 +35,7 @@ const textos = {
   en: {
     titulo: 'Why what exists isn’t enough',
     columnas: ['AceCam', 'Manual analysis', 'Phone apps'],
+    cortas: ['AceCam', 'Manual', 'Apps'],
     filas: [
       'No smartwatch or special hardware',
       'Record with any camera, not just from the app',
@@ -56,8 +58,8 @@ function Marca({ activo, t }) {
   }
 
   return (
-    <span className={activo ? 'text-good' : 'text-bad'}>
-      <Icon name={activo ? 'check' : 'close'} size={20} />
+    <span className={activo ? 'text-good' : 'text-bad opacity-80'}>
+      <Icon name={activo ? 'check' : 'close'} size={20} className="max-sm:size-[18px]" />
       <span className="sr-only">{activo ? t.si : t.no}</span>
     </span>
   )
@@ -69,23 +71,27 @@ export default function Comparacion() {
 
   return (
     <Section title={t.titulo}>
-      <Reveal className="mt-10 overflow-x-auto rounded-card border border-line">
-        <table className="w-full min-w-[34rem] border-collapse text-left">
+      <Reveal className="mt-8 overflow-hidden rounded-card border border-line sm:mt-10 sm:overflow-x-auto">
+        <table className="w-full table-fixed border-collapse text-left sm:min-w-[34rem] sm:table-auto">
           <caption className="sr-only">{t.resumen}</caption>
           <thead>
             <tr className="bg-surface2">
-              <th scope="col" className="px-5 py-4 text-sm font-semibold text-text">
+              <th
+                scope="col"
+                className="px-3.5 py-3 text-sm font-semibold text-text sm:px-5 sm:py-4"
+              >
                 <span className="sr-only">{t.caracteristica}</span>
               </th>
               {columnas.map((columna, index) => (
                 <th
                   key={columna}
                   scope="col"
-                  className={`px-5 py-4 text-center font-display text-lg font-semibold tracking-wide ${
-                    index === 0 ? 'text-accent-ink' : 'text-muted'
+                  className={`w-[3.4rem] px-0.5 py-3 text-center font-display text-[12px] leading-tight font-semibold tracking-wide sm:w-auto sm:px-5 sm:py-4 sm:text-lg ${
+                    index === 0 ? 'text-accent-ink max-sm:bg-accent/10' : 'text-muted'
                   }`}
                 >
-                  {columna}
+                  <span className="sm:hidden">{t.cortas[index]}</span>
+                  <span className="max-sm:hidden">{columna}</span>
                 </th>
               ))}
             </tr>
@@ -93,11 +99,17 @@ export default function Comparacion() {
           <tbody>
             {t.filas.map((fila, indiceFila) => (
               <tr key={fila} className="border-t border-line">
-                <th scope="row" className="px-5 py-4 text-sm font-medium text-text2">
+                <th
+                  scope="row"
+                  className="px-3.5 py-3 text-[13px] leading-snug font-medium text-text2 sm:px-5 sm:py-4 sm:text-sm"
+                >
                   {fila}
                 </th>
                 {valores[indiceFila].map((valor, index) => (
-                  <td key={columnas[index]} className="px-5 py-4 text-center">
+                  <td
+                    key={columnas[index]}
+                    className={`px-1 py-3 text-center sm:px-5 sm:py-4 ${index === 0 ? 'max-sm:bg-accent/5' : ''}`}
+                  >
                     <span className="inline-flex justify-center">
                       <Marca activo={valor} t={t} />
                     </span>

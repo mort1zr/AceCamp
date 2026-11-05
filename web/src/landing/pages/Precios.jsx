@@ -142,6 +142,8 @@ const textos = {
     pruebaDespues: 'gratis durante un mes con el plan Básico.',
     mensual: 'Mensual',
     anual: 'Anual',
+    elegirPlan: 'Elige un plan',
+    paraCorto: ['Jugadores', 'Entrenadores', 'Clubes'],
     pagoAnual: 'Periodo de pago',
     mes: 'mes',
     meses: 'meses',
@@ -267,6 +269,8 @@ const textos = {
     pruebaDespues: 'free for a month with the Basic plan.',
     mensual: 'Monthly',
     anual: 'Yearly',
+    elegirPlan: 'Choose a plan',
+    paraCorto: ['Players', 'Coaches', 'Clubs'],
     pagoAnual: 'Billing period',
     mes: 'month',
     meses: 'months',
@@ -332,40 +336,43 @@ function Comparar({ anual }) {
   const fondo = fijo ? 'bg-bg' : ''
 
   return (
-    <section className="mx-auto mt-44 max-w-5xl">
+    <section className="mx-auto mt-24 max-w-5xl sm:mt-44">
       <h2 className="text-center text-4xl sm:text-5xl">{t.comparar}</h2>
 
-      <div ref={marcaRef} aria-hidden="true" className="mt-12 h-px" />
-      <div className="max-sm:overflow-x-auto">
-        <table className="w-full min-w-[34rem] border-collapse text-left">
+      <div ref={marcaRef} aria-hidden="true" className="mt-8 h-px sm:mt-12" />
+      <div>
+        <table className="w-full table-fixed border-collapse text-left sm:table-auto">
           <caption className="sr-only">{t.resumen}</caption>
           <thead>
             <tr>
-              <th scope="col" className={`w-1/3 pt-6 pr-4 pb-4 align-top ${encabezado} ${fondo}`}>
-                <span className="font-display text-3xl">{t.funciones}</span>
+              <th
+                scope="col"
+                className={`w-[38%] pt-4 pr-2 pb-3 align-top sm:w-1/3 sm:pt-6 sm:pr-4 sm:pb-4 ${encabezado} ${fondo}`}
+              >
+                <span className="font-display text-xl sm:text-3xl">{t.funciones}</span>
               </th>
               {comparados.map((plan) => (
                 <th
                   key={plan.nombre}
                   scope="col"
-                  className={`w-1/3 px-6 pt-6 pb-4 align-top ${encabezado} ${
+                  className={`w-[31%] px-2 pt-4 pb-3 align-top sm:w-1/3 sm:px-6 sm:pt-6 sm:pb-4 ${encabezado} ${
                     plan.popular
                       ? `rounded-t-2xl ${fijo ? `${fondo} ${fondoPro}` : columnaPro}`
                       : fondo
                   }`}
                 >
                   <span className="flex items-center justify-between gap-3">
-                    <span className="font-display text-3xl">{plan.nombre}</span>
+                    <span className="font-display text-xl sm:text-3xl">{plan.nombre}</span>
                     {plan.popular ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 font-display text-sm font-semibold whitespace-nowrap text-on-accent">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 font-display text-sm font-semibold whitespace-nowrap text-on-accent max-sm:hidden">
                         <Icon name="check" size={15} strokeWidth={2.6} />
                         {t.popular}
                       </span>
                     ) : null}
                   </span>
-                  <span className="mt-1 block font-display text-lg font-semibold text-text">
+                  <span className="mt-1 block font-display text-sm font-semibold break-words text-text sm:text-lg">
                     {anual ? plan.precio.anual : plan.precio.mensual}
-                    <span className="text-sm font-normal text-muted"> {t.porMes}</span>
+                    <span className="text-xs font-normal text-muted sm:text-sm"> {t.porMes}</span>
                   </span>
                 </th>
               ))}
@@ -376,7 +383,7 @@ function Comparar({ anual }) {
               <tr>
                 <th
                   scope="colgroup"
-                  className="pt-10 pr-4 pb-3 font-display text-base tracking-[0.15em] text-accent-ink uppercase"
+                  className="pt-8 pr-2 pb-3 font-display text-sm tracking-[0.12em] text-accent-ink uppercase sm:pt-10 sm:pr-4 sm:text-base sm:tracking-[0.15em]"
                 >
                   {grupo}
                 </th>
@@ -388,13 +395,16 @@ function Comparar({ anual }) {
                   key={fila.label}
                   className="border-t border-line2 transition-colors hover:bg-surface/60"
                 >
-                  <th scope="row" className="py-5 pr-4 text-sm font-medium text-text2">
+                  <th
+                    scope="row"
+                    className="py-3.5 pr-2 text-[13px] leading-snug font-medium text-text2 sm:py-5 sm:pr-4 sm:text-sm"
+                  >
                     {fila.label}
                   </th>
                   {fila.valores.map((valor, indice) => (
                     <td
                       key={comparados[indice].nombre}
-                      className={`px-6 py-5 ${comparados[indice].popular ? columnaPro : ''}`}
+                      className={`px-2 py-3.5 sm:px-6 sm:py-5 ${comparados[indice].popular ? columnaPro : ''}`}
                     >
                       <Valor valor={valor} destacado={comparados[indice].popular} t={t} />
                     </td>
@@ -405,14 +415,14 @@ function Comparar({ anual }) {
           ))}
           <tfoot>
             <tr className="border-t border-line2">
-              <td className="py-8" />
+              <td className="py-5 sm:py-8" />
               {comparados.map((plan) => {
                 const tono = tonos[plan.tono ?? 'basico']
-                const clases = `flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-base font-semibold whitespace-nowrap transition ${tono.boton}`
+                const clases = `flex w-full items-center justify-center gap-2 rounded-full px-2 py-2.5 text-center text-[13px] leading-tight font-semibold transition sm:px-5 sm:py-3 sm:text-base sm:whitespace-nowrap ${tono.boton}`
                 return (
                   <td
                     key={plan.nombre}
-                    className={`px-6 py-8 ${plan.popular ? `rounded-b-2xl ${columnaPro}` : ''}`}
+                    className={`px-1.5 py-5 sm:px-6 sm:py-8 ${plan.popular ? `rounded-b-2xl ${columnaPro}` : ''}`}
                   >
                     {plan.accion.to ? (
                       <LinkDeslizante to={plan.accion.to} className={clases}>
@@ -515,13 +525,37 @@ function CanchaPerspectiva() {
   )
 }
 
+function useColorBarra(referencia) {
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]')
+    const elemento = referencia.current
+    if (!meta || !elemento || typeof IntersectionObserver === 'undefined') return undefined
+    const original = meta.getAttribute('content')
+    const observador = new IntersectionObserver(
+      ([entrada]) => {
+        const estilos = getComputedStyle(document.documentElement)
+        const color = estilos.getPropertyValue(entrada.isIntersecting ? '--surface' : '--bg').trim()
+        if (color) meta.setAttribute('content', color)
+      },
+      { rootMargin: '-98% 0px 0px 0px' },
+    )
+    observador.observe(elemento)
+    return () => {
+      observador.disconnect()
+      meta.setAttribute('content', original)
+    }
+  }, [referencia])
+}
+
 function Preguntas() {
   const t = useTextos(textos)
   const [abierta, setAbierta] = useState(0)
+  const seccion = useRef(null)
+  useColorBarra(seccion)
 
   return (
     <>
-      <div aria-hidden="true" className="mt-40 flex flex-col items-center gap-1.5">
+      <div aria-hidden="true" className="mt-24 flex flex-col items-center gap-1.5 sm:mt-40">
         {gradas.map(({ ancho, alto, opacidad, personas }, fila) => (
           <span
             key={ancho}
@@ -531,7 +565,10 @@ function Preguntas() {
           </span>
         ))}
       </div>
-      <section className="relative mt-1.5 overflow-hidden rounded-t-[48px] border-t border-line2 bg-surface pt-28 sm:rounded-t-[64px]">
+      <section
+        ref={seccion}
+        className="relative mt-1.5 overflow-hidden rounded-t-[48px] border-t border-line2 bg-surface pt-16 sm:rounded-t-[64px] sm:pt-28"
+      >
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0"
@@ -546,9 +583,9 @@ function Preguntas() {
           className="pointer-events-none absolute -top-40 left-1/2 h-80 w-[60rem] max-w-full -translate-x-1/2 rounded-full bg-accent/5 blur-3xl"
         />
         <CanchaPerspectiva />
-        <div className="relative mx-auto max-w-3xl px-6">
+        <div className="relative mx-auto max-w-3xl px-5 sm:px-6">
           <h2 className="text-center text-4xl sm:text-5xl">{t.faq}</h2>
-          <ul className="mt-14 divide-y divide-line2 border-y border-line2">
+          <ul className="mt-8 divide-y sm:mt-14 divide-line2 border-y border-line2">
             {t.preguntas.map(({ pregunta, respuesta }, indice) => {
               const abiertaAhora = abierta === indice
               return (
@@ -559,7 +596,7 @@ function Preguntas() {
                       aria-expanded={abiertaAhora}
                       aria-controls={`respuesta-${indice}`}
                       onClick={() => setAbierta(abiertaAhora ? null : indice)}
-                      className="group flex w-full items-center justify-between gap-6 py-6 text-left font-sans text-lg font-medium text-text"
+                      className="group flex w-full items-center justify-between gap-4 py-5 text-left font-sans text-base font-medium text-text sm:gap-6 sm:py-6 sm:text-lg"
                     >
                       {pregunta}
                       <span
@@ -577,7 +614,7 @@ function Preguntas() {
                       abiertaAhora ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
                     }`}
                   >
-                    <p className="overflow-hidden pr-12 text-lg leading-relaxed text-muted">
+                    <p className="overflow-hidden pr-6 text-base leading-relaxed text-muted sm:pr-12 sm:text-lg">
                       <span className="block pb-6">{respuesta}</span>
                     </p>
                   </div>
@@ -654,7 +691,7 @@ function Periodo({ anual, onElegir }) {
   )
 }
 
-function Plan({ plan, anual }) {
+function Plan({ plan, anual, oculto = false }) {
   const t = useTextos(textos)
   const tono = tonos[plan.tono ?? 'basico']
   const boton = `mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 font-semibold transition ${tono.boton}`
@@ -684,7 +721,7 @@ function Plan({ plan, anual }) {
       ref={tarjetaRef}
       onPointerMove={inclinar}
       onPointerLeave={soltar}
-      className={`relative flex flex-col rounded-[24px] border bg-surface p-7 shadow-tile transition-[transform,border-color,box-shadow] duration-300 ease-out will-change-transform hover:ring-1 ${tono.tarjeta}`}
+      className={`relative flex flex-col rounded-[24px] border bg-surface p-6 shadow-tile sm:p-7 ${oculto ? 'max-md:hidden' : ''} transition-[transform,border-color,box-shadow] duration-300 ease-out will-change-transform hover:ring-1 ${tono.tarjeta}`}
     >
       {tono.brillo ? (
         <span
@@ -757,9 +794,10 @@ export default function Precios() {
   const aterrizaje = useAterrizaje()
   const t = useTextos(textos)
   const [anual, setAnual] = useState(false)
+  const [elegido, setElegido] = useState(1)
 
   return (
-    <div className="relative overflow-clip pt-6">
+    <div className="precios-pagina relative overflow-clip bg-bg pt-[calc(env(safe-area-inset-top)+4.75rem)] sm:pt-6">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
@@ -770,7 +808,7 @@ export default function Precios() {
         }}
       />
 
-      <div className="relative mx-auto max-w-6xl px-6">
+      <div className="relative mx-auto max-w-6xl px-5 sm:px-6">
         <LinkDeslizante
           to="/"
           sentido="atras"
@@ -781,24 +819,47 @@ export default function Precios() {
           <span className="inline-flex size-9 items-center justify-center rounded-full border-2 border-line3 text-text2 ring-text transition-[translate,border-color,color,box-shadow] duration-300 group-hover:-translate-x-1 group-hover:border-text group-hover:text-text group-hover:ring-1">
             <Icon name="arrowBack" size={17} strokeWidth={2.4} />
           </span>
-          <Logo size={56} wordmarkClassName="text-4xl" rebota />
+          <Logo size={56} wordmarkClassName="text-4xl" className="max-sm:[&_svg]:size-11" rebota />
         </LinkDeslizante>
 
-        <header className="mt-16 text-center">
+        <header className="mt-10 text-center sm:mt-16">
           <h1 className="mx-auto max-w-2xl text-4xl sm:text-6xl">
             {t.titulo}
             <br />
             {t.tituloFin}
           </h1>
-          <p className="mx-auto mt-4 max-w-md text-lg text-text2">
+          <p className="mx-auto mt-4 max-w-md text-base text-text2 sm:text-lg">
             {t.pruebaAntes} <span className="text-accent-ink">AceCam</span> {t.pruebaDespues}
           </p>
           <Periodo anual={anual} onElegir={setAnual} />
         </header>
 
-        <div className="mx-auto mt-14 grid max-w-5xl gap-5 md:grid-cols-3">
+        <div
+          role="tablist"
+          aria-label={t.elegirPlan}
+          className="mx-auto mt-8 grid max-w-sm grid-cols-3 gap-1 rounded-2xl border border-line2 bg-surface2 p-1.5 shadow-tile md:hidden"
+        >
           {t.planes.map((plan, indice) => (
-            <Plan key={indice} plan={plan} anual={anual} />
+            <button
+              key={plan.nombre}
+              type="button"
+              role="tab"
+              aria-selected={indice === elegido}
+              onClick={() => setElegido(indice)}
+              className="relative flex cursor-pointer flex-col items-center gap-0.5 rounded-xl px-1 py-2.5 text-muted transition-colors aria-selected:bg-accent/12 aria-selected:text-text aria-selected:ring-1 aria-selected:ring-accent-line/50"
+            >
+              {plan.popular ? (
+                <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-accent" />
+              ) : null}
+              <span className="font-display text-lg leading-none font-semibold">{plan.nombre}</span>
+              <span className="text-[11px] leading-tight">{t.paraCorto[indice]}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mx-auto mt-8 grid max-w-5xl gap-4 sm:mt-14 sm:gap-5 md:grid-cols-3">
+          {t.planes.map((plan, indice) => (
+            <Plan key={indice} plan={plan} anual={anual} oculto={indice !== elegido} />
           ))}
         </div>
 

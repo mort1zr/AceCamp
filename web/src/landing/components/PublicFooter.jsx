@@ -39,12 +39,12 @@ const redes = [
 export default function PublicFooter() {
   const t = useTextos(textos)
   return (
-    <footer className="border-t border-line px-6 py-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+    <footer className="border-t border-line px-5 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <Logo rebota />
 
         <nav aria-label={t.pie}>
-          <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-text2">
+          <ul className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-text2 sm:gap-x-6">
             {links.map(({ desliza, ...link }) => {
               const Enlace = desliza ? LinkDeslizante : Link
               return (
@@ -59,7 +59,7 @@ export default function PublicFooter() {
         </nav>
       </div>
 
-      <div className="mx-auto mt-6 flex max-w-6xl flex-col gap-3 border-t border-line pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto mt-4 flex max-w-6xl flex-col gap-2 border-t border-line pt-4 text-xs text-muted sm:mt-6 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:pt-5">
         <p>
           © {year} AceCam · {t.lugar}
         </p>

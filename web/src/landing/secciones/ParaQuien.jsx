@@ -155,15 +155,19 @@ export default function ParaQuien() {
       }
       align="center"
     >
-      <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <div className="-mx-6 mt-8 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] md:mx-0 md:mt-12 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 md:pb-0 [&::-webkit-scrollbar]:hidden">
         {t.perfiles.map(({ etiqueta, clave, title, text }, index) => {
           const Vista = vistas[index]
           return (
-            <Reveal key={index} delay={index * 90}>
+            <Reveal
+              key={index}
+              delay={index * 90}
+              className="w-[80%] shrink-0 snap-start md:w-auto"
+            >
               <Card className="group flex h-full flex-col overflow-hidden ring-line3 transition hover:border-line3 hover:ring-1">
                 <div
                   aria-hidden="true"
-                  className="flex h-48 items-center border-b border-line bg-surface2 px-8"
+                  className="flex h-40 items-center border-b border-line bg-surface2 px-6 md:h-48 md:px-8"
                   style={{
                     backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
                     backgroundSize: '18px 18px',
@@ -173,12 +177,12 @@ export default function ParaQuien() {
                     <Vista />
                   </div>
                 </div>
-                <div className="flex flex-1 flex-col p-7">
+                <div className="flex flex-1 flex-col p-5 md:p-7">
                   <p className="font-display text-xs tracking-[0.2em] text-electric-ink uppercase">
                     {etiqueta}
                   </p>
-                  <h3 className="mt-2 text-2xl">{title}</h3>
-                  <p className="mt-2 mb-6 text-text2">{text}</p>
+                  <h3 className="mt-2 text-xl md:text-2xl">{title}</h3>
+                  <p className="mt-2 mb-5 text-[15px] text-text2 md:mb-6 md:text-base">{text}</p>
                   <p className="mt-auto flex items-center gap-2 border-t border-line pt-4 text-sm font-medium text-text">
                     <span className="grid size-5 place-content-center rounded-full bg-accent text-on-accent">
                       <Icon name="check" size={13} strokeWidth={2.6} />

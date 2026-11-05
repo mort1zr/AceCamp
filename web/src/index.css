@@ -18,6 +18,11 @@
     background-color: var(--bg);
   }
 
+  html:has(.precios-pagina),
+  html:has(.precios-pagina) body {
+    background-color: var(--surface);
+  }
+
   body {
     min-height: 100dvh;
     margin: 0;
