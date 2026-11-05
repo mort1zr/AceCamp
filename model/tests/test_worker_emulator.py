@@ -58,13 +58,13 @@ def clear_queue(store):
 
 @pytest.fixture
 def synthetic_video(tmp_path):
-    from tests.test_pipeline_smoke import write_synthetic_video
+    from test_pipeline_smoke import write_synthetic_video
 
     return write_synthetic_video(tmp_path / "partido.avi")
 
 
 def model_stats(path):
-    from tests.test_worker import model_stats as fake
+    from test_worker import model_stats as fake
 
     return fake()
 
@@ -131,8 +131,9 @@ def test_a_match_changed_while_processing_is_not_overwritten(backend):
 
 def test_end_to_end_storage_pipeline_firestore(backend, tmp_path, monkeypatch, synthetic_video):
     """Video en Storage → pipeline real (modelos sustituidos) → estadísticas en Firestore."""
+    import test_pipeline_smoke as smoke
+
     import main
-    from tests import test_pipeline_smoke as smoke
     from worker.__main__ import make_analyzer
 
     monkeypatch.setattr(main, "PlayerTracker", smoke.FakePlayerTracker)
@@ -148,6 +149,9 @@ def test_end_to_end_storage_pipeline_firestore(backend, tmp_path, monkeypatch, s
     assert run_once(store, videos, make_analyzer(), tmp_path / "work", version="v") == (match_id, "listo")
 
     statistics = store.db.collection("matches").document(match_id).get().get("statistics")
-    assert statistics["schemaVersion"] == "acecam.match-stats.v1"
     assert statistics["durationSeconds"] == 4.0  # 120 fotogramas a 30 fps
-    assert "shots" in statistics["player"] and "shots" in statistics["opponent"]
+    # En el vídeo sintético solo hay un golpe medible, del jugador cercano ('abajo').
+    assert statistics["player"]["shots"]["count"] == 1
+    assert 40 < statistics["player"]["shots"]["maxSpeedKmh"] < 120
+    assert statistics["opponent"]["shots"] == {"count": 0, "sumSpeedKmh": 0.0}  # medido y cero, no "sin dato"
+    assert "movement" in statistics["opponent"]

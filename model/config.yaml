@@ -7,17 +7,54 @@ paths:
   cache_dir: cache
 
 models:
-  players: models/yolov8x.pt
+  # Detector de jugadores (los descarga scripts/download_models.py). Con el vídeo de ejemplo en CPU,
+  # yolov8m tarda un 39 % menos que yolov8x (700 frente a 1145 s por minuto de vídeo) y da las mismas
+  # estadísticas salvo un 1-2 % en el desplazamiento del jugador del fondo.
+  # Para la máxima precisión: models/yolov8x.pt
+  players: models/yolov8m.pt
   ball: models/yolo5_last.pt
   court_keypoints: models/keypoints_model.pth
+  # Detector de pelota TrackNet (TA-14b): solo se usa con detection.ball_detector: tracknet.
+  ball_tracknet: models/tracknet.pt
 
 detection:
   # Dispositivo para la inferencia: null (automático), cpu, cuda:0, mps...
   device: null
+  # Detector de la pelota: yolo (models.ball) o tracknet (models.ball_tracknet, en evaluación
+  # en TA-14b: mira 3 fotogramas seguidos y ve mejor la pelota borrosa).
+  ball_detector: yolo
   ball_confidence: 0.15
+  # Tamaño al que se reescala cada fotograma para buscar la pelota: auto, null (640, el de YOLO)
+  # o un número. Con auto, los vídeos de menos de 1280 px de ancho se analizan a 1280: en 640x360
+  # la pelota mide 2-3 px y a 640 el detector la pierde (en h2, 45 % frente a 81 % de fotogramas).
+  # A 1280 la detección de la pelota tarda unas 4 veces más; los vídeos de 1080p no cambian.
+  ball_image_size: auto
+  # Huecos sin pelota de hasta estos fotogramas se interpolan; los más largos no.
+  ball_max_interpolation_gap: 5
+  # Detectar jugadores en uno de cada N fotogramas e interpolar el resto (la pelota, en todos).
+  # 1 = en todos. Con 2, el vídeo de ejemplo tardó un 8 % menos, pero la distancia recorrida baja
+  # un poco (la interpolación en línea recta pierde los desvíos): solo para partidos completos.
+  player_every_n_frames: 1
 
-shots:
-  # Fotogramas seguidos con la misma dirección vertical para contar un golpe.
-  min_change_frames_for_hit: 25
-  # Ventana de la media móvil sobre la altura de la pelota.
-  rolling_window: 5
+court:
+  # Volver a detectar los puntos clave de la pista cada N fotogramas.
+  redetect_every_frames: 30
+  # Peso de cada nueva detección en la media móvil (0 = no cambia, 1 = sin suavizar).
+  smoothing: 0.3
+  # Ajustar cada punto clave al cruce de líneas blancas más cercano.
+  refine_keypoints: true
+
+cameras:
+  # Detectar cortes de cámara y repeticiones (TA-15): fuera de la cámara principal no se analiza.
+  detect_cuts: true
+  # Cuánto puede desplazarse la pista respecto a su posición habitual (fracción del ancho del
+  # fotograma) para seguir contando como cámara principal.
+  max_shift_fraction: 0.08
+
+worker:
+  # Duración máxima del vídeo que acepta el worker, en segundos. Los más largos pasan a
+  # 'error' antes de cargarlos (PCIT-147). Se puede subir cuando haya procesamiento por tramos.
+  max_duration_seconds: 60
+  # Resolución mínima (lado corto, en píxeles): por debajo de 720p la pelota mide 2-3 px y el
+  # modelo la pierde y la confunde con marcas de la pista. Recomendado: 1080p.
+  min_resolution: 720

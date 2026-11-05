@@ -151,35 +151,51 @@ en cola ──▶ procesando ──▶ listo
 El worker toma un partido `'en cola'` y lo marca `'procesando'` dentro de una
 transacción, para que dos workers no tomen el mismo.
 
-### `matches.statistics` (propuesta v1, confirmar con Aaron)
+### `matches.statistics` (v1)
 
-Estadísticas **de ese partido**. El worker traduce `player_1` / `player_2` del modelo
-a `player` (el jugador registrado) y `opponent` usando `playerPosition`.
-Todas las métricas son opcionales: si el modelo todavía no la calcula, se omite.
+Estadísticas **de ese partido**, escritas por el worker (`model/stats/match_stats.py`).
+El worker traduce `player_1` / `player_2` del modelo a `player` (el jugador registrado) y
+`opponent` usando `playerPosition`.
 
 ```js
 statistics: {
   schemaVersion: 'acecam.match-stats.v1',
-  durationSeconds: 5520,
+  durationSeconds: 24,
   player: {
-    shots:    { count: 412, sumSpeedKmh: 41612, maxSpeedKmh: 124 },
-    movement: { distanceMeters: 3400, maxSpeedKmh: 23, avgSpeedKmh: 7.2 },
-    serve:    { sumSpeedKmh: 15200, sampleCount: 100, maxSpeedKmh: 171,
-                firstServeIn: 58, firstServeAttempts: 100, doubleFaults: 5 },
-    forehand: { count: 210, maxSpeedKmh: 124 },
-    backhand: { count: 160, maxSpeedKmh: 112 },
+    shots:    { count: 6, sumSpeedKmh: 630, maxSpeedKmh: 171 },
+    movement: { distanceMeters: 25, avgSpeedKmh: 11.4, maxSpeedKmh: 22.7 },
+    serve: {
+      count: 2, fromRight: 1, fromLeft: 1,          // saques (intentos, también los segundos)
+      sumSpeedKmh: 110, sampleCount: 1, maxSpeedKmh: 110,  // velocidad media hasta el bote
+      firstServeAttempts: 1, firstServeIn: 0,       // primeros saques y cuántos entraron
+      doubleFaults: 0,
+    },
   },
-  opponent: { /* mismas claves, opcionales */ },
-  rallies: { count: 96, avgShots: 4.9, longestShots: 21 },
+  opponent: { /* mismas claves */ },
+  rallies: { count: 1, sumShots: 18, longestShots: 18, short: 0, medium: 0, long: 1 },
 }
 ```
 
-- **Lo que el modelo ya calcula hoy** (`model/main.py`): golpes por jugador
-  (`shots.count`, `shots.sumSpeedKmh`) y velocidad de desplazamiento (`movement`).
-- **Lo demás** (saque, derecha/revés, peloteos) llega con las épicas TA-E2 a TA-E5.
-  Hasta entonces esas claves no existen y el Dashboard las muestra como "sin dato".
-- Promedios: se guardan **sumas y cantidades**, no promedios, para que el Dashboard
-  pueda combinar partidos sin error (como pide PCIT-28).
+| Campo | Qué es | Cuándo falta |
+| --- | --- | --- |
+| `shots.count`, `shots.sumSpeedKmh`, `shots.maxSpeedKmh` | Golpes medidos y su velocidad (distancia entre los jugadores / tiempo hasta el golpe del rival) | `maxSpeedKmh` falta si no hay golpes |
+| `movement.*` | Distancia recorrida y velocidad del jugador | Si no se pudo seguir al jugador |
+| `serve.count`, `serve.fromRight`, `serve.fromLeft` | Saques detectados y desde qué lado (derecha o izquierda del sacador, mirando a la red) | Nunca: 0 si no sacó |
+| `serve.sumSpeedKmh`, `serve.sampleCount`, `serve.maxSpeedKmh` | Velocidad media del saque **hasta el bote**, solo de los saques con bote visto. Es menor que la de un radar, que mide la salida de la raqueta | `maxSpeedKmh` falta si `sampleCount` es 0 |
+| `serve.firstServeAttempts`, `serve.firstServeIn` | Primeros saques y cuántos entraron en el cuadro cruzado | Si de algún primer saque no se supo si entró |
+| `serve.doubleFaults` | Dobles faltas | Si de algún segundo saque no se supo si entró |
+| `rallies.count`, `rallies.sumShots`, `rallies.longestShots` | Puntos (peloteos) del partido, golpes en total y el más largo | Nunca |
+| `rallies.short`, `rallies.medium`, `rallies.long` | Peloteos de 0-4, 5-8 y 9 o más golpes | Nunca |
+
+- **Un dato que el modelo no pudo saber se omite; nunca es 0** (por ejemplo, el primer
+  saque dentro si en un punto no se vio el bote ni hubo resto). Un 0 significa que se midió
+  y dio cero.
+- Promedios: se guardan **sumas y cantidades**, no promedios, para que el Dashboard pueda
+  combinar partidos sin error (como pide PCIT-28). La velocidad media de saque es
+  `sumSpeedKmh / sampleCount` sumando todos los partidos; el % de primer saque,
+  `firstServeIn / firstServeAttempts`.
+- Todavía no se miden: derecha/revés (descartado del alcance) y dentro/fuera de cada golpe.
+- El Dashboard lo lee con `web/src/panel/lib/workerDashboardStatistics.js`.
 
 ### `matches/{matchId}/coachNotes/{uid}` (PCIT-44)
 
