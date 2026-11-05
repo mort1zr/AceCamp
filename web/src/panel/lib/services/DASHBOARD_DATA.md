@@ -16,8 +16,8 @@ simulado; no prueban las reglas desplegadas ni el modelo.
 En `ModeloAI` revisión `6c17537`, `model/stats/match_stats.py` asigna la
 posición registrada a `statistics.player` y la otra posición a `opponent`.
 El Dashboard lee `player.shots.count` y `player.shots.sumSpeedKmh`. El worker
-también mide desplazamiento. Los indicadores de saque y su evolución quedan
-como «Sin datos» hasta que el modelo mida el saque.
+también mide desplazamiento y, desde el Sprint 3 (TA-18), el saque: velocidad media
+hasta el bote, primer saque dentro y dobles faltas.
 
 La rama Landing_Rolando incorpora layout, rutas y tokens compartidos; no se ha
 fusionado dentro de interfaces_Fabian durante PCIT-139.
@@ -48,7 +48,10 @@ no cero. Se admiten contadores cero cuando están realmente presentes. Los tipos
 deben ser numéricos; no se convierten cadenas automáticamente.
 
 La versión interna permite conservar el contrato de la interfaz. El decoder
-de PCIT-35 mapea únicamente los contadores de golpe de la versión publicada.
+de PCIT-35 (`workerDashboardStatistics.js`) mapea `statistics.player.shots` a `shots` y
+`statistics.player.serve` a `serveSpeed` (`sumSpeedKmh`, `sampleCount`), `firstServe`
+(`firstServeIn`, `firstServeAttempts`) y `doubleFaults`. Lo que el worker no escribió queda
+ausente: ver `docs/firestore-schema.md`.
 
 ## Reglas de cálculo
 
