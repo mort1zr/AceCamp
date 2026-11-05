@@ -60,7 +60,7 @@ beforeEach(async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore()
     const created = new Date('2026-10-01T00:00:00Z')
-    await setDoc(doc(db, 'orgs', ORG), { name: 'Universidad Demo', ownerId: COACH, plan: 'free', createdAt: created })
+    await setDoc(doc(db, 'orgs', ORG), { name: 'Universidad Demo', ownerId: COACH, plan: 'pro', createdAt: created })
     await setDoc(doc(db, 'orgs', OTHER_ORG), { name: 'Club Ejemplo', ownerId: OTHER_COACH, plan: 'free', createdAt: created })
     await setDoc(doc(db, 'users', COACH), { email: 'coach@acecam.test', displayName: 'Coach Ramírez', orgId: ORG, role: 'coach', createdAt: created })
     await setDoc(doc(db, 'users', OTHER_COACH), { email: 'coach2@acecam.test', displayName: 'Coach Paredes', orgId: OTHER_ORG, role: 'coach', createdAt: created })
@@ -302,7 +302,7 @@ describe('registro (users y orgs)', () => {
 
   it('el plan de la organización no se cambia desde la web', async () => {
     await assertSucceeds(updateDoc(doc(coachDb(), 'orgs', ORG), { name: 'Universidad Demo Lima' }))
-    await assertFails(updateDoc(doc(coachDb(), 'orgs', ORG), { plan: 'pro' }))
+    await assertFails(updateDoc(doc(coachDb(), 'orgs', ORG), { plan: 'ultra' }))
   })
 })
 
@@ -410,6 +410,51 @@ describe('uso mensual de análisis (PCIT-41)', () => {
     await assertSucceeds(createMatch(coachDb(), 'm-lectura'))
     await assertFails(getDoc(usageDoc(env.authenticatedContext(OTHER_COACH, { email: 'coach2@acecam.test' }).firestore())))
     await assertFails(getDoc(usageDoc(anonDb())))
+  })
+
+  describe('límite según el plan', () => {
+    const preparar = (plan, analyses) => env.withSecurityRulesDisabled(async context => {
+      const db = context.firestore()
+      await updateDoc(doc(db, 'orgs', ORG), { plan })
+      if (analyses != null) await setDoc(usageDoc(db), { analyses, lastMatchId: 'previo', updatedAt: new Date() })
+    })
+
+    it('permite llegar justo al límite y niega el siguiente análisis', async () => {
+      await preparar('prueba', 14)
+      await assertSucceeds(createMatch(coachDb(), 'm-15'))
+      await assertFails(createMatch(coachDb(), 'm-16'))
+      await preparar('basico', 30)
+      await assertFails(createMatch(coachDb(), 'm-31'))
+      await preparar('pro', 149)
+      await assertSucceeds(createMatch(coachDb(), 'm-150'))
+      await assertFails(createMatch(coachDb(), 'm-151'))
+    })
+
+    it('sin plan o con un plan desconocido no se analiza; Ultra no tiene tope', async () => {
+      await preparar('free')
+      await assertFails(createMatch(coachDb(), 'm-free'))
+      await preparar('inventado')
+      await assertFails(createMatch(coachDb(), 'm-inventado'))
+      await preparar('ultra', 5000)
+      await assertSucceeds(createMatch(coachDb(), 'm-ultra'))
+    })
+
+    it('el contador es de la organización: suma los análisis de todos sus entrenadores', async () => {
+      await env.withSecurityRulesDisabled(async context => {
+        const db = context.firestore()
+        await setDoc(doc(db, 'users', 'coach-colega'), { email: 'colega@acecam.test', displayName: 'Coach Colega', orgId: ORG, role: 'coach', createdAt: new Date() })
+        await setDoc(doc(db, 'players', 'p-colega'), { orgId: ORG, fullName: 'Lucía Torres', birthDate: '2008-01-20', consent: consent('coach-colega'), createdBy: 'coach-colega', createdAt: new Date() })
+      })
+      await preparar('prueba', 13)
+      await assertSucceeds(createMatch(coachDb(), 'm-mio'))
+      const colega = env.authenticatedContext('coach-colega', { email: 'colega@acecam.test' }).firestore()
+      const delColega = { playerId: 'p-colega', createdBy: 'coach-colega' }
+      await assertSucceeds(createMatch(colega, 'm-colega-15', delColega))
+      await assertFails(createMatch(colega, 'm-colega-16', delColega))
+      await assertFails(createMatch(coachDb(), 'm-mio-16'))
+      const usage = await getDoc(usageDoc(coachDb()))
+      expect(usage.data().analyses).toBe(15)
+    })
   })
 })
 

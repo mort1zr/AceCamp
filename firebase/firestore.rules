@@ -59,6 +59,15 @@ service cloud.firestore {
       return /databases/$(database)/documents/matches/$(matchId);
     }
 
+    // Análisis por mes según orgs/{orgId}.plan. Mismos valores que PLANES en
+    // web/src/panel/lib/services/firestoreConfiguracionService.js: cambiar ambos a la vez.
+    // 'free' (sin plan) y cualquier valor desconocido no permiten análisis; 'ultra' no tiene tope.
+    function withinPlan(orgId, analyses) {
+      let plan = get(/databases/$(database)/documents/orgs/$(orgId)).data.get('plan', 'free');
+      return plan == 'ultra'
+        || analyses <= {'prueba': 15, 'basico': 30, 'pro': 150}.get(plan, 0);
+    }
+
     // El partido nuevo suma exactamente uno al contador del mes, en la misma escritura.
     function countsAsAnalysis(orgId, matchId) {
       let after = getAfter(usagePath(orgId)).data;
@@ -169,6 +178,8 @@ service cloud.firestore {
           && period == currentPeriod()
           && request.resource.data.keys().hasOnly(['analyses', 'lastMatchId', 'updatedAt'])
           && request.resource.data.analyses == (resource == null ? 0 : resource.data.analyses) + 1
+          // Al llegar al límite del plan no se crean más análisis en el mes.
+          && withinPlan(orgId, request.resource.data.analyses)
           && request.resource.data.updatedAt == request.time
           && request.resource.data.lastMatchId is string
           && !exists(matchPath(request.resource.data.lastMatchId))
