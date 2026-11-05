@@ -1,6 +1,6 @@
 export const PLAYER_CONSENT_VERSION = 'players-v1'
 
-function localDateString(date) {
+export function localDateString(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 

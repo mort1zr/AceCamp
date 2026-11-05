@@ -6,6 +6,7 @@ import BloqueVacio from '../components/layout/BloqueVacio.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { useDashboardOverview } from '../hooks/useDashboardOverview.js'
 import { playerAge } from '../lib/players.js'
+import { dashboardPeriods } from '../lib/dashboardPeriods.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import { createFirestoreDashboardService } from '../lib/services/firestoreDashboardService.js'
 import './jugadores.css'
@@ -236,7 +237,23 @@ function Perfil({ player, sample }) {
   )
 }
 
-function Cabecera({ players, selected, onSelect, disabled }) {
+function DashboardSelect({ id, label, children, value, disabled, onChange }) {
+  return (
+    <div className="players-field dashboard-player-select">
+      <label htmlFor={id}>{label}</label>
+      <div className="dashboard-select-wrap">
+        <select id={id} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>
+          {children}
+        </select>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilter }) {
   return (
     <header className="dashboard-head">
       <div>
@@ -245,15 +262,14 @@ function Cabecera({ players, selected, onSelect, disabled }) {
           Dashboard<span className="players-title-dot">.</span>
         </h1>
       </div>
-      <div className="players-field dashboard-player-select">
-        <label htmlFor="dashboard-player">Jugador</label>
-        <div className="dashboard-select-wrap">
-          <select
-            id="dashboard-player"
-            value={selected?.id ?? ''}
-            disabled={disabled}
-            onChange={(event) => onSelect(event.target.value)}
-          >
+      <div className="dashboard-controls">
+        <DashboardSelect
+          id="dashboard-player"
+          label="Jugador"
+          value={selected?.id ?? ''}
+          disabled={players.loading || Boolean(players.error) || players.rows.length === 0}
+          onChange={onSelect}
+        >
             <option value="">
               {players.loading ? 'Cargando jugadores…' : 'Selecciona un jugador'}
             </option>
@@ -262,21 +278,10 @@ function Cabecera({ players, selected, onSelect, disabled }) {
                 {player.fullName}
               </option>
             ))}
-          </select>
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </div>
+        </DashboardSelect>
+        <DashboardSelect id="dashboard-period" label="Periodo" value={period} disabled={!canFilter} onChange={onPeriodChange}>
+          {dashboardPeriods.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </DashboardSelect>
       </div>
     </header>
   )
@@ -285,18 +290,20 @@ function Cabecera({ players, selected, onSelect, disabled }) {
 function DashboardWorkspace({ playersService, overviewService, renderEvolution }) {
   const players = usePlayers(playersService)
   const [selectedId, setSelectedId] = useState('')
+  const [period, setPeriod] = useState('all')
   const selected =
     !players.loading && !players.error
       ? players.rows.find((player) => player.id === selectedId)
       : null
   const overview = useDashboardOverview(overviewService, selected?.id ?? '')
   const ready = overview.status === 'ready'
+  const report = ready ? (period === 'all' ? overview.data : overview.data?.periods?.[period]) : null
   const sample = playersService.mode === 'demo'
   const sinIndicadores =
     overview.status === 'unavailable' ||
-    !overview.data?.metrics ||
-    overview.data?.coverage?.compatibleMatches === 0 ||
-    Object.values(overview.data.metrics).every((value) => value == null)
+    !report?.metrics ||
+    report.coverage?.compatibleMatches === 0 ||
+    Object.values(report.metrics).every((value) => value == null)
 
   return (
     <section className="players-page dashboard-page" aria-labelledby="dashboard-title">
@@ -313,7 +320,9 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
         players={players}
         selected={selected}
         onSelect={setSelectedId}
-        disabled={players.loading || Boolean(players.error) || players.rows.length === 0}
+        period={period}
+        onPeriodChange={setPeriod}
+        canFilter={Boolean(overview.data?.periods)}
       />
 
       {players.loading ? (
@@ -375,9 +384,9 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                     {sample ? 'Ejemplos de interfaz' : 'Indicadores disponibles'}
                   </span>
                 </div>
-                <DashboardMetrics metrics={ready ? overview.data?.metrics : null} sample={sample} />
+                <DashboardMetrics metrics={report?.metrics} sample={sample} />
               </section>
-              {ready && overview.data?.coverage?.incompatibleMatches > 0 && (
+              {report?.coverage?.incompatibleMatches > 0 && (
                 <p className="dashboard-data-notice" role="status">
                   Algunos análisis terminados aún no tienen indicadores disponibles. El resumen
                   incluye únicamente los resultados verificables.
@@ -389,7 +398,9 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                     title={
                       overview.status === 'unavailable'
                         ? 'Los indicadores aún no están disponibles'
-                        : 'Todavía no hay estadísticas para este jugador'
+                        : period === 'all'
+                          ? 'Todavía no hay estadísticas para este jugador'
+                          : 'No hay estadísticas en este periodo'
                     }
                     description="Las métricas disponibles aparecerán aquí cuando se reciban los resultados de sus análisis."
                   />
@@ -397,7 +408,7 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
               )}
               <EvolutionPanel
                 playerId={selected.id}
-                evolution={ready ? overview.data?.evolution : undefined}
+                evolution={report?.evolution}
                 sample={sample}
                 renderEvolution={ready ? renderEvolution : undefined}
               />

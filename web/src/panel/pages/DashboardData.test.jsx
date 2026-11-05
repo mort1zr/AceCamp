@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { act, cleanup, render, screen, within } from '@testing-library/react'
 import { collection, getDoc, onSnapshot, query } from 'firebase/firestore'
 import userEvent from '@testing-library/user-event'
 import Dashboard from './Dashboard.jsx'
 import { buildDashboardOverview } from '../lib/dashboardOverview.js'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 vi.mock('firebase/firestore', () => ({
   collection: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), onSnapshot: vi.fn(),
@@ -70,4 +73,64 @@ it('avisa de resultados incompatibles y no los convierte en estadísticas de saq
   expect(screen.getByText('Todavía no hay estadísticas para este jugador')).toBeTruthy()
   expect(screen.queryByText('160')).toBeNull()
   expect(screen.getAllByText('Sin datos')).toHaveLength(3)
+})
+
+it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 7, 31, 12))
+  const orgId = 'org-a'
+  const playerId = 'p1'
+  const player = { orgId, fullName: 'Jugador de periodos' }
+  const match = (matchDate, speed) => ({
+    id: `m-${speed}`,
+    data: () => ({
+      orgId, playerId, status: 'listo', matchDate, playerPosition: 'abajo', opponent: `Rival ${speed}`,
+      statistics: {
+        schemaVersion: 'acecam.match-stats.v1', durationSeconds: 4,
+        player: { shots: { count: 1, sumSpeedKmh: speed, maxSpeedKmh: speed } },
+        opponent: { shots: { count: 1, sumSpeedKmh: speed, maxSpeedKmh: speed } },
+      },
+    }),
+  })
+  const dates = [match('2026-02-27', 110), match('2026-02-28', 90), match('2026-05-31', 60),
+    match('2026-07-31', 40), match('2026-08-31', 20), match(undefined, 200)]
+  let publish
+  collection.mockImplementation((_, name) => name)
+  query.mockImplementation(name => name)
+  getDoc.mockResolvedValue({ exists: () => true, data: () => player })
+  onSnapshot.mockClear().mockImplementation((name, receive) => {
+    if (name === 'matches') publish = receive
+    receive({ docs: name === 'players' ? [{ id: playerId, data: () => player }] : dates })
+    return () => {}
+  })
+
+  const user = userEvent.setup()
+  render(<Dashboard db={{ app: { options: { projectId: 'prueba' } } }} session={{ uid: 'coach-a', orgId }} />)
+  await screen.findByRole('option', { name: player.fullName })
+  await user.selectOptions(screen.getByLabelText('Jugador'), playerId)
+  const kpi = name => within(screen.getByRole('heading', { name, exact: true }).closest('article'))
+  await screen.findByRole('heading', { name: 'Partidos analizados', exact: true })
+  expect(kpi('Partidos analizados').getByText('6')).toBeTruthy()
+
+  const period = screen.getByLabelText('Periodo')
+  await user.selectOptions(period, '1')
+  expect(kpi('Partidos analizados').getByText('2')).toBeTruthy()
+  expect(kpi('Velocidad media de golpe').getByText('30')).toBeTruthy()
+  expect(kpi('Velocidad media de saque').getByText('Sin datos')).toBeTruthy()
+  const evolution = within(screen.getByRole('region', { name: 'Evolución del jugador' }))
+  await user.click(evolution.getByText('Ver datos del gráfico'))
+  const graphRows = within(evolution.getByRole('table', { name: 'Velocidades de golpe por partido' }))
+  expect(graphRows.getAllByRole('row')).toHaveLength(3)
+  expect(graphRows.getByText('Rival 40')).toBeTruthy()
+  expect(graphRows.queryByText('Rival 60')).toBeNull()
+
+  await user.selectOptions(period, '3')
+  expect(kpi('Partidos analizados').getByText('3')).toBeTruthy()
+  await user.selectOptions(period, '6')
+  expect(kpi('Partidos analizados').getByText('4')).toBeTruthy()
+  act(() => publish({ docs: [dates[0], dates[5]] }))
+  expect(screen.getByText('No hay estadísticas en este periodo')).toBeTruthy()
+  await user.selectOptions(period, 'all')
+  expect(kpi('Partidos analizados').getByText('2')).toBeTruthy()
+  expect(onSnapshot).toHaveBeenCalledTimes(2)
 })

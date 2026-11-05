@@ -1,6 +1,7 @@
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
 import { buildDashboardOverview } from '../dashboardOverview.js'
 import { buildDashboardEvolution } from '../dashboardEvolution.js'
+import { buildDashboardPeriods } from '../dashboardPeriods.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
 /** No Firebase initialization and no guessed statistics path or player mapping. */
@@ -40,7 +41,11 @@ export function createFirestoreDashboardService({ db, orgId, actorId, decodeStat
                 if (!decoded.has(match)) decoded.set(match, decodeStatistics(match, identity))
                 return decoded.get(match)
               } }
-              onData({ ...buildDashboardOverview(rows, context), evolution: buildDashboardEvolution(rows, context) })
+              const summarize = matches => ({
+                ...buildDashboardOverview(matches, context),
+                evolution: buildDashboardEvolution(matches, context),
+              })
+              onData({ ...summarize(rows), periods: buildDashboardPeriods(rows, summarize) })
             } catch (error) { fail(error) }
           }, fail)
           // Covers an error raised synchronously while attaching a listener.
