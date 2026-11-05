@@ -5,7 +5,7 @@ import { buildDashboardPeriods } from '../dashboardPeriods.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
 /** No Firebase initialization and no guessed statistics path or player mapping. */
-export function createFirestoreDashboardService({ db, orgId, actorId, decodeStatistics = decodeWorkerDashboardStatistics }) {
+export function createFirestoreDashboardService({ db, orgId, actorId, onlyOwned = false, decodeStatistics = decodeWorkerDashboardStatistics }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof decodeStatistics !== 'function') throw new TypeError('Dashboard requires database, organization, user and an agreed statistics decoder.')
 
   return {
@@ -27,15 +27,19 @@ export function createFirestoreDashboardService({ db, orgId, actorId, decodeStat
         try {
           const player = await getDoc(doc(db, 'players', playerId))
           if (!active) return
-          if (!player.exists() || player.data().orgId !== orgId) {
+          const data = player.exists() ? player.data() : null
+          if (data?.orgId !== orgId || (onlyOwned && data.createdBy !== actorId)) {
             fail(Object.assign(new Error('Player not available to this organization.'), { code: 'permission-denied' }))
             return
           }
-          const matches = query(collection(db, 'matches'), where('orgId', '==', orgId), where('playerId', '==', playerId))
+          const filters = [where('orgId', '==', orgId), where('playerId', '==', playerId)]
+          if (onlyOwned) filters.push(where('createdBy', '==', actorId))
+          const matches = query(collection(db, 'matches'), ...filters)
           unsubscribe = onSnapshot(matches, snapshot => {
             if (!active) return
             try {
               const rows = snapshot.docs.map(item => ({ ...item.data(), id: item.id }))
+                .filter(match => !onlyOwned || match.createdBy === actorId)
               const decoded = new Map()
               const context = { orgId, playerId, decodeStatistics: (match, identity) => {
                 if (!decoded.has(match)) decoded.set(match, decodeStatistics(match, identity))

@@ -1,6 +1,20 @@
 /** Proposed adapter boundary, not an assertion about the worker's current JSON. */
 export const DASHBOARD_STATISTICS_SCHEMA = 'acecam.player-match.v1'
 
+export const dashboardMetricDefinitions = [
+  { key: 'analyzedMatches', label: 'Partidos analizados', integer: true },
+  { key: 'measuredShots', label: 'Golpes medidos', integer: true, optional: true },
+  { key: 'averageShotSpeed', label: 'Velocidad media de golpe', speed: true, optional: true },
+  { key: 'averageServeSpeed', label: 'Velocidad media de saque', speed: true },
+  { key: 'firstServeInRate', label: 'Primer saque dentro', unit: '%', max: 100 },
+  { key: 'doubleFaults', label: 'Dobles faltas', integer: true, lowerIsBetter: true },
+]
+
+export function isDashboardMetricValue(metric, value) {
+  return Number.isFinite(value) && value >= 0 && (!metric.integer || Number.isSafeInteger(value))
+    && (metric.max == null || value <= metric.max)
+}
+
 const isCount = value => Number.isSafeInteger(value) && value >= 0
 const isNonnegative = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
 
