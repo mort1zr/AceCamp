@@ -60,7 +60,7 @@ service cloud.firestore {
     }
 
     // Análisis por mes según orgs/{orgId}.plan. Mismos valores que PLANES en
-    // web/src/panel/lib/services/firestoreConfiguracionService.js: cambiar ambos a la vez.
+    // web/src/panel/lib/planes.js: cambiar ambos a la vez (lo comprueba planes.test.js).
     // 'free' (sin plan) y cualquier valor desconocido no permiten análisis; 'ultra' no tiene tope.
     function withinPlan(orgId, analyses) {
       let plan = get(/databases/$(database)/documents/orgs/$(orgId)).data.get('plan', 'free');

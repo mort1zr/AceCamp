@@ -1,6 +1,7 @@
 // Planes que se guardan en orgs/{orgId}.plan y sus análisis por mes.
 // limite: null = sin tope. Los mismos valores están en withinPlan de
 // firebase/firestore.rules (PCIT-41): si cambian aquí, cambiarlos allá.
+// planes.test.js falla si los dos lugares no coinciden.
 export const PLANES = {
   free: { id: 'ninguno', prueba: false, limite: 0 },
   prueba: { id: 'basico', prueba: true, limite: 15 },
