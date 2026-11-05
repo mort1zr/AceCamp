@@ -10,7 +10,7 @@ import { createFirestorePlayersService } from '../../src/panel/lib/services/fire
 const read = name => readFileSync(fileURLToPath(new URL(`../../../firebase/${name}`, import.meta.url)), 'utf8')
 let env
 beforeAll(async () => {
-  env = await initializeTestEnvironment({ projectId: 'demo-acecam-pcit39-roles',
+  env = await initializeTestEnvironment({ projectId: process.env.ACECAM_RULES_PROJECT || 'demo-acecam',
     firestore: { rules: read('firestore.rules'), host: '127.0.0.1', port: Number(process.env.FIRESTORE_EMULATOR_HOST?.split(':').at(-1) || 8080) },
     storage: { rules: read('storage.rules'), host: '127.0.0.1', port: Number(process.env.STORAGE_EMULATOR_HOST?.split(':').at(-1) || 9199) } })
 })
