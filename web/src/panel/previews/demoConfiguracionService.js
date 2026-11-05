@@ -42,7 +42,7 @@ function ejemplo() {
       units: 'kmh',
       notifications: { analysis: true, application: true, alerts: false, weekly: true },
     },
-    plan: { id: 'ultra', trial: false, used: 18, limit: null },
+    plan: { id: 'ultra', trial: false, used: 18, limit: null, cycle: 'anual', renewsAt: '2027-03-01T00:00:00.000Z' },
   }
 }
 

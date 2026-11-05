@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore'
 
 import { anularInvitacion, invitarMiembro } from '../invitaciones.js'
-import { PLANES } from '../planes.js'
+import { PLANES, proximaRenovacion } from '../planes.js'
 import { INVITE_STATUS } from '../schema.js'
 import { usagePeriod, usageRef } from '../usage.js'
 
@@ -99,7 +99,23 @@ export function createFirestoreConfiguracionService({
               .sort((a, b) => a.email.localeCompare(b.email, 'es')),
           ],
           preferences: leerPreferencias(clavePreferencias),
-          plan: { id: plan.id, trial: plan.prueba, used: usados, limit: plan.limite },
+          plan: {
+            id: plan.id,
+            trial: plan.prueba,
+            used: usados,
+            limit: plan.limite,
+            // Periodo y renovación guardados por el checkout (PCIT-158).
+            cycle: estado.organizacion.billingCycle ?? null,
+            renewsAt:
+              proximaRenovacion(
+                {
+                  plan: estado.organizacion.plan,
+                  planSince: estado.organizacion.planSince?.toDate?.() ?? estado.organizacion.planSince,
+                  billingCycle: estado.organizacion.billingCycle,
+                },
+                ahora(),
+              )?.toISOString() ?? null,
+          },
         })
       }
       avisos.add(emitir)

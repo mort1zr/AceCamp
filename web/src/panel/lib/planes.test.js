@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { PLANES } from './planes.js'
+import { PLANES, proximaRenovacion } from './planes.js'
 
 const reglas = readFileSync(fileURLToPath(new URL('../../../../firebase/firestore.rules', import.meta.url)), 'utf8')
 
@@ -34,5 +34,30 @@ describe('planes de la web y de las reglas', () => {
     const lista = reglas.match(/request\.resource\.data\.plan in \[([^\]]*)\]/)[1]
     const permitidos = [...lista.matchAll(/'(\w+)'/g)].map(([, plan]) => plan)
     expect(permitidos.sort()).toEqual(Object.keys(PLANES).filter((id) => id !== 'free').sort())
+  })
+})
+
+describe('proximaRenovacion (PCIT-158)', () => {
+  const inicio = new Date('2026-11-05T15:00:00Z')
+
+  it('mensual y anual avanzan hasta la próxima fecha futura', () => {
+    expect(proximaRenovacion({ plan: 'pro', planSince: inicio, billingCycle: 'mensual' }, new Date('2026-11-20T00:00:00Z')).toISOString())
+      .toBe('2026-12-05T15:00:00.000Z')
+    expect(proximaRenovacion({ plan: 'pro', planSince: inicio, billingCycle: 'mensual' }, new Date('2027-02-10T00:00:00Z')).toISOString())
+      .toBe('2027-03-05T15:00:00.000Z')
+    expect(proximaRenovacion({ plan: 'ultra', planSince: inicio, billingCycle: 'anual' }, new Date('2026-12-01T00:00:00Z')).toISOString())
+      .toBe('2027-11-05T15:00:00.000Z')
+  })
+
+  it('la prueba termina un mes después y no se renueva', () => {
+    expect(proximaRenovacion({ plan: 'prueba', planSince: inicio, billingCycle: 'mensual' }, new Date('2027-05-01T00:00:00Z')).toISOString())
+      .toBe('2026-12-05T15:00:00.000Z')
+  })
+
+  it('sin plan o sin fecha de inicio no hay renovación', () => {
+    expect(proximaRenovacion({ plan: 'free', planSince: inicio })).toBeNull()
+    expect(proximaRenovacion({ plan: 'pro', planSince: null })).toBeNull()
+    expect(proximaRenovacion({ plan: 'inventado', planSince: inicio })).toBeNull()
+    expect(proximaRenovacion({ plan: 'pro', planSince: 'no-es-fecha' })).toBeNull()
   })
 })

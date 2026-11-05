@@ -107,6 +107,8 @@ const textos = {
       'Con Ultra tu organización tiene su propio espacio e invitas a todo tu cuerpo técnico.',
     conocerUltra: 'Conocer Ultra',
     renueva: (fecha) => `Se renueva el ${fecha}`,
+    pruebaTermina: (fecha) => `La prueba termina el ${fecha}`,
+    ciclos: { mensual: 'Pago mensual', anual: 'Pago anual' },
     planes: [
       { id: 'basico', nombre: 'Básico', detalle: 'Para jugadores y padres. Hasta 2 jugadores.' },
       {
@@ -215,6 +217,8 @@ const textos = {
       'With Ultra your organization gets its own space and you invite your whole coaching staff.',
     conocerUltra: 'Discover Ultra',
     renueva: (fecha) => `Renews on ${fecha}`,
+    pruebaTermina: (fecha) => `Trial ends on ${fecha}`,
+    ciclos: { mensual: 'Billed monthly', anual: 'Billed yearly' },
     planes: [
       { id: 'basico', nombre: 'Basic', detalle: 'For players and parents. Up to 2 players.' },
       { id: 'pro', nombre: 'Pro', detalle: 'For coaches and recruiters. Up to 24 players.' },
@@ -874,9 +878,16 @@ function Plan({ t, plan, locale, esOrganizacion }) {
   const tieneUso = typeof plan?.used === 'number'
   const renovacion =
     plan?.renewsAt &&
-    new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+    new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
       new Date(plan.renewsAt),
     )
+  // PCIT-158: periodo y renovación del plan contratado; en la prueba, cuándo termina.
+  const facturacion = [
+    !plan?.trial && plan?.cycle ? t.ciclos[plan.cycle] : null,
+    renovacion ? (plan?.trial ? t.pruebaTermina(renovacion) : t.renueva(renovacion)) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <section className={`${tarjeta} flex flex-col gap-4.5`} aria-labelledby={`${id}-titulo`}>
@@ -895,6 +906,7 @@ function Plan({ t, plan, locale, esOrganizacion }) {
             )}
           </p>
           <p className="mt-1 text-sm text-muted">{actual ? actual.detalle : t.sinPlanTexto}</p>
+          {facturacion && <p className="mt-1 text-xs text-muted">{facturacion}</p>}
         </div>
         {tieneUso && !plan.limit ? (
           <span className="text-sm">{t.usadosSinLimite(plan.used)}</span>
@@ -914,7 +926,6 @@ function Plan({ t, plan, locale, esOrganizacion }) {
                 style={{ width: `${porcentaje}%` }}
               />
             </div>
-            {renovacion && <span className="text-xs text-muted">{t.renueva(renovacion)}</span>}
           </div>
         ) : (
           <Link to="/inicio" className={botonPrincipal}>

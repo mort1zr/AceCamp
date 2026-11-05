@@ -31,6 +31,12 @@ const montar = (service, entrada = '/configuracion') =>
   )
 
 describe('Configuración', () => {
+  it('Plan muestra el periodo y la próxima renovación (PCIT-158)', async () => {
+    montar(createDemoConfiguracionService(), '/configuracion?seccion=plan')
+    const linea = await screen.findByText(/Pago anual · Se renueva el/)
+    expect(linea.textContent).toContain('2027')
+  })
+
   it('cambia de pestaña y la refleja en la URL', async () => {
     const user = userEvent.setup()
     montar(createDemoConfiguracionService())
