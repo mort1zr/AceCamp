@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextUsage, planLimit, quotaReached, usagePeriod } from './usage.js'
+import { nextUsage, planLimit, quotaLow, quotaReached, remainingAnalyses, usagePeriod } from './usage.js'
 import { analysisErrorMessage } from './analysis.js'
 
 describe('límite del plan', () => {
@@ -7,6 +7,15 @@ describe('límite del plan', () => {
     expect([planLimit('free'), planLimit('prueba'), planLimit('basico'), planLimit('pro'), planLimit('ultra')]).toEqual([0, 15, 30, 150, null])
     expect(planLimit('inventado')).toBe(0)
     expect(planLimit(undefined)).toBe(0)
+  })
+
+  it('cuenta los que quedan y avisa en el último 20 % del plan', () => {
+    expect(remainingAnalyses(12, 15)).toBe(3)
+    expect(remainingAnalyses(20, 15)).toBe(0)
+    expect(remainingAnalyses(900, null)).toBeNull()
+    expect([quotaLow(11, 15), quotaLow(12, 15), quotaLow(15, 15)]).toEqual([false, true, false])
+    expect([quotaLow(119, 150), quotaLow(120, 150)]).toEqual([false, true])
+    expect(quotaLow(900, null)).toBe(false)
   })
 
   it('se alcanza al llegar al tope; Ultra nunca', () => {

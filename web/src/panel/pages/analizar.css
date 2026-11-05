@@ -8,6 +8,8 @@
 .analysis-limit { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 1rem; padding: 0.85rem 1rem; border: 1px solid var(--bad, #e5484d); border-radius: 0.75rem; font-size: 0.8125rem; color: var(--players-muted); }
 .analysis-limit strong { color: var(--bad, #e5484d); font-weight: 600; }
 .analysis-limit a { margin-left: auto; }
+.analysis-limit--low { border-color: var(--electric, #f5a524); }
+.analysis-limit--low strong { color: var(--text, inherit); }
 
 .analysis-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; align-items: start; }
 .analysis-form { min-width: 0; }

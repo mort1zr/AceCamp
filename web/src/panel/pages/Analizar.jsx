@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
 import { usePlanVista } from '../context/PlanVistaContext.js'
-import { quotaReached } from '../lib/usage.js'
+import { quotaLow, quotaReached, remainingAnalyses } from '../lib/usage.js'
 import AnalysisForm from '../components/analysis/AnalysisForm.jsx'
 import PlayerForm from '../components/players/PlayerForm.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
@@ -90,11 +90,29 @@ function LimiteAlcanzado({ usados, limite }) {
   )
 }
 
+// Aviso previo: quedan pocos análisis en el mes (PCIT-41).
+function QuedanPocos({ usados, limite }) {
+  const quedan = remainingAnalyses(usados, limite)
+  return (
+    <div className="analysis-limit analysis-limit--low" role="status">
+      <strong>{quedan === 1 ? 'Te queda 1 análisis este mes' : `Te quedan ${quedan} análisis este mes`}</strong>
+      <span>
+        Tu organización usó {usados} de {limite}. Al llegar al límite no se podrán analizar más
+        partidos hasta el próximo mes.
+      </span>
+      <Link to="/configuracion" className="players-button-secondary">
+        Ver mi plan
+      </Link>
+    </div>
+  )
+}
+
 function AnalysisWorkspace({ service, playersService }) {
   const players = usePlayers(playersService)
   const queue = useAnalysisQueue(service)
   const { uso } = usePlanVista()
   const sinAnalisis = service.mode === 'live' && quotaReached(uso.usados, uso.limite)
+  const quedanPocos = service.mode === 'live' && quotaLow(uso.usados, uso.limite)
   const [playerId, setPlayerId] = useState('')
   const [showNewPlayer, setShowNewPlayer] = useState(false)
   const columns = [
@@ -121,6 +139,7 @@ function AnalysisWorkspace({ service, playersService }) {
       )}
       <Cabecera />
       {sinAnalisis && <LimiteAlcanzado usados={uso.usados} limite={uso.limite} />}
+      {quedanPocos && <QuedanPocos usados={uso.usados} limite={uso.limite} />}
       {showNewPlayer && (
         <PlayerForm
           service={playersService}
