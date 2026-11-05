@@ -1,75 +1,67 @@
 import { Route, Routes } from 'react-router'
-import { useCallback, useMemo } from 'react'
-import AppLayout from './panel/components/AppLayout.jsx'
+import { lazy, Suspense } from 'react'
 import PublicLayout from './landing/components/PublicLayout.jsx'
 import RequireAuth from './panel/components/RequireAuth.jsx'
-import { useAuth } from './panel/context/AuthContext.js'
-import { contratarPlan } from './panel/lib/contratarPlan.js'
-import { auth, db, storage } from './panel/lib/firebase.js'
-import { createHttpVideoImporter } from './panel/lib/services/httpVideoImportService.js'
-import { createVideoUploadService, MAX_VIDEO_BYTES } from './panel/lib/videoUpload.js'
-import Acceso from './panel/pages/Acceso.jsx'
-import Analizar from './panel/pages/Analizar.jsx'
-import Checkout from './panel/pages/Checkout.jsx'
-import Comparador from './panel/pages/Comparador.jsx'
-import Configuracion from './panel/pages/Configuracion.jsx'
-import Dashboard from './panel/pages/Dashboard.jsx'
-import Inicio from './panel/pages/Inicio.jsx'
-import Jugadores from './panel/pages/Jugadores.jsx'
 import Landing from './landing/pages/Landing.jsx'
-import Login from './panel/pages/Login.jsx'
 import NotFound from './compartido/pages/NotFound.jsx'
-import Partidos from './panel/pages/Partidos.jsx'
-import Precios from './landing/pages/Precios.jsx'
-import Privacidad from './landing/pages/Privacidad.jsx'
-import Reclutamiento from './panel/pages/Reclutamiento.jsx'
-import Registro from './panel/pages/Registro.jsx'
-import Terminos from './landing/pages/Terminos.jsx'
 
-const { uploadVideo } = createVideoUploadService({ storage })
+const conPanel = (cargar) =>
+  lazy(() =>
+    Promise.all([import('./panel/rutas.jsx'), cargar()]).then(([{ conectar }, pagina]) => ({
+      default: conectar(pagina.default),
+    })),
+  )
+
+const Acceso = lazy(() => import('./panel/pages/Acceso.jsx'))
+const Analizar = conPanel(() => import('./panel/pages/Analizar.jsx'))
+const AppLayout = lazy(() => import('./panel/components/AppLayout.jsx'))
+const Checkout = conPanel(() => import('./panel/pages/Checkout.jsx'))
+const Comparador = conPanel(() => import('./panel/pages/Comparador.jsx'))
+const Configuracion = conPanel(() => import('./panel/pages/Configuracion.jsx'))
+const Dashboard = conPanel(() => import('./panel/pages/Dashboard.jsx'))
+const Inicio = lazy(() => import('./panel/pages/Inicio.jsx'))
+const Jugadores = conPanel(() => import('./panel/pages/Jugadores.jsx'))
+const Login = lazy(() => import('./panel/pages/Login.jsx'))
+const Partidos = conPanel(() => import('./panel/pages/Partidos.jsx'))
+const Precios = lazy(() => import('./landing/pages/Precios.jsx'))
+const Privacidad = lazy(() => import('./landing/pages/Privacidad.jsx'))
+const Reclutamiento = lazy(() => import('./panel/pages/Reclutamiento.jsx'))
+const Registro = lazy(() => import('./panel/pages/Registro.jsx'))
+const Terminos = lazy(() => import('./landing/pages/Terminos.jsx'))
 
 export default function App() {
-  const { user, profile } = useAuth()
-  const session = user && profile ? { uid: user.uid, orgId: profile.orgId, role: profile.role } : undefined
-  const importVideo = useMemo(() => createHttpVideoImporter({
-    enabled: import.meta.env.DEV && import.meta.env.MODE === 'demo' && Boolean(user && profile),
-    supportsYouTube: true,
-    endpoint: '/api/video-import',
-    getSession: async () => ({ orgId: profile.orgId, actorId: user.uid, token: await user.getIdToken() }),
-  }), [user, profile])
-  const orgId = profile?.orgId
-  const contratar = useCallback(({ plan, periodo }) => contratarPlan({ db, orgId, plan, periodo }), [orgId])
-
   return (
-    <Routes>
-      <Route element={<PublicLayout />}>
-        <Route path="/" element={<Landing />} />
-        <Route path="/precios" element={<Precios />} />
-        <Route path="/terminos" element={<Terminos />} />
-        <Route path="/privacidad" element={<Privacidad />} />
-      </Route>
-
-      <Route element={<Acceso />}>
-        <Route path="/login" element={<Login />} />
-        <Route path="/registro" element={<Registro />} />
-      </Route>
-
-      <Route path="/checkout" element={<Checkout contratar={contratar} />} />
-
-      <Route element={<RequireAuth />}>
-        <Route element={<AppLayout />}>
-          <Route path="/inicio" element={<Inicio />} />
-          <Route path="/dashboard" element={<Dashboard db={db} session={session} />} />
-          <Route path="/jugadores" element={<Jugadores db={db} session={session} />} />
-          <Route path="/analizar" element={<Analizar db={db} session={session} uploadVideo={uploadVideo} importVideo={importVideo} maxBytes={MAX_VIDEO_BYTES} />} />
-          <Route path="/partidos" element={<Partidos db={db} storage={storage} session={session} />} />
-          <Route path="/comparador" element={<Comparador db={db} session={session} />} />
-          <Route path="/reclutamiento" element={<Reclutamiento />} />
-          <Route path="/configuracion" element={<Configuracion db={db} auth={auth} session={session} />} />
+    <Suspense fallback={null}>
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<Landing />} />
+          <Route path="/precios" element={<Precios />} />
+          <Route path="/terminos" element={<Terminos />} />
+          <Route path="/privacidad" element={<Privacidad />} />
         </Route>
-      </Route>
 
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        <Route element={<Acceso />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/registro" element={<Registro />} />
+        </Route>
+
+        <Route path="/checkout" element={<Checkout />} />
+
+        <Route element={<RequireAuth />}>
+          <Route element={<AppLayout />}>
+            <Route path="/inicio" element={<Inicio />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/jugadores" element={<Jugadores />} />
+            <Route path="/analizar" element={<Analizar />} />
+            <Route path="/partidos" element={<Partidos />} />
+            <Route path="/comparador" element={<Comparador />} />
+            <Route path="/reclutamiento" element={<Reclutamiento />} />
+            <Route path="/configuracion" element={<Configuracion />} />
+          </Route>
+        </Route>
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   )
 }
