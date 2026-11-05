@@ -7,7 +7,7 @@ import { connectFirestoreEmulator, doc, getDoc, getFirestore } from 'firebase/fi
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createAuthService } from '../../src/panel/lib/auth.js'
 
-const PROJECT = 'demo-acecam'
+const PROJECT = process.env.ACECAM_RULES_PROJECT || 'demo-acecam'
 const HOST = '127.0.0.1'
 
 let app
@@ -16,12 +16,13 @@ let db
 let service
 
 beforeAll(async () => {
-  await fetch(`http://${HOST}:9099/emulator/v1/projects/${PROJECT}/accounts`, { method: 'DELETE' })
+  const authHost = process.env.FIREBASE_AUTH_EMULATOR_HOST || `${HOST}:9099`
+  await fetch(`http://${authHost}/emulator/v1/projects/${PROJECT}/accounts`, { method: 'DELETE' })
   app = initializeApp({ projectId: PROJECT, apiKey: 'demo-api-key' }, `auth-test-${Date.now()}`)
   auth = getAuth(app)
-  connectAuthEmulator(auth, `http://${HOST}:9099`, { disableWarnings: true })
+  connectAuthEmulator(auth, `http://${authHost}`, { disableWarnings: true })
   db = getFirestore(app)
-  connectFirestoreEmulator(db, HOST, 8080)
+  connectFirestoreEmulator(db, HOST, Number(process.env.FIRESTORE_EMULATOR_HOST?.split(':').at(-1) || 8080))
   service = createAuthService({ auth, db })
 })
 

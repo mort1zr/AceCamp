@@ -1,29 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { PLANES } from '../lib/services/firestoreConfiguracionService.js'
+import { PLANES } from '../lib/planes.js'
 import { PLANES_VISTA, PlanVistaContexto } from './PlanVistaContext.js'
 
 const CLAVE = 'acecam-plan-vista'
 
-function leerPlan() {
+function leerPlan(clave) {
   try {
-    const guardado = localStorage.getItem(CLAVE)
+    const guardado = localStorage.getItem(clave)
     return PLANES_VISTA.some((plan) => plan.id === guardado) ? guardado : null
   } catch {
     return null
   }
 }
 
-export default function PlanVistaProvider({ planReal = null, usados = null, children }) {
-  const [planVista, setPlanVista] = useState(leerPlan)
+export default function PlanVistaProvider({ cuenta, planReal = null, usados = null, children }) {
+  const clave = `${CLAVE}:${cuenta ?? ''}`
+  const [planVista, setPlanVista] = useState(() => leerPlan(clave))
 
   useEffect(() => {
     try {
-      if (planVista) localStorage.setItem(CLAVE, planVista)
-      else localStorage.removeItem(CLAVE)
+      if (planVista) localStorage.setItem(clave, planVista)
+      else localStorage.removeItem(clave)
     } catch {
       return
     }
-  }, [planVista])
+  }, [clave, planVista])
 
   const valor = useMemo(() => {
     const limite = planVista ? PLANES[planVista].limite : (planReal?.limite ?? null)

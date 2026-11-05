@@ -10,7 +10,7 @@ rules_version = '2';
 // - orgId, createdBy y el consentimiento salen de la sesión y no se pueden cambiar.
 // - El worker del modelo (PCIT-35) usa el Admin SDK, que no pasa por estas reglas:
 //   por eso la web no puede escribir statistics ni los estados procesando/listo.
-// - Los permisos por rol (administrador / entrenador) llegan en PCIT-39.
+// - PCIT-39: admin ve su organización; coach solo sus jugadores y partidos.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,7 +31,48 @@ service cloud.firestore {
     }
 
     function inOrg(orgId) {
-      return signedIn() && orgId is string && myOrgId() == orgId;
+      return signedIn() && orgId is string && myOrgId() == orgId
+        && get(userPath(request.auth.uid)).data.role in ['admin', 'coach'];
+    }
+
+    function isAdmin() {
+      return signedIn() && get(userPath(request.auth.uid)).data.role == 'admin';
+    }
+
+    function canManage(data) {
+      return inOrg(data.orgId) && (isAdmin() || data.createdBy == request.auth.uid);
+    }
+
+    // ---------- Uso mensual (PCIT-41) ----------
+    // Contador en orgs/{orgId}/usage/{YYYY-MM}, con el mes en UTC como request.time.
+
+    function currentPeriod() {
+      return string(request.time.year()) + '-'
+        + (request.time.month() < 10 ? '0' : '') + string(request.time.month());
+    }
+
+    function usagePath(orgId) {
+      return /databases/$(database)/documents/orgs/$(orgId)/usage/$(currentPeriod());
+    }
+
+    function matchPath(matchId) {
+      return /databases/$(database)/documents/matches/$(matchId);
+    }
+
+    // Análisis por mes según orgs/{orgId}.plan. Mismos valores que PLANES en
+    // web/src/panel/lib/services/firestoreConfiguracionService.js: cambiar ambos a la vez.
+    // 'free' (sin plan) y cualquier valor desconocido no permiten análisis; 'ultra' no tiene tope.
+    function withinPlan(orgId, analyses) {
+      let plan = get(/databases/$(database)/documents/orgs/$(orgId)).data.get('plan', 'free');
+      return plan == 'ultra'
+        || analyses <= {'prueba': 15, 'basico': 30, 'pro': 150}.get(plan, 0);
+    }
+
+    // El partido nuevo suma exactamente uno al contador del mes, en la misma escritura.
+    function countsAsAnalysis(orgId, matchId) {
+      let after = getAfter(usagePath(orgId)).data;
+      let before = exists(usagePath(orgId)) ? get(usagePath(orgId)).data.analyses : 0;
+      return after.lastMatchId == matchId && after.analyses == before + 1;
     }
 
     function isText(value, min, max) {
@@ -119,21 +160,76 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && getAfter(userPath(request.auth.uid)).data.orgId == orgId;
 
-      // Solo quien la creó cambia el nombre o el programa. El plan lo cambia el cobro (PCIT-41).
+      // Solo quien la creó cambia el nombre o el programa.
       allow update: if inOrg(orgId)
         && resource.data.ownerId == request.auth.uid
         && onlyChanges(['name', 'program', 'updatedAt'])
         && isText(request.resource.data.name, 2, 120)
         && optionalText(request.resource.data, 'program', 120);
 
+      // Checkout simulado (PCIT-158): solo el dueño contrata un plan, y solo cambia
+      // plan, periodo y fecha de inicio. 'free' no se elige: es la cuenta sin plan.
+      // La prueba de Básico se da una sola vez (antes de cualquier planSince).
+      allow update: if inOrg(orgId)
+        && resource.data.ownerId == request.auth.uid
+        && onlyChanges(['plan', 'billingCycle', 'planSince'])
+        && request.resource.data.plan in ['prueba', 'basico', 'pro', 'ultra']
+        && (request.resource.data.plan != 'prueba' || resource.data.get('planSince', null) == null)
+        && request.resource.data.billingCycle in ['mensual', 'anual']
+        && request.resource.data.planSince == request.time;
+
       allow delete: if false;
+
+      // Contador de análisis del mes (PCIT-41). Solo sube de uno en uno y junto con
+      // el alta de un partido nuevo; borrar un partido no devuelve el análisis.
+      match /usage/{period} {
+        allow get, list: if inOrg(orgId);
+
+        allow create, update: if inOrg(orgId)
+          && period == currentPeriod()
+          && request.resource.data.keys().hasOnly(['analyses', 'lastMatchId', 'updatedAt'])
+          && request.resource.data.analyses == (resource == null ? 0 : resource.data.analyses) + 1
+          // Al llegar al límite del plan no se crean más análisis en el mes.
+          && withinPlan(orgId, request.resource.data.analyses)
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.lastMatchId is string
+          && !exists(matchPath(request.resource.data.lastMatchId))
+          && getAfter(matchPath(request.resource.data.lastMatchId)).data.orgId == orgId;
+
+        allow delete: if false;
+      }
     }
 
     // ---------- players/{playerId} ----------
 
+    function validBirthDate(value) {
+      let parts = value.split('-');
+      let date = timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+      return date >= timestamp.date(1900, 1, 1) && date <= request.time;
+    }
+
+    function isMinor(value) {
+      let parts = value.split('-');
+      let beforeBirthday = request.time.month() < int(parts[1])
+        || (request.time.month() == int(parts[1]) && request.time.day() < int(parts[2]));
+      return request.time.year() - int(parts[0]) - (beforeBirthday ? 1 : 0) < 18;
+    }
+
+    function validGuardian(data) {
+      let value = data.get('guardian', null);
+      return value == null ? !isMinor(data.birthDate)
+        : value is map && value.keys().hasAll(['name', 'phone', 'email'])
+          && value.keys().hasOnly(['name', 'phone', 'email'])
+          && isText(value.name, 2, 120) && isText(value.phone, 7, 32)
+          && value.phone.matches('^[+0-9 ().-]{7,32}$')
+          && value.phone.matches('.*[0-9].*')
+          && isText(value.email, 3, 254) && value.email.matches('^[^ @]+@[^ @]+[.][^ @]+$');
+    }
+
     function validPlayer(data) {
       return isText(data.fullName, 2, 120)
         && isIsoDate(data.birthDate)
+        && validBirthDate(data.birthDate)
         && optionalText(data, 'academy', 120)
         && optionalIn(data, 'category', ['Sub-14', 'Sub-16', 'Sub-18', 'Adulto'])
         && optionalIn(data, 'dominantHand', ['diestro', 'zurdo'])
@@ -141,15 +237,19 @@ service cloud.firestore {
         && optionalNumber(data, 'utr')
         && optionalNumber(data, 'nationalRanking')
         && optionalNumber(data, 'graduationYear')
+        // Un número finito restado a sí mismo da cero; NaN/Infinity no son válidos.
+        && (data.get('utr', null) == null || (data.utr >= 0 && data.utr - data.utr == 0))
+        && (data.get('nationalRanking', null) == null || (data.nationalRanking is int && data.nationalRanking > 0 && data.nationalRanking <= 9007199254740991))
+        && (data.get('graduationYear', null) == null || (data.graduationYear is int && data.graduationYear >= 1900 && data.graduationYear <= 2100))
         && optionalText(data, 'nationality', 60)
         && optionalText(data, 'coachName', 120)
-        && (data.get('guardian', null) == null || data.get('guardian', null) is map);
+        && validGuardian(data);
     }
 
     match /players/{playerId} {
       // get de un documento inexistente se permite: no revela nada y lo usa el alta de partidos.
-      allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
-      allow list: if inOrg(resource.data.orgId);
+      allow get: if signedIn() && (resource == null || canManage(resource.data));
+      allow list: if canManage(resource.data);
 
       allow create: if inOrg(request.resource.data.orgId)
         && request.resource.data.keys().hasAll(['orgId', 'fullName', 'birthDate', 'consent', 'createdBy', 'createdAt'])
@@ -162,22 +262,30 @@ service cloud.firestore {
         && validConsent(request.resource.data.consent, request.auth.uid)
         && validPlayer(request.resource.data);
 
-      allow update: if inOrg(resource.data.orgId)
+      allow update: if canManage(resource.data)
+        && resource.data.get('deletedAt', null) == null
         && unchanged(['orgId', 'createdBy', 'createdAt', 'consent'])
         && onlyChanges([
              'fullName', 'birthDate', 'academy', 'category', 'dominantHand', 'backhand', 'utr',
              'nationalRanking', 'nationality', 'graduationYear', 'coachName', 'guardian', 'updatedAt'])
         && validPlayer(request.resource.data);
 
-      allow delete: if inOrg(resource.data.orgId);
+      // PCIT-42: retirar de la plantilla conserva los partidos y su identidad.
+      allow update: if canManage(resource.data)
+        && resource.data.get('deletedAt', null) == null
+        && onlyChanges(['deletedAt', 'updatedAt'])
+        && request.resource.data.deletedAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if canManage(resource.data);
     }
 
     // ---------- matches/{matchId} ----------
     // La web crea el partido 'en cola'; el worker (Admin SDK) lo procesa.
 
     match /matches/{matchId} {
-      allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
-      allow list: if inOrg(resource.data.orgId);
+      allow get: if signedIn() && (resource == null || canManage(resource.data));
+      allow list: if canManage(resource.data);
 
       allow create: if inOrg(request.resource.data.orgId)
         && request.resource.data.keys().hasAll([
@@ -199,6 +307,8 @@ service cloud.firestore {
         // El jugador tiene que ser de la misma organización.
         && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.orgId
              == request.resource.data.orgId
+        && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.get('deletedAt', null) == null
+        && (isAdmin() || get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.createdBy == request.auth.uid)
         && request.resource.data.playerPosition in ['arriba', 'abajo']
         && isText(request.resource.data.opponent, 2, 120)
         && isIsoDate(request.resource.data.matchDate)
@@ -208,10 +318,12 @@ service cloud.firestore {
         // El video tiene que estar en la carpeta de este partido y de esta organización (PCIT-24).
         && request.resource.data.videoPath is string
         && request.resource.data.videoPath.matches(
-             '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$');
+             '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$')
+        // Cada partido nuevo cuenta como un análisis del mes (PCIT-41).
+        && countsAsAnalysis(request.resource.data.orgId, matchId);
 
       // La web puede corregir los datos del partido…
-      allow update: if inOrg(resource.data.orgId)
+      allow update: if canManage(resource.data)
         && onlyChanges(['opponent', 'tournament', 'result', 'surface', 'matchDate', 'updatedAt'])
         && isText(request.resource.data.opponent, 2, 120)
         && isIsoDate(request.resource.data.matchDate)
@@ -220,7 +332,7 @@ service cloud.firestore {
         && optionalIn(request.resource.data, 'surface', ['arcilla', 'dura', 'césped', 'otra']);
 
       // …o reintentar un partido con error (botón Reintentar).
-      allow update: if inOrg(resource.data.orgId)
+      allow update: if canManage(resource.data)
         && resource.data.status == 'error'
         && request.resource.data.status == 'en cola'
         && request.resource.data.get('errorMessage', null) == null
@@ -228,7 +340,24 @@ service cloud.firestore {
         && onlyChanges(['status', 'errorMessage', 'startedAt', 'finishedAt', 'updatedAt']);
 
       // No se borra un partido mientras el worker lo procesa.
-      allow delete: if inOrg(resource.data.orgId) && resource.data.status != 'procesando';
+      allow delete: if canManage(resource.data) && resource.data.status != 'procesando';
+
+      match /coachNotes/{authorId} {
+        function canUseOwnNote() {
+          let parent = get(/databases/$(database)/documents/matches/$(matchId)).data;
+          let profile = get(userPath(request.auth.uid)).data;
+          return request.auth.uid == authorId
+            && parent.orgId is string && profile.orgId == parent.orgId
+            && parent.status == 'listo'
+            && (profile.role == 'admin' || (profile.role == 'coach' && parent.createdBy == authorId));
+        }
+
+        allow get, delete: if signedIn() && canUseOwnNote();
+        allow create, update: if signedIn() && canUseOwnNote()
+          && request.resource.data.keys().hasOnly(['text', 'updatedAt'])
+          && isText(request.resource.data.text, 1, 2000)
+          && request.resource.data.updatedAt == request.time;
+      }
     }
 
     // ---------- applications/{applicationId} ----------

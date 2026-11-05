@@ -1,14 +1,11 @@
-import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
-import { PLANES } from '../lib/services/firestoreConfiguracionService.js'
+import { PLANES } from '../lib/planes.js'
+import { usageRef } from '../lib/usage.js'
 
-function milisegundos(valor) {
-  if (!valor) return 0
-  if (typeof valor.toMillis === 'function') return valor.toMillis()
-  const fecha = new Date(valor).getTime()
-  return Number.isNaN(fecha) ? 0 : fecha
-}
-
+// Plan de la organización y análisis usados en el mes (PCIT-41).
+// El uso sale del contador orgs/{orgId}/usage/{YYYY-MM}: es de toda la organización,
+// el mismo número que aplica el límite en las reglas.
 export function usePlanOrganizacion(db, orgId) {
   const [plan, setPlan] = useState(null)
   const [usados, setUsados] = useState(null)
@@ -21,15 +18,8 @@ export function usePlanOrganizacion(db, orgId) {
       () => setPlan(null),
     )
     const detenerUso = onSnapshot(
-      query(collection(db, 'matches'), where('orgId', '==', orgId)),
-      (instantanea) => {
-        const ahora = new Date()
-        const desde = new Date(ahora.getFullYear(), ahora.getMonth(), 1).getTime()
-        setUsados(
-          instantanea.docs.filter((partido) => milisegundos(partido.data().createdAt) >= desde)
-            .length,
-        )
-      },
+      usageRef(db, orgId),
+      (instantanea) => setUsados(instantanea.data()?.analyses ?? 0),
       () => setUsados(null),
     )
     return () => {

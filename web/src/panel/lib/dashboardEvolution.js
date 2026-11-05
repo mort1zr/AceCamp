@@ -12,7 +12,8 @@ function chronological(a, b) {
 }
 
 /** Per-match observations; absent values remain null to preserve visible gaps. */
-export function buildDashboardEvolution(matches, { orgId, playerId, decodeStatistics }) {
+export function buildDashboardEvolution(matches, { orgId, playerId, decodeStatistics }, metric = 'averageShotSpeed') {
+  if (!['averageShotSpeed', 'averageServeSpeed'].includes(metric)) throw new TypeError('Unknown evolution metric.')
   if (!Array.isArray(matches) || !orgId || !playerId || typeof decodeStatistics !== 'function') throw new TypeError('Evolution requires rows, organization, player and a statistics decoder.')
   const seen = new Set()
   const points = []
@@ -24,29 +25,29 @@ export function buildDashboardEvolution(matches, { orgId, playerId, decodeStatis
     const decoded = decodeStatistics(match, { playerId })
     if (decoded && typeof decoded.then === 'function') throw new TypeError('Statistics decoder must be synchronous.')
     const statistics = normalizeDashboardStatistics(decoded, playerId)
-    const speed = statistics?.shots
+    const speed = metric === 'averageServeSpeed' ? statistics?.serveSpeed : statistics?.shots
     const value = speed?.sampleCount > 0 ? speed.sumKmh / speed.sampleCount : null
     points.push({
       matchId: match.id, playerId, date: match.matchDate,
       opponent: typeof match.opponent === 'string' ? match.opponent : '',
-      averageShotSpeed: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
+      [metric]: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
     })
   }
   return { playerId, points: points.sort(chronological) }
 }
 
 /** Defensive presentation boundary: do not display another player's old series. */
-export function selectEvolutionPoints(evolution, playerId) {
+export function selectEvolutionPoints(evolution, playerId, metric = 'averageShotSpeed') {
   if (!evolution || evolution.playerId !== playerId || !Array.isArray(evolution.points)) return []
   const seen = new Set()
   return evolution.points.flatMap(point => {
     if (!point || point.playerId !== playerId || typeof point.matchId !== 'string' || !point.matchId || seen.has(point.matchId) || !isValidMatchDate(point.date)) return []
     seen.add(point.matchId)
-    const value = point.averageShotSpeed
+    const value = point[metric]
     return [{
       matchId: point.matchId, playerId, date: point.date,
       opponent: typeof point.opponent === 'string' ? point.opponent : '',
-      averageShotSpeed: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
+      [metric]: typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null,
     }]
   }).sort(chronological)
 }

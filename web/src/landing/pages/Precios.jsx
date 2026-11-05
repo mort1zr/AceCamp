@@ -49,7 +49,7 @@ const textos = {
           'Videos propios o de YouTube',
           'Reporte en PDF',
         ],
-        accion: { label: 'Prueba gratis', to: '/registro' },
+        accion: { label: 'Prueba gratis', to: '/checkout?plan=basico' },
       },
       {
         nombre: 'Pro',
@@ -67,7 +67,7 @@ const textos = {
           'Bandeja de reclutamiento',
           'Soporte prioritario',
         ],
-        accion: { label: 'Empieza ahora', to: '/registro' },
+        accion: { label: 'Empieza ahora', to: '/checkout?plan=pro' },
       },
       {
         nombre: 'Ultra',
@@ -77,7 +77,7 @@ const textos = {
         tono: 'ultra',
         base: 'Todo lo de Pro, más:',
         incluye: ['Muchos más jugadores', 'Muchos más análisis', 'Soporte dedicado'],
-        accion: { label: 'Contáctanos', href: 'mailto:consultas@acecam.com' },
+        accion: { label: 'Empieza ahora', to: '/checkout?plan=ultra' },
       },
     ],
     comparacion: [
@@ -176,7 +176,7 @@ const textos = {
           'Your own videos or YouTube',
           'PDF report',
         ],
-        accion: { label: 'Free trial', to: '/registro' },
+        accion: { label: 'Free trial', to: '/checkout?plan=basico' },
       },
       {
         nombre: 'Pro',
@@ -194,7 +194,7 @@ const textos = {
           'Recruiting inbox',
           'Priority support',
         ],
-        accion: { label: 'Start now', to: '/registro' },
+        accion: { label: 'Start now', to: '/checkout?plan=pro' },
       },
       {
         nombre: 'Ultra',
@@ -204,7 +204,7 @@ const textos = {
         tono: 'ultra',
         base: 'Everything in Pro, plus:',
         incluye: ['Many more players', 'Many more analyses', 'Dedicated support'],
-        accion: { label: 'Contact us', href: 'mailto:consultas@acecam.com' },
+        accion: { label: 'Start now', to: '/checkout?plan=ultra' },
       },
     ],
     comparacion: [
@@ -425,7 +425,10 @@ function Comparar({ anual }) {
                     className={`px-1.5 py-5 sm:px-6 sm:py-8 ${plan.popular ? `rounded-b-2xl ${columnaPro}` : ''}`}
                   >
                     {plan.accion.to ? (
-                      <LinkDeslizante to={plan.accion.to} className={clases}>
+                      <LinkDeslizante
+                        to={`${plan.accion.to}${anual ? '&ciclo=anual' : ''}`}
+                        className={clases}
+                      >
                         {plan.accion.label}
                       </LinkDeslizante>
                     ) : (
@@ -775,7 +778,7 @@ function Plan({ plan, anual, oculto = false }) {
 
       <div className="mt-auto">
         {plan.accion.to ? (
-          <LinkDeslizante to={plan.accion.to} className={boton}>
+          <LinkDeslizante to={`${plan.accion.to}${anual ? '&ciclo=anual' : ''}`} className={boton}>
             {plan.accion.label}
             <Icon name="arrow" size={18} strokeWidth={2.2} />
           </LinkDeslizante>

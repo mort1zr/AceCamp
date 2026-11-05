@@ -5,6 +5,9 @@
 .analysis-head > p:last-child { margin: 0.5rem 0 0; color: var(--players-muted); font-size: 0.9375rem; }
 .analysis-offline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 1rem; padding: 0.85rem 1rem; border: 1px dashed var(--line3, var(--players-line)); border-radius: 0.75rem; font-size: 0.8125rem; color: var(--players-muted); }
 .analysis-offline strong { color: var(--players-info); font-weight: 600; }
+.analysis-limit { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 1rem; padding: 0.85rem 1rem; border: 1px solid var(--bad, #e5484d); border-radius: 0.75rem; font-size: 0.8125rem; color: var(--players-muted); }
+.analysis-limit strong { color: var(--bad, #e5484d); font-weight: 600; }
+.analysis-limit a { margin-left: auto; }
 
 .analysis-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1rem; align-items: start; }
 .analysis-form { min-width: 0; }

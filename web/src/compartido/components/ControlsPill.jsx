@@ -1,4 +1,7 @@
+import { useContext } from 'react'
 import LinkDeslizante from './LinkDeslizante.jsx'
+import MenuCuenta from './MenuCuenta.jsx'
+import { AuthContext } from '../../panel/context/AuthContext.js'
 import { useTheme } from '../hooks/useTheme.js'
 import { useIdioma } from '../lib/idioma.jsx'
 
@@ -23,7 +26,9 @@ const textos = {
   },
 }
 
-export default function ControlsPill({ ocultarIngreso = false, className = '' }) {
+export default function ControlsPill({ ocultarIngreso = false, cuenta = false, className = '' }) {
+  const sesion = useContext(AuthContext)
+  const usuario = cuenta ? sesion?.user : null
   const { toggleTheme, isLight } = useTheme()
   const { idioma, cambiarIdioma } = useIdioma()
   const t = textos[idioma]
@@ -95,18 +100,27 @@ export default function ControlsPill({ ocultarIngreso = false, className = '' })
           <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
         </svg>
       </button>
-      <LinkDeslizante
-        to="/login"
-        aria-hidden={ocultarIngreso}
-        tabIndex={ocultarIngreso ? -1 : undefined}
-        className={`inline-flex h-9 items-center overflow-hidden rounded-full text-sm font-semibold whitespace-nowrap text-text2 transition-all duration-500 hover:bg-accent/10 hover:text-accent-ink ${
-          ocultarIngreso
-            ? 'pointer-events-none max-w-0 px-0 opacity-0'
-            : 'max-w-28 px-3.5 opacity-100'
-        }`}
-      >
-        {t.ingresar}
-      </LinkDeslizante>
+      {usuario ? (
+        <MenuCuenta
+          idioma={idioma}
+          nombre={sesion.profile?.displayName ?? usuario.email}
+          correo={usuario.email}
+          onSalir={sesion.logout}
+        />
+      ) : (
+        <LinkDeslizante
+          to="/login"
+          aria-hidden={ocultarIngreso}
+          tabIndex={ocultarIngreso ? -1 : undefined}
+          className={`inline-flex h-9 items-center overflow-hidden rounded-full text-sm font-semibold whitespace-nowrap text-text2 transition-all duration-500 hover:bg-accent/10 hover:text-accent-ink ${
+            ocultarIngreso
+              ? 'pointer-events-none max-w-0 px-0 opacity-0'
+              : 'max-w-28 px-3.5 opacity-100'
+          }`}
+        >
+          {t.ingresar}
+        </LinkDeslizante>
+      )}
     </div>
   )
 }

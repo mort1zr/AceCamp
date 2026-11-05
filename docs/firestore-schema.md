@@ -8,12 +8,28 @@ Si cambias un campo, actualiza los dos archivos y avisa en Jira.
 
 ## Qué permiten las reglas (PCIT-23)
 
+PCIT-39 añade el alcance por rol: en `players` y `matches`, un `admin` puede
+consultar y gestionar los documentos de su organización; un `coach`, solo los
+que tengan `createdBy` igual a su UID. Las consultas del entrenador incluyen
+`where('createdBy', '==', uid)` además de `orgId`. Firestore aplica esta regla
+también a lecturas directas, actualizaciones y borrados. La cola solo admite
+jugadores propios del entrenador, o de la organización para administradores.
+Los roles se leen del perfil de servidor y la web no puede modificar `role`.
+
+Las referencias de videos originales y procesados respetan el mismo propietario
+del partido en Storage. Antes de crear el partido, el video original solo se
+lee por quien lo subió o por un administrador de la organización. El resultado
+procesado sigue siendo de escritura exclusiva del worker. Ver
+`docs/PCIT-39-permisos-por-rol.md`.
+
 | Colección | Leer | Crear | Modificar | Borrar |
 | --- | --- | --- | --- | --- |
 | `users` | La propia y las de su organización | Solo la propia, en el registro, con rol `coach` y en una organización que crea él mismo | Solo nombre y cargo | No |
-| `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó | No |
-| `players` | De su organización | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Datos del jugador; nunca `orgId`, `createdBy` ni `consent` | De su organización |
-| `matches` | De su organización | En `'en cola'`, sin estadísticas, con un jugador de su organización y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola` (Reintentar) | De su organización, salvo si está `procesando` |
+| `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó. El plan solo lo cambia el dueño desde el checkout, junto con `billingCycle` y `planSince` (PCIT-158) | No |
+| `orgs/{orgId}/usage/{YYYY-MM}` | Miembros de la organización | Solo junto con el alta de un partido nuevo, sumando 1 (PCIT-41) | Igual: +1 por partido nuevo | No |
+| `players` | Admin: su organización; coach: propios | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Admin: su organización; coach: propios. Nunca `orgId`, `createdBy` ni `consent` | Admin: su organización; coach: propios |
+| `matches` | Admin: su organización; coach: propios | En `'en cola'`, sin estadísticas, con un jugador accesible por rol y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola`, dentro del alcance por rol | Dentro del alcance por rol, salvo si está `procesando` |
+| `matches/{matchId}/coachNotes/{uid}` | Nota propia por ID, en un partido Listo accesible | Nota propia con texto y fecha de servidor | Solo su propia nota | Solo su propia nota |
 | `applications` | De su organización | Por ahora solo con sesión (el formulario público llega en PCIT-54) | Estado y notas | De su organización |
 
 El worker usa el Admin SDK, que no pasa por las reglas: es el único que escribe
@@ -22,9 +38,9 @@ deben filtrar por `orgId`; sin ese filtro, Firestore las rechaza.
 
 ## Decisiones
 
-- **Colecciones en la raíz con un campo `orgId`** (`players`, `matches`, `applications`),
-  no subcolecciones. Así ya las consulta el código de Fabián
-  (`where('orgId', '==', orgId)`) y las reglas de PCIT-23 filtran por ese campo.
+- **Colecciones principales en la raíz con un campo `orgId`** (`players`, `matches`, `applications`).
+  La web las consulta con `where('orgId', '==', orgId)`. Las notas privadas usan una subcolección
+  de cada partido para separar sus permisos de los del reporte.
 - **Nombres de campos en inglés, en camelCase. Valores que ve el usuario en español.**
   Los estados coinciden con `StatusBadge` (PCIT-25).
 - **Se usa `applications` y el estado de procesamiento vive dentro de `matches`**,
@@ -42,6 +58,7 @@ deben filtrar por `orgId`; sin ese filtro, Firestore las rechaza.
 ```
 users/{uid}                 Perfil de cada persona que inicia sesión
 orgs/{orgId}                Universidad, club o academia
+  usage/{YYYY-MM}           Análisis usados en el mes (PCIT-41)
 players/{playerId}          Jugadores de una organización          · orgId
 matches/{matchId}           Partidos subidos y sus estadísticas    · orgId, playerId
 applications/{appId}        Postulaciones de reclutamiento         · orgId
@@ -74,9 +91,29 @@ Se crea en el registro, junto con el usuario (PCIT-21).
 | `name` | string | sí | "Universidad …", 2–120 caracteres |
 | `ownerId` | string | sí | `uid` de quien la creó. PCIT-23 lo usa para validar el alta |
 | `program` | string \| null | no | Ej. "Tenis varones" |
-| `plan` | string | sí | `'free'` por ahora. PCIT-41 agrega límites por plan |
+| `plan` | string | sí | `'free'` (sin plan) al registrarse. `'prueba'`, `'basico'`, `'pro'` o `'ultra'` fijan los análisis por mes (PCIT-41, `docs/PCIT-41-limite-de-analisis.md`) |
+| `billingCycle` | string | no | `'mensual'` o `'anual'`, el periodo elegido en el checkout (PCIT-158) |
+| `planSince` | Timestamp | no | Inicio o renovación del plan, hora del servidor. Sin este campo, Básico entra como `'prueba'` (una sola vez) |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
+
+### `orgs/{orgId}/usage/{YYYY-MM}` (PCIT-41)
+
+Contador de análisis de la organización en un mes. El ID es el mes en **UTC**
+(`2026-11`), el mismo que calcula la regla con `request.time`; en Lima el mes
+nuevo empieza a las 19:00 del último día. Cada mes arranca un documento nuevo,
+así que no hay que reiniciar nada.
+
+| Campo | Tipo | Notas |
+| --- | --- | --- |
+| `analyses` | number | Partidos creados en el mes. Solo sube de uno en uno |
+| `lastMatchId` | string | Partido que sumó la última unidad |
+| `updatedAt` | Timestamp | `serverTimestamp()` |
+
+La web lo escribe en la misma transacción que crea el partido
+(`firestoreAnalysisService` → `usage.js`). Las reglas exigen las dos escrituras
+juntas: no se crea un partido sin contarlo, ni se suma sin un partido nuevo.
+Reintentar un partido con `error` no suma; borrar un partido no resta.
 
 ## `players/{playerId}`
 
@@ -102,6 +139,18 @@ El resto los completa la gestión completa (PCIT-42).
 | `createdBy` | string | sí | `uid` del entrenador |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
+| `deletedAt` | Timestamp | no | Fecha de retirada de la plantilla (PCIT-42) |
+
+PCIT-42 añade la acción **Eliminar de la plantilla**: guarda `deletedAt` y
+`updatedAt`, oculta el jugador en Jugadores, Dashboard y nuevos análisis, y
+conserva su registro y partidos. El historial de Partidos incluye los jugadores
+retirados para conservar sus nombres. El alta de un partido nuevo para un
+jugador retirado se rechaza en las reglas.
+
+La edición valida datos personales, deportivos y el objeto completo del
+apoderado para menores, preserva `orgId`, `createdBy`, `createdAt` y `consent`, y
+usa `updatedAt` para detectar ediciones concurrentes. No hay una operación de
+restauración en esta entrega. Ver `docs/PCIT-42-gestion-completa-jugadores.md`.
 
 **`consent`** (Ley N.° 29733, datos personales y videos):
 
@@ -150,35 +199,85 @@ en cola ──▶ procesando ──▶ listo
 El worker toma un partido `'en cola'` y lo marca `'procesando'` dentro de una
 transacción, para que dos workers no tomen el mismo.
 
-### `matches.statistics` (propuesta v1, confirmar con Aaron)
+### Video procesado (PCIT-161)
 
-Estadísticas **de ese partido**. El worker traduce `player_1` / `player_2` del modelo
-a `player` (el jugador registrado) y `opponent` usando `playerPosition`.
-Todas las métricas son opcionales: si el modelo todavía no la calcula, se omite.
+`matches.processedVideoPath` es un campo opcional escrito solo por el worker:
+`orgs/{orgId}/matches/{matchId}/processed.mp4`. El archivo MP4 H.264 se sube antes
+de guardar la referencia y las estadísticas en la transacción final a `listo`.
+Al reclamar un reintento o al terminar en error se borra la referencia del
+documento. Los partidos históricos pueden no tenerla.
+
+El cliente lee por SDK autenticado y reglas de Storage de la misma organización;
+no guarda URLs públicas ni tokens permanentes. Solo Admin SDK puede escribir o
+borrar el resultado. Ver `docs/PCIT-161-video-procesado.md`.
+
+### `matches.statistics` (v1)
+
+Estadísticas **de ese partido**, escritas por el worker (`model/stats/match_stats.py`).
+El worker traduce `player_1` / `player_2` del modelo a `player` (el jugador registrado) y
+`opponent` usando `playerPosition`.
 
 ```js
 statistics: {
   schemaVersion: 'acecam.match-stats.v1',
-  durationSeconds: 5520,
+  durationSeconds: 24,
   player: {
-    shots:    { count: 412, sumSpeedKmh: 41612, maxSpeedKmh: 124 },
-    movement: { distanceMeters: 3400, maxSpeedKmh: 23, avgSpeedKmh: 7.2 },
-    serve:    { sumSpeedKmh: 15200, sampleCount: 100, maxSpeedKmh: 171,
-                firstServeIn: 58, firstServeAttempts: 100, doubleFaults: 5 },
-    forehand: { count: 210, maxSpeedKmh: 124 },
-    backhand: { count: 160, maxSpeedKmh: 112 },
+    shots:    { count: 6, sumSpeedKmh: 630, maxSpeedKmh: 171 },
+    movement: { distanceMeters: 25, avgSpeedKmh: 11.4, maxSpeedKmh: 22.7 },
+    serve: {
+      count: 2, fromRight: 1, fromLeft: 1,          // saques (intentos, también los segundos)
+      sumSpeedKmh: 110, sampleCount: 1, maxSpeedKmh: 110,  // velocidad media hasta el bote
+      firstServeAttempts: 1, firstServeIn: 0,       // primeros saques y cuántos entraron
+      doubleFaults: 0,
+    },
   },
-  opponent: { /* mismas claves, opcionales */ },
-  rallies: { count: 96, avgShots: 4.9, longestShots: 21 },
+  opponent: { /* mismas claves */ },
+  rallies: { count: 1, sumShots: 18, longestShots: 18, short: 0, medium: 0, long: 1 },
 }
 ```
 
-- **Lo que el modelo ya calcula hoy** (`model/main.py`): golpes por jugador
-  (`shots.count`, `shots.sumSpeedKmh`) y velocidad de desplazamiento (`movement`).
-- **Lo demás** (saque, derecha/revés, peloteos) llega con las épicas TA-E2 a TA-E5.
-  Hasta entonces esas claves no existen y el Dashboard las muestra como "sin dato".
-- Promedios: se guardan **sumas y cantidades**, no promedios, para que el Dashboard
-  pueda combinar partidos sin error (como pide PCIT-28).
+| Campo | Qué es | Cuándo falta |
+| --- | --- | --- |
+| `shots.count`, `shots.sumSpeedKmh`, `shots.maxSpeedKmh` | Golpes medidos y su velocidad (distancia entre los jugadores / tiempo hasta el golpe del rival) | `maxSpeedKmh` falta si no hay golpes |
+| `movement.*` | Distancia recorrida y velocidad del jugador | Si no se pudo seguir al jugador |
+| `serve.count`, `serve.fromRight`, `serve.fromLeft` | Saques detectados y desde qué lado (derecha o izquierda del sacador, mirando a la red) | Nunca: 0 si no sacó |
+| `serve.sumSpeedKmh`, `serve.sampleCount`, `serve.maxSpeedKmh` | Velocidad media del saque **hasta el bote**, solo de los saques con bote visto. Es menor que la de un radar, que mide la salida de la raqueta | `maxSpeedKmh` falta si `sampleCount` es 0 |
+| `serve.firstServeAttempts`, `serve.firstServeIn` | Primeros saques y cuántos entraron en el cuadro cruzado | Si de algún primer saque no se supo si entró |
+| `serve.doubleFaults` | Dobles faltas | Si de algún segundo saque no se supo si entró |
+| `rallies.count`, `rallies.sumShots`, `rallies.longestShots` | Puntos (peloteos) del partido, golpes en total y el más largo | Nunca |
+| `rallies.short`, `rallies.medium`, `rallies.long` | Peloteos de 0-4, 5-8 y 9 o más golpes | Nunca |
+
+- **Un dato que el modelo no pudo saber se omite; nunca es 0** (por ejemplo, el primer
+  saque dentro si en un punto no se vio el bote ni hubo resto). Un 0 significa que se midió
+  y dio cero.
+- Promedios: se guardan **sumas y cantidades**, no promedios, para que el Dashboard pueda
+  combinar partidos sin error (como pide PCIT-28). La velocidad media de saque es
+  `sumSpeedKmh / sampleCount` sumando todos los partidos; el % de primer saque,
+  `firstServeIn / firstServeAttempts`.
+- Todavía no se miden: derecha/revés (descartado del alcance) y dentro/fuera de cada golpe.
+- El Dashboard lo lee con `web/src/panel/lib/workerDashboardStatistics.js`.
+
+### `matches/{matchId}/coachNotes/{uid}` (PCIT-44)
+
+Cada cuenta puede guardar una nota privada por partido Listo. El entrenador
+puede anotarla en los partidos que registró. El administrador puede escribir su
+propia nota en cualquier partido Listo de su organización. Las reglas permiten
+leer la nota por su ID cuando el UID de sesión coincide con el autor. Las
+consultas de la subcolección se rechazan.
+
+| Campo | Tipo | Requisito |
+| --- | --- | --- |
+| `text` | string | De 1 a 2000 caracteres |
+| `updatedAt` | Timestamp | `serverTimestamp()` de la escritura |
+
+Al guardar, la app compara en una transacción el texto actual con el que la
+sesión abrió. Si otro dispositivo guardó cambios, se conserva el borrador y se
+avisa del conflicto. Guardar un texto vacío borra la nota.
+
+Desde `web/`, ejecuta `npm run test:rules` para verificar la persistencia,
+el conflicto de escritura y los rechazos de acceso en Firebase Emulator Suite.
+En el emulador, abre **Partidos → Ver reporte → Tu nota** con una cuenta de
+prueba y un partido Listo accesible.
 
 ## `applications/{appId}`
 

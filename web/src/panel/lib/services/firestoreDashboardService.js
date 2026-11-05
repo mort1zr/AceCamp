@@ -1,11 +1,42 @@
 import { collection, doc, getDoc, onSnapshot, query, where } from 'firebase/firestore'
-import { buildDashboardOverview } from '../dashboardOverview.js'
+import { buildDashboardOverview, normalizeDashboardStatistics } from '../dashboardOverview.js'
 import { buildDashboardEvolution } from '../dashboardEvolution.js'
+import { buildDashboardPeriods } from '../dashboardPeriods.js'
+import { buildDashboardDetails } from '../dashboardDetails.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
+function summarizeDashboard(rows, context) {
+  const { orgId, playerId, decodeStatistics } = context
+  const summarize = matches => {
+    const overview = buildDashboardOverview(matches, context)
+    const evolution = buildDashboardEvolution(matches, context)
+    const serveEvolution = buildDashboardEvolution(matches, context, 'averageServeSpeed')
+    const details = buildDashboardDetails(matches, context)
+    const point = evolution.points.at(-1)
+    const row = point && matches.find(match => match.id === point.matchId
+      && match.orgId === orgId && match.playerId === playerId
+      && match.status === 'listo' && match.matchDate === point.date)
+    const latestMatch = row ? {
+      ...point,
+      tournament: row.tournament,
+      result: row.result,
+      measuredShots: normalizeDashboardStatistics(decodeStatistics(row, { playerId }), playerId)?.shots?.sampleCount,
+    } : null
+    return { ...overview, metrics: { ...overview.metrics, distanceMeters: details.movement.distanceMeters }, evolution, serveEvolution, details, latestMatch }
+  }
+  return {
+    ...summarize(rows),
+    periods: buildDashboardPeriods(rows, summarize, summarize),
+  }
+}
+
 /** No Firebase initialization and no guessed statistics path or player mapping. */
-export function createFirestoreDashboardService({ db, orgId, actorId, decodeStatistics = decodeWorkerDashboardStatistics }) {
+export function createFirestoreDashboardService({
+  db, orgId, actorId, role = 'coach', onlyOwned = false, decodeStatistics = decodeWorkerDashboardStatistics, summarizePlayer = summarizeDashboard,
+}) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof decodeStatistics !== 'function') throw new TypeError('Dashboard requires database, organization, user and an agreed statistics decoder.')
+  if (!['admin', 'coach'].includes(role)) throw new TypeError('Invalid dashboard role.')
+  const restrictOwner = role !== 'admin' || onlyOwned
 
   return {
     scopeKey: `firestore:${db.app?.options?.projectId ?? ''}:${orgId}:${actorId}`,
@@ -26,21 +57,25 @@ export function createFirestoreDashboardService({ db, orgId, actorId, decodeStat
         try {
           const player = await getDoc(doc(db, 'players', playerId))
           if (!active) return
-          if (!player.exists() || player.data().orgId !== orgId) {
+          const data = player.exists() ? player.data() : null
+          if (data?.orgId !== orgId || (restrictOwner && data.createdBy !== actorId)) {
             fail(Object.assign(new Error('Player not available to this organization.'), { code: 'permission-denied' }))
             return
           }
-          const matches = query(collection(db, 'matches'), where('orgId', '==', orgId), where('playerId', '==', playerId))
+          const filters = [where('orgId', '==', orgId), where('playerId', '==', playerId)]
+          if (restrictOwner) filters.push(where('createdBy', '==', actorId))
+          const matches = query(collection(db, 'matches'), ...filters)
           unsubscribe = onSnapshot(matches, snapshot => {
             if (!active) return
             try {
               const rows = snapshot.docs.map(item => ({ ...item.data(), id: item.id }))
+                .filter(match => !restrictOwner || match.createdBy === actorId)
               const decoded = new Map()
               const context = { orgId, playerId, decodeStatistics: (match, identity) => {
                 if (!decoded.has(match)) decoded.set(match, decodeStatistics(match, identity))
                 return decoded.get(match)
               } }
-              onData({ ...buildDashboardOverview(rows, context), evolution: buildDashboardEvolution(rows, context) })
+              onData(summarizePlayer(rows, context))
             } catch (error) { fail(error) }
           }, fail)
           // Covers an error raised synchronously while attaching a listener.

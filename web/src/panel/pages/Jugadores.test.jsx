@@ -13,6 +13,22 @@ vi.mock('firebase/firestore', () => ({
 
 afterEach(cleanup)
 
+it.each(['coach', 'admin'])('oculta perfiles no permitidos al rol %s aunque el SDK entregue filas ajenas', async role => {
+  const rows = [
+    { id: 'own', fullName: 'Jugador propio', orgId: 'org-a', createdBy: 'coach-a' },
+    { id: 'teammate', fullName: 'Jugador de colega', orgId: 'org-a', createdBy: 'coach-b' },
+    { id: 'foreign', fullName: 'Jugador de otra organización', orgId: 'org-b', createdBy: 'coach-a' },
+  ]
+  onSnapshot.mockImplementation((_, receive) => {
+    receive({ docs: rows.map(({ id, ...data }) => ({ id, data: () => data })) })
+    return () => {}
+  })
+  render(<Jugadores db={{ app: { options: { projectId: 'roles-test' } } }} session={{ uid: 'coach-a', orgId: 'org-a', role }} />)
+  expect(await screen.findByRole('button', { name: 'Ver perfil de Jugador propio' })).toBeTruthy()
+  expect(Boolean(screen.queryByRole('button', { name: 'Ver perfil de Jugador de colega' }))).toBe(role === 'admin')
+  expect(screen.queryByText('Jugador de otra organización')).toBeNull()
+})
+
 async function fillPlayer(user, name = 'Jugador de prueba') {
   await user.type(screen.getByLabelText('Nombre completo *'), name)
   await user.type(screen.getByLabelText('Fecha de nacimiento *'), '2004-03-10')
@@ -113,6 +129,38 @@ describe('Jugadores v1', () => {
     await waitFor(() => expect(screen.getByText('Tu equipo empieza aquí')).toBeTruthy())
   })
 
+  it('pagina y combina la búsqueda sin acentos con el filtro de academia', async () => {
+    const initialPlayers = Array.from({ length: 11 }, (_, index) => ({
+      id: `p-${index}`,
+      fullName: `Camila Ríos ${String(index + 1).padStart(2, '0')}`,
+      academy: 'Club Central',
+    }))
+    initialPlayers.push({ id: 'p-last', fullName: 'Zoe Sánchez' })
+    const user = userEvent.setup()
+    render(<Jugadores service={createDemoPlayersService({ initialPlayers })} />)
+
+    const table = await screen.findByRole('table', { name: 'Jugadores registrados' })
+    expect(within(table).getAllByRole('row')).toHaveLength(11)
+    expect(screen.getByText('Página 1 de 2')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(screen.getByText('Página 2 de 2')).toBeTruthy()
+    expect(within(table).getByText('Camila Ríos 11')).toBeTruthy()
+
+    const search = screen.getByRole('searchbox', { name: 'Buscar por nombre' })
+    await user.type(search, 'RIOS')
+    expect(screen.getByText('Página 1 de 2')).toBeTruthy()
+    expect(within(table).getByText('Camila Ríos 01')).toBeTruthy()
+    const academy = screen.getByLabelText('Filtrar por academia')
+    await user.selectOptions(academy, within(academy).getByRole('option', { name: 'Sin academia' }))
+    expect(screen.getByText('No se encontraron jugadores')).toBeTruthy()
+    await user.clear(search)
+    expect(screen.getByText('Zoe Sánchez')).toBeTruthy()
+    expect(screen.getByText('1 de 12 jugadores')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
+    expect(screen.getByText('Página 1 de 2')).toBeTruthy()
+    expect(screen.getByText('12 jugadores')).toBeTruthy()
+  })
+
   it('no usa ejemplos como respaldo cuando la sesión real no está disponible', () => {
     render(<Jugadores />)
     expect(screen.getByText('Los jugadores aún no están disponibles')).toBeTruthy()
@@ -120,10 +168,38 @@ describe('Jugadores v1', () => {
     expect(screen.queryByRole('button', { name: /Nuevo jugador/ })).toBeNull()
   })
 
+  it('abre el perfil con historial, reintenta y devuelve el foco a la plantilla', async () => {
+    const user = userEvent.setup()
+    const stop = vi.fn()
+    const service = createDemoPlayersService({ initialPlayers: [
+      { id: 'p1', fullName: 'Camila Ríos', birthDate: '2005-04-12', dominantHand: 'zurdo', guardian: { email: 'reservado@example.test' } },
+    ] })
+    service.subscribeAnalyzedMatches = vi.fn()
+      .mockImplementationOnce((_player, _receive, fail) => { fail({ code: 'unavailable' }); return stop })
+      .mockImplementationOnce((_player, receive) => {
+        receive([{ id: 'match-1', matchDate: '2026-10-03', opponent: 'Rival de prueba' }])
+        return stop
+      })
+    render(<Jugadores service={service} />)
+    await user.click(await screen.findByRole('button', { name: 'Ver perfil de Camila Ríos' }))
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Camila Ríos' }))
+    expect(screen.getByText('zurdo')).toBeTruthy()
+    expect(screen.getByText('reservado@example.test')).toBeTruthy()
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }))
+    const history = await screen.findByRole('table', { name: 'Historial de partidos analizados' })
+    expect(within(history).getByText('03/10/2026')).toBeTruthy()
+    expect(within(history).getByText('Rival de prueba')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Volver a Jugadores' }))
+    expect(stop).toHaveBeenCalledTimes(2)
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Tu plantilla' }))
+    expect(screen.queryByText('Rival de prueba')).toBeNull()
+  })
+
   it('abre la consulta con la sesión completa y la cierra al salir', async () => {
     const unsubscribe = vi.fn()
     onSnapshot.mockImplementationOnce((_, receive) => {
-      receive({ docs: [{ id: 'p1', data: () => ({ fullName: 'Jugador del equipo' }) }] })
+      receive({ docs: [{ id: 'p1', data: () => ({ fullName: 'Jugador del equipo', orgId: 'equipo-1', createdBy: 'coach-1' }) }] })
       return unsubscribe
     })
     const db = { app: { options: { projectId: 'prueba' } } }

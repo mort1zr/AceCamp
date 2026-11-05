@@ -1,14 +1,16 @@
 import { Route, Routes } from 'react-router'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import AppLayout from './panel/components/AppLayout.jsx'
 import PublicLayout from './landing/components/PublicLayout.jsx'
 import RequireAuth from './panel/components/RequireAuth.jsx'
 import { useAuth } from './panel/context/AuthContext.js'
+import { contratarPlan } from './panel/lib/contratarPlan.js'
 import { auth, db, storage } from './panel/lib/firebase.js'
 import { createHttpVideoImporter } from './panel/lib/services/httpVideoImportService.js'
 import { createVideoUploadService, MAX_VIDEO_BYTES } from './panel/lib/videoUpload.js'
 import Acceso from './panel/pages/Acceso.jsx'
 import Analizar from './panel/pages/Analizar.jsx'
+import Checkout from './panel/pages/Checkout.jsx'
 import Comparador from './panel/pages/Comparador.jsx'
 import Configuracion from './panel/pages/Configuracion.jsx'
 import Dashboard from './panel/pages/Dashboard.jsx'
@@ -28,13 +30,15 @@ const { uploadVideo } = createVideoUploadService({ storage })
 
 export default function App() {
   const { user, profile } = useAuth()
-  const session = user && profile ? { uid: user.uid, orgId: profile.orgId } : undefined
+  const session = user && profile ? { uid: user.uid, orgId: profile.orgId, role: profile.role } : undefined
   const importVideo = useMemo(() => createHttpVideoImporter({
     enabled: import.meta.env.DEV && import.meta.env.MODE === 'demo' && Boolean(user && profile),
     supportsYouTube: true,
     endpoint: '/api/video-import',
     getSession: async () => ({ orgId: profile.orgId, actorId: user.uid, token: await user.getIdToken() }),
   }), [user, profile])
+  const orgId = profile?.orgId
+  const contratar = useCallback(({ plan, periodo }) => contratarPlan({ db, orgId, plan, periodo }), [orgId])
 
   return (
     <Routes>
@@ -50,14 +54,16 @@ export default function App() {
         <Route path="/registro" element={<Registro />} />
       </Route>
 
+      <Route path="/checkout" element={<Checkout contratar={contratar} />} />
+
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route path="/inicio" element={<Inicio />} />
           <Route path="/dashboard" element={<Dashboard db={db} session={session} />} />
           <Route path="/jugadores" element={<Jugadores db={db} session={session} />} />
           <Route path="/analizar" element={<Analizar db={db} session={session} uploadVideo={uploadVideo} importVideo={importVideo} maxBytes={MAX_VIDEO_BYTES} />} />
-          <Route path="/partidos" element={<Partidos />} />
-          <Route path="/comparador" element={<Comparador />} />
+          <Route path="/partidos" element={<Partidos db={db} storage={storage} session={session} />} />
+          <Route path="/comparador" element={<Comparador db={db} session={session} />} />
           <Route path="/reclutamiento" element={<Reclutamiento />} />
           <Route path="/configuracion" element={<Configuracion db={db} auth={auth} session={session} />} />
         </Route>

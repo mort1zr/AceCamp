@@ -45,27 +45,54 @@ def _moving_average(points, window):
     return np.column_stack([np.convolve(points[:, k], kernel, mode="valid") for k in range(2)])
 
 
+def _valid(position):
+    return position is not None and not any(math.isnan(v) for v in position)
+
+
+def _runs(positions_m):
+    """Tramos seguidos de posiciones válidas (un hueco, por ejemplo una repetición, corta el tramo)."""
+    runs, current = [], []
+    for position in positions_m:
+        if _valid(position):
+            current.append(position)
+        elif current:
+            runs.append(current)
+            current = []
+    if current:
+        runs.append(current)
+    return runs
+
+
 def movement_stats(positions_m, fps, smoothing_seconds=SMOOTHING_SECONDS, window_seconds=SPEED_WINDOW_SECONDS):
     """Distancia recorrida y velocidades de un jugador a partir de su posición en cada fotograma.
 
     positions_m: lista de (x, y) en metros (None o NaN en los fotogramas sin posición).
+    Cada tramo seguido de posiciones se mide por separado: entre dos tramos (por ejemplo,
+    antes y después de una repetición) no se suma la distancia (TA-15).
     Devuelve None si no hay suficientes posiciones para medir.
     """
-    valid = [p for p in positions_m if p is not None and not any(math.isnan(v) for v in p)]
-    if len(valid) < 2:
-        return None
-    points = _moving_average(np.asarray(valid, dtype=float), max(1, int(round(smoothing_seconds * fps))))
-    steps = np.linalg.norm(np.diff(points, axis=0), axis=1)
-    distance = float(steps.sum())
-    # Tiempo del mismo tramo que la distancia (el suavizado recorta unos fotogramas en los extremos).
-    duration = len(steps) / fps
-
+    smoothing = max(1, int(round(smoothing_seconds * fps)))
     window = max(1, int(round(window_seconds * fps)))
-    if len(steps) >= window:
-        per_window = np.convolve(steps, np.ones(window), mode="valid")  # metros en cada ventana
-        max_speed = float(per_window.max()) / window_seconds * 3.6
-    else:
-        max_speed = distance / duration * 3.6
+    distance, num_steps, max_speed = 0.0, 0, None
+    for run in _runs(positions_m):
+        if len(run) < 2:
+            continue
+        points = _moving_average(np.asarray(run, dtype=float), smoothing)
+        steps = np.linalg.norm(np.diff(points, axis=0), axis=1)
+        if len(steps) == 0:
+            continue
+        distance += float(steps.sum())
+        num_steps += len(steps)
+        if len(steps) >= window:
+            per_window = np.convolve(steps, np.ones(window), mode="valid")  # metros en cada ventana
+            run_max = float(per_window.max()) / window_seconds * 3.6
+        else:
+            run_max = float(steps.sum()) / (len(steps) / fps) * 3.6
+        max_speed = run_max if max_speed is None else max(max_speed, run_max)
+    if num_steps == 0:
+        return None
+    # Tiempo de los mismos tramos que la distancia (el suavizado recorta unos fotogramas en los extremos).
+    duration = num_steps / fps
     return {
         "distanceMeters": _round(distance),
         "avgSpeedKmh": _round(distance / duration * 3.6),
@@ -100,6 +127,58 @@ def build_model_statistics(shots, player_positions, fps, num_frames):
     }
 
 
+RALLY_SHORT_MAX, RALLY_MEDIUM_MAX = 4, 8  # peloteo corto: 0-4 golpes; medio: 5-8; largo: 9 o más
+
+
+def serve_stats(points, player):
+    """Saques de un jugador a partir de los puntos (events.detect_points). Ver docs del esquema.
+
+    Solo cuentan los puntos en que se detectó el saque. Las métricas que dependen de saber si
+    un saque entró se omiten si en algún punto no se pudo saber (regla del esquema: nunca 0
+    en lugar de desconocido).
+    """
+    attempts = [a for p in points for a in p.get("serve_attempts", []) if a["player"] == player]
+    speeds = [a["speedKmh"] for a in attempts if a["speedKmh"] is not None]
+    stats = {
+        "count": len(attempts),
+        "fromRight": sum(a["side"] == "derecha" for a in attempts),
+        "fromLeft": sum(a["side"] == "izquierda" for a in attempts),
+        "sumSpeedKmh": _round(sum(speeds)),
+        "sampleCount": len(speeds),
+    }
+    if speeds:
+        stats["maxSpeedKmh"] = _round(max(speeds))
+    served = [p["serve_attempts"] for p in points if p.get("serve_attempts") and p["serve_attempts"][0]["player"] == player]
+    if served and all(s[0]["fault"] is not None for s in served):
+        stats["firstServeAttempts"] = len(served)
+        stats["firstServeIn"] = sum(s[0]["fault"] is False for s in served)
+        after_fault = [s for s in served if s[0]["fault"]]
+        if all(len(s) > 1 and s[1]["fault"] is not None for s in after_fault):
+            stats["doubleFaults"] = sum(s[1]["fault"] is True for s in after_fault)
+    return stats
+
+
+def rally_stats(points):
+    """Peloteos del partido: cuántos, golpes totales, el más largo y por longitud (opción A)."""
+    lengths = [p["shots"] - max(0, len(p.get("serve_attempts", [])) - 1) for p in points]
+    return {
+        "count": len(lengths),
+        "sumShots": sum(lengths),
+        "longestShots": max(lengths) if lengths else 0,
+        "short": sum(n <= RALLY_SHORT_MAX for n in lengths),
+        "medium": sum(RALLY_SHORT_MAX < n <= RALLY_MEDIUM_MAX for n in lengths),
+        "long": sum(n > RALLY_MEDIUM_MAX for n in lengths),
+    }
+
+
+def add_serve_and_rally_stats(model_statistics, points):
+    """Añade serve a cada jugador y rallies al partido (TA-17, TA-18). Devuelve el mismo objeto."""
+    for player in (FAR_PLAYER, NEAR_PLAYER):
+        model_statistics["players"][str(player)]["serve"] = serve_stats(points, player)
+    model_statistics["rallies"] = rally_stats(points)
+    return model_statistics
+
+
 def renumber_far_near(shots, player_positions):
     """Numera a los jugadores como 1 = lado lejano y 2 = lado cercano.
 
@@ -127,9 +206,12 @@ def to_match_statistics(model_statistics, player_position):
         raise ValueError(f"playerPosition debe ser 'arriba' o 'abajo', llegó {player_position!r}")
     player = POSITION_TO_PLAYER[player_position]
     opponent = NEAR_PLAYER if player == FAR_PLAYER else FAR_PLAYER
-    return {
+    statistics = {
         "schemaVersion": MATCH_STATS_VERSION,
         "durationSeconds": model_statistics["durationSeconds"],
         "player": model_statistics["players"][str(player)],
         "opponent": model_statistics["players"][str(opponent)],
     }
+    if "rallies" in model_statistics:
+        statistics["rallies"] = model_statistics["rallies"]
+    return statistics

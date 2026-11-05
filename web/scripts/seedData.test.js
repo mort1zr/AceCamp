@@ -80,6 +80,18 @@ describe('datos de ejemplo de Firestore', () => {
     }
   })
 
+  it('el contador de uso coincide con los partidos de cada organización y mes (PCIT-41)', () => {
+    const total = data.usage.reduce((sum, item) => sum + item.doc.analyses, 0)
+    expect(total).toBe(data.matches.length)
+    for (const { orgId, id, doc } of data.usage) {
+      expect(orgIds.has(orgId)).toBe(true)
+      expect(id).toMatch(/^\d{4}-\d{2}$/)
+      const delMes = data.matches.filter(m => m.doc.orgId === orgId && m.doc.createdAt.toISOString().startsWith(id))
+      expect(doc.analyses).toBe(delMes.length)
+      expect(delMes.map(m => m.id)).toContain(doc.lastMatchId)
+    }
+  })
+
   it('IDs únicos en cada colección', () => {
     for (const name of ['orgs', 'players', 'matches', 'applications']) {
       const ids = data[name].map(item => item.id)

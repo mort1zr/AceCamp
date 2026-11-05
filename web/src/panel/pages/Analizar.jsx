@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
+import { usePlanVista } from '../context/PlanVistaContext.js'
+import { quotaReached } from '../lib/usage.js'
 import AnalysisForm from '../components/analysis/AnalysisForm.jsx'
 import PlayerForm from '../components/players/PlayerForm.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
@@ -71,9 +74,27 @@ function Cola({ columns, rows, loading, error, onRetry }) {
   )
 }
 
+// Aviso cuando la organización llegó al límite de análisis de su plan (PCIT-41).
+function LimiteAlcanzado({ usados, limite }) {
+  return (
+    <div className="analysis-limit" role="alert">
+      <strong>Llegaste al límite de tu plan</strong>
+      <span>
+        Tu organización ya usó {usados} de {limite} análisis este mes. Para analizar más
+        partidos, cambia de plan o espera al próximo mes.
+      </span>
+      <Link to="/configuracion" className="players-button-secondary">
+        Ver mi plan
+      </Link>
+    </div>
+  )
+}
+
 function AnalysisWorkspace({ service, playersService }) {
   const players = usePlayers(playersService)
   const queue = useAnalysisQueue(service)
+  const { uso } = usePlanVista()
+  const sinAnalisis = service.mode === 'live' && quotaReached(uso.usados, uso.limite)
   const [playerId, setPlayerId] = useState('')
   const [showNewPlayer, setShowNewPlayer] = useState(false)
   const columns = [
@@ -99,6 +120,7 @@ function AnalysisWorkspace({ service, playersService }) {
         </aside>
       )}
       <Cabecera />
+      {sinAnalisis && <LimiteAlcanzado usados={uso.usados} limite={uso.limite} />}
       {showNewPlayer && (
         <PlayerForm
           service={playersService}
@@ -119,6 +141,7 @@ function AnalysisWorkspace({ service, playersService }) {
           onPlayerChange={setPlayerId}
           onNewPlayer={() => setShowNewPlayer(true)}
           playerCreationOpen={showNewPlayer}
+          disabled={sinAnalisis}
         />
         <Guia />
       </div>
@@ -183,11 +206,12 @@ export default function Analizar({
 }) {
   const uid = session?.uid
   const orgId = session?.orgId
+  const role = session?.role ?? 'coach'
   const hasInjectedServices = service != null || playersService != null
   const liveServices = useMemo(() => {
     if (
       hasInjectedServices ||
-      !db ||
+      !db || !['coach', 'admin'].includes(role) ||
       typeof uid !== 'string' ||
       !uid.trim() ||
       typeof orgId !== 'string' ||
@@ -198,12 +222,12 @@ export default function Analizar({
     )
       return null
 
-    const identity = { db, orgId, actorId: uid }
+    const identity = { db, orgId, actorId: uid, role }
     return {
       analysis: createFirestoreAnalysisService({ ...identity, uploadVideo, importVideo, maxBytes }),
       players: createFirestorePlayersService(identity),
     }
-  }, [hasInjectedServices, db, uid, orgId, uploadVideo, importVideo, maxBytes])
+  }, [hasInjectedServices, db, uid, orgId, role, uploadVideo, importVideo, maxBytes])
 
   const analysis = service ?? liveServices?.analysis
   const players = playersService ?? liveServices?.players

@@ -29,8 +29,8 @@ describe('Contrato del adaptador Firestore (SDK simulado)', () => {
     expect(where).toHaveBeenCalledWith('orgId', '==', 'org-a')
     expect(onSnapshot.mock.calls[0][0]).toBe('players-query')
     onSnapshot.mock.calls[0][1]({ docs: [
-      { id: 'real-z', data: () => ({ id: 'forged', fullName: 'Zoe' }) },
-      { id: 'real-a', data: () => ({ fullName: 'Ana' }) },
+      { id: 'real-z', data: () => ({ id: 'forged', fullName: 'Zoe', orgId: 'org-a', createdBy: 'coach-a' }) },
+      { id: 'real-a', data: () => ({ fullName: 'Ana', orgId: 'org-a', createdBy: 'coach-a' }) },
     ] })
     expect(receive.mock.calls[0][0].map(row => row.id)).toEqual(['real-a', 'real-z'])
     const denied = { code: 'permission-denied' }

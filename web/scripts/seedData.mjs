@@ -8,6 +8,7 @@ import {
   MATCH_STATUS as M,
   PLAYER_CONSENT_VERSION,
 } from '../src/panel/lib/schema.js'
+import { usagePeriod } from '../src/panel/lib/usage.js'
 
 export const SEED_PASSWORD = 'acecam123'
 
@@ -173,5 +174,14 @@ export function buildSeedData() {
   // sentOn solo arma createdAt; no es un campo del esquema.
   for (const app of applications) delete app.doc.sentOn
 
-  return { users, orgs, players, matches, applications }
+  // Contador de análisis por organización y mes, como lo dejaría la web (PCIT-41).
+  const usage = []
+  for (const { id, doc } of [...matches].sort((a, b) => a.doc.createdAt - b.doc.createdAt)) {
+    const period = usagePeriod(doc.createdAt)
+    let counter = usage.find(item => item.orgId === doc.orgId && item.id === period)
+    if (!counter) usage.push(counter = { orgId: doc.orgId, id: period, doc: { analyses: 0 } })
+    counter.doc = { analyses: counter.doc.analyses + 1, lastMatchId: id, updatedAt: doc.createdAt }
+  }
+
+  return { users, orgs, players, matches, applications, usage }
 }

@@ -29,22 +29,37 @@ from pathlib import Path
 
 from config import load_config
 
-from .processor import run_forever, run_once
+from .processor import AnalysisResult, VideoResolutionError, VideoTooLongError, run_forever, run_once
+from .video import encode_browser_video
 
 DEFAULT_PROJECT_ID = "acecam-e93a2"
 
 
-def make_analyzer(config_path=None, device=None):
+def make_analyzer(config_path=None, device=None, render_video=True):
     """Función vídeo → estadísticas del modelo, con la configuración de config.yaml."""
     import main as pipeline  # se importa aquí: carga trackers y modelos solo si hay trabajo
+    from utils import get_video_info
 
     base = load_config(config_path)
+    max_seconds = base["worker"]["max_duration_seconds"]
+    min_short_side = base["worker"].get("min_resolution")
 
     def analyze(video_path: Path):
-        config = {**base, "paths": {**base["paths"], "input": str(video_path)},
+        # Duración y resolución se leen de la cabecera del vídeo, sin cargar los fotogramas.
+        info = get_video_info(video_path)
+        if max_seconds and info.duration_seconds > max_seconds:
+            raise VideoTooLongError(info.duration_seconds, max_seconds)
+        if min_short_side and min(info.width, info.height) < min_short_side:
+            raise VideoResolutionError(info.width, info.height, min_short_side)
+        config = {**base, "paths": {**base["paths"], "input": str(video_path),
+                                  "output": str(video_path.parent / "annotated.avi")},
                   "detection": {**base["detection"], **({"device": device} if device else {})},
                   "use_cache": True}  # mismo vídeo (mismo hash) en un reintento: no repite YOLO
-        return pipeline.run_pipeline(config, render=False)["model_statistics"]
+        result = pipeline.run_pipeline(config, render=render_video)
+        if not render_video:
+            return result["model_statistics"]
+        output = encode_browser_video(Path(result["output_video"]), video_path.parent / "processed.mp4")
+        return AnalysisResult(result["model_statistics"], output)
 
     return analyze
 

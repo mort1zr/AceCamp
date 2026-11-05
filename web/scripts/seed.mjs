@@ -83,6 +83,7 @@ for (const user of data.users) batch.set(db.collection('users').doc(user.uid), u
 for (const name of ['orgs', 'players', 'matches', 'applications']) {
   for (const item of data[name]) batch.set(db.collection(name).doc(item.id), item.doc)
 }
+for (const item of data.usage) batch.set(db.collection('orgs').doc(item.orgId).collection('usage').doc(item.id), item.doc)
 await batch.commit()
 
 clearTimeout(watchdog)

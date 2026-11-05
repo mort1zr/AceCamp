@@ -1,4 +1,5 @@
 import { buildDashboardOverview } from '../lib/dashboardOverview.js'
+import { buildDashboardPeriods } from '../lib/dashboardPeriods.js'
 
 const examples = {
   'example-1': { metrics: { analyzedMatches: 6, averageServeSpeed: 128.5, firstServeInRate: 62, doubleFaults: 0 } },
@@ -27,7 +28,25 @@ export function createDemoDashboardService({ scopeKey, scenario = 'data' }) {
         else if (scenario === 'unmapped') onData(buildDashboardOverview([
           { id: 'demo-unmapped', orgId: 'demo-org', playerId, status: 'listo', statistics: { player_1_average_shot_speed: 140 } },
         ], { orgId: 'demo-org', playerId, decodeStatistics: row => row.statistics }))
-        else onData({ ...(scenario === 'empty' ? { metrics: null } : structuredClone(examples[playerId] ?? { metrics: null })), evolution: exampleEvolution(playerId, scenario === 'empty') })
+        else {
+          const evolution = exampleEvolution(playerId, scenario === 'empty')
+          const dated = evolution.points.map(point => ({ point, matchDate: point.date }))
+          const summarizeCounts = rows => ({
+            metrics: { analyzedMatches: rows.length },
+            coverage: { compatibleMatches: rows.length },
+          })
+          const periods = buildDashboardPeriods(dated, rows => ({
+            ...summarizeCounts(rows),
+            evolution: { playerId, points: rows.map(row => row.point) },
+            latestMatch: rows.at(-1)?.point ?? null,
+          }), summarizeCounts)
+          onData({
+            ...(scenario === 'empty' ? { metrics: null } : structuredClone(examples[playerId] ?? { metrics: null })),
+            evolution,
+            latestMatch: evolution.points.at(-1) ?? null,
+            periods,
+          })
+        }
       })
       return () => { active = false }
     },

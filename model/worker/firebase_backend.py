@@ -58,6 +58,7 @@ class FirestoreMatchStore:
                 "finishedAt": None,
                 "errorMessage": None,
                 "statistics": None,
+                "processedVideoPath": None,
                 "workerVersion": worker_version,
             })
             return snapshot.to_dict()
@@ -78,11 +79,13 @@ class FirestoreMatchStore:
 
         return finish(self.db.transaction())
 
-    def mark_ready(self, match_id, statistics):
-        return self._finish(match_id, {"status": READY, "statistics": statistics, "errorMessage": None})
+    def mark_ready(self, match_id, statistics, processed_video_path=None):
+        return self._finish(match_id, {"status": READY, "statistics": statistics, "errorMessage": None,
+                                      "processedVideoPath": processed_video_path})
 
     def mark_error(self, match_id, error_message):
-        return self._finish(match_id, {"status": ERROR, "statistics": None, "errorMessage": error_message})
+        return self._finish(match_id, {"status": ERROR, "statistics": None, "errorMessage": error_message,
+                                      "processedVideoPath": None})
 
 
 class CloudStorageVideos:
@@ -98,3 +101,8 @@ class CloudStorageVideos:
             self.bucket.blob(video_path).download_to_filename(str(destination))
         except NotFound as exc:
             raise VideoNotFoundError(video_path) from exc
+
+    def upload_processed(self, source, destination):
+        blob = self.bucket.blob(destination)
+        blob.cache_control = "private, max-age=0"
+        blob.upload_from_filename(str(source), content_type="video/mp4")

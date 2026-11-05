@@ -4,6 +4,7 @@ Uso (desde la carpeta model/):
 
     python scripts/download_models.py            # modelos + vídeo de ejemplo
     python scripts/download_models.py --no-video # solo modelos
+    python scripts/download_models.py --tracknet # además, los pesos de TrackNet (evaluación, TA-14b)
 
 Los archivos ya descargados no se vuelven a bajar (usa --force para repetir).
 """
@@ -26,6 +27,14 @@ DRIVE_FILES = {
 # Detector de personas preentrenado de Ultralytics.
 URL_FILES = {
     "models/yolov8x.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8x.pt",
+    # Versión más ligera, para vídeos largos (models.players en config.yaml).
+    "models/yolov8m.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8m.pt",
+}
+
+# TrackNet (TA-14b): pesos de la implementación pública yastrebksv/TrackNet, solo para evaluar.
+# No tienen licencia publicada: no se descargan por defecto (--tracknet).
+TRACKNET_FILES = {
+    "models/tracknet.pt": "1XEYZ4myUN7QT-NeBYJI0xteLsvs-ZAOl",
 }
 
 SAMPLE_VIDEO = {
@@ -54,10 +63,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--no-video", action="store_true", help="no descargar el vídeo de ejemplo")
     parser.add_argument("--force", action="store_true", help="descargar aunque el archivo ya exista")
+    parser.add_argument("--tracknet", action="store_true", help="descargar también los pesos de TrackNet (TA-14b)")
     args = parser.parse_args(argv)
 
     jobs: list[tuple[str, str, str]] = [(p, "drive", i) for p, i in DRIVE_FILES.items()]
     jobs += [(p, "url", u) for p, u in URL_FILES.items()]
+    if args.tracknet:
+        jobs += [(p, "drive", i) for p, i in TRACKNET_FILES.items()]
     if not args.no_video:
         jobs += [(p, "url", u) for p, u in SAMPLE_VIDEO.items()]
 

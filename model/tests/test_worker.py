@@ -246,3 +246,92 @@ def test_renumbering_keeps_players_already_numbered_by_side():
     shots = [{"frame": 1, "player": 1, "speedKmh": 60.0}]
 
     assert renumber_far_near(shots, positions) == (shots, positions)
+
+
+# ------------------------------------------------- duración máxima (PCIT-147)
+
+
+def test_a_video_that_is_too_long_ends_in_error_with_the_limit(tmp_path):
+    def too_long(path):
+        raise processor.VideoTooLongError(95.0, 60)
+
+    store = MemoryStore({"m1": queued_match()})
+    storage = MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"})
+
+    assert run_once(store, storage, too_long, tmp_path, version="v") == ("m1", "error")
+    assert store.matches["m1"]["errorMessage"] == (
+        "Por ahora el análisis admite videos de hasta 1 minuto. Recorta el video y vuelve a subirlo.")
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(("seconds", "text"), [(45, "45 segundos"), (60, "1 minuto"), (600, "10 minutos"),
+                                               (90, "1 min 30 s")])
+def test_the_limit_is_written_for_people(seconds, text):
+    assert text in processor.message_too_long(seconds)
+
+
+def write_video(path, seconds, fps=10, size=(64, 48)):
+    import cv2
+    import numpy as np
+
+    out = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), fps, size)
+    for _ in range(int(seconds * fps)):
+        out.write(np.zeros((size[1], size[0], 3), np.uint8))
+    out.release()
+    return path
+
+
+def test_the_analyzer_rejects_long_videos_before_running_the_model(tmp_path, monkeypatch):
+    import main
+    from worker.__main__ import make_analyzer
+
+    config = tmp_path / "config.yaml"
+    config.write_text("worker:\n  max_duration_seconds: 2\n  min_resolution: 0\n")
+    ran = []
+    monkeypatch.setattr(main, "run_pipeline", lambda config, render: ran.append(1) or {"model_statistics": {}})
+    analyze = make_analyzer(config, render_video=False)
+
+    with pytest.raises(processor.VideoTooLongError) as error:
+        analyze(write_video(tmp_path / "largo.avi", seconds=3))
+    assert error.value.duration_seconds == pytest.approx(3)
+    assert ran == []
+
+    analyze(write_video(tmp_path / "corto.avi", seconds=1))
+    assert ran == [1]
+
+
+
+# ---------------------------------------------- resolución mínima
+
+
+def test_a_low_resolution_video_ends_in_error_with_the_requirement(tmp_path):
+    def low_resolution(path):
+        raise processor.VideoResolutionError(640, 360, 720)
+
+    store = MemoryStore({"m1": queued_match()})
+
+    assert run_once(store, MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"}), low_resolution, tmp_path,
+                    version="v") == ("m1", "error")
+    assert store.matches["m1"]["errorMessage"] == (
+        "El video debe tener al menos 720p (1280x720). Grábalo o expórtalo en 720p o 1080p y vuelve a subirlo.")
+
+
+@pytest.mark.parametrize(("size", "accepted"), [((640, 360), False), ((1280, 720), True), ((720, 1280), True),
+                                                 ((1920, 1080), True)],
+                         ids=["360p", "720p", "720p-vertical", "1080p"])
+def test_the_analyzer_checks_the_resolution_before_running_the_model(tmp_path, monkeypatch, size, accepted):
+    import main
+    from worker.__main__ import make_analyzer
+
+    ran = []
+    monkeypatch.setattr(main, "run_pipeline", lambda config, render: ran.append(1) or {"model_statistics": {}})
+    analyze = make_analyzer(render_video=False)
+    video = write_video(tmp_path / "v.avi", seconds=0.3, size=size)
+
+    if accepted:
+        analyze(video)
+        assert ran == [1]
+    else:
+        with pytest.raises(processor.VideoResolutionError):
+            analyze(video)
+        assert ran == []

@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react'
 import { EmptyState, ErrorState, LoadingState } from '../components/ui'
 import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
+import DashboardLatestMatch from '../components/dashboard/DashboardLatestMatch.jsx'
 import EvolutionPanel from '../components/dashboard/EvolutionPanel.jsx'
+import DashboardDetails from '../components/dashboard/DashboardDetails.jsx'
 import BloqueVacio from '../components/layout/BloqueVacio.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { useDashboardOverview } from '../hooks/useDashboardOverview.js'
 import { playerAge } from '../lib/players.js'
+import { dashboardPeriods } from '../lib/dashboardPeriods.js'
+import { completeDashboardMetricDefinitions } from '../lib/dashboardOverview.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import { createFirestoreDashboardService } from '../lib/services/firestoreDashboardService.js'
 import './jugadores.css'
@@ -68,10 +72,10 @@ const secciones = [
   },
   {
     clave: 'radar',
-    titulo: 'Perfil del jugador',
-    nota: 'Escala 0–100',
-    vacio: 'Perfil en construcción',
-    texto: 'Saque, derecha, revés, consistencia, movimiento y resistencia en una sola figura.',
+    titulo: 'Radar del jugador',
+    nota: 'Perfil normalizado',
+    vacio: 'Sin datos',
+    texto: 'El modelo aún no entrega puntuaciones comparables de 0–100. No se convierten velocidades o distancias en calificaciones inventadas.',
   },
   {
     clave: 'saque',
@@ -83,8 +87,8 @@ const secciones = [
   {
     clave: 'golpes',
     titulo: 'Derecha vs. revés',
-    vacio: 'Sin golpes comparados',
-    texto: 'Velocidad y efectividad de cada golpe, lado a lado.',
+    vacio: 'Sin datos',
+    texto: 'El modelo todavía no clasifica los golpes como derecha o revés. Los golpes medidos no se asignan a un lado sin evidencia.',
   },
   {
     clave: 'peloteos',
@@ -102,12 +106,7 @@ const secciones = [
   },
 ]
 
-const indicadores = [
-  'Partidos analizados',
-  'Velocidad media de saque',
-  'Primer saque dentro',
-  'Dobles faltas',
-]
+const indicadores = completeDashboardMetricDefinitions.map(metric => metric.label)
 
 function iniciales(nombre) {
   return nombre
@@ -135,12 +134,16 @@ function SeccionVacia({ seccion }) {
   )
 }
 
-function SeccionesVacias({ conEvolucion = false }) {
-  const [partido, radar, saque, ...resto] = secciones
+function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = false, details, serveEvolution, playerId, sample }) {
+  const [partido, radar] = secciones
   return (
     <>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
-        <SeccionVacia seccion={partido} />
+        {latestMatch ? <DashboardLatestMatch match={latestMatch} /> : (
+          <SeccionVacia seccion={filtered
+            ? { ...partido, vacio: 'No hay partidos analizados en este periodo', texto: 'Elige otro periodo para consultar sus partidos.' }
+            : partido} />
+        )}
         <SeccionVacia seccion={radar} />
       </div>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
@@ -155,13 +158,9 @@ function SeccionesVacias({ conEvolucion = false }) {
             }}
           />
         )}
-        <SeccionVacia seccion={saque} />
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-4">
-        {resto.map((seccion) => (
-          <SeccionVacia key={seccion.clave} seccion={seccion} />
-        ))}
-      </div>
+      <DashboardDetails details={details} serveEvolution={serveEvolution} playerId={playerId} sample={sample} />
+      <SeccionVacia seccion={secciones.find(section => section.clave === 'golpes')} />
     </>
   )
 }
@@ -172,8 +171,8 @@ function IndicadoresVacios() {
       {indicadores.map((nombre) => (
         <div key={nombre} className={`${tarjeta} flex flex-col gap-2 p-4`}>
           <p className={etiqueta}>{nombre}</p>
-          <p className="font-display text-4xl leading-none font-bold text-line3">0</p>
-          <p className="text-[13px] text-muted">Sin análisis todavía</p>
+          <p className="font-display text-4xl leading-none font-bold text-line3">—</p>
+          <p className="text-[13px] text-muted">Sin datos</p>
         </div>
       ))}
     </div>
@@ -236,7 +235,23 @@ function Perfil({ player, sample }) {
   )
 }
 
-function Cabecera({ players, selected, onSelect, disabled }) {
+function DashboardSelect({ id, label, children, value, disabled, onChange }) {
+  return (
+    <div className="players-field dashboard-player-select">
+      <label htmlFor={id}>{label}</label>
+      <div className="dashboard-select-wrap">
+        <select id={id} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>
+          {children}
+        </select>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilter }) {
   return (
     <header className="dashboard-head">
       <div>
@@ -245,15 +260,14 @@ function Cabecera({ players, selected, onSelect, disabled }) {
           Dashboard<span className="players-title-dot">.</span>
         </h1>
       </div>
-      <div className="players-field dashboard-player-select">
-        <label htmlFor="dashboard-player">Jugador</label>
-        <div className="dashboard-select-wrap">
-          <select
-            id="dashboard-player"
-            value={selected?.id ?? ''}
-            disabled={disabled}
-            onChange={(event) => onSelect(event.target.value)}
-          >
+      <div className="dashboard-controls">
+        <DashboardSelect
+          id="dashboard-player"
+          label="Jugador"
+          value={selected?.id ?? ''}
+          disabled={players.loading || Boolean(players.error) || players.rows.length === 0}
+          onChange={onSelect}
+        >
             <option value="">
               {players.loading ? 'Cargando jugadores…' : 'Selecciona un jugador'}
             </option>
@@ -262,21 +276,10 @@ function Cabecera({ players, selected, onSelect, disabled }) {
                 {player.fullName}
               </option>
             ))}
-          </select>
-          <svg
-            aria-hidden="true"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </div>
+        </DashboardSelect>
+        <DashboardSelect id="dashboard-period" label="Periodo" value={period} disabled={!canFilter} onChange={onPeriodChange}>
+          {dashboardPeriods.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+        </DashboardSelect>
       </div>
     </header>
   )
@@ -285,18 +288,20 @@ function Cabecera({ players, selected, onSelect, disabled }) {
 function DashboardWorkspace({ playersService, overviewService, renderEvolution }) {
   const players = usePlayers(playersService)
   const [selectedId, setSelectedId] = useState('')
+  const [period, setPeriod] = useState('all')
   const selected =
     !players.loading && !players.error
       ? players.rows.find((player) => player.id === selectedId)
       : null
   const overview = useDashboardOverview(overviewService, selected?.id ?? '')
   const ready = overview.status === 'ready'
+  const report = ready ? (period === 'all' ? overview.data : overview.data?.periods?.[period]) : null
   const sample = playersService.mode === 'demo'
   const sinIndicadores =
     overview.status === 'unavailable' ||
-    !overview.data?.metrics ||
-    overview.data?.coverage?.compatibleMatches === 0 ||
-    Object.values(overview.data.metrics).every((value) => value == null)
+    !report?.metrics ||
+    report.coverage?.compatibleMatches === 0 ||
+    Object.values(report.metrics).every((value) => value == null)
 
   return (
     <section className="players-page dashboard-page" aria-labelledby="dashboard-title">
@@ -313,7 +318,9 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
         players={players}
         selected={selected}
         onSelect={setSelectedId}
-        disabled={players.loading || Boolean(players.error) || players.rows.length === 0}
+        period={period}
+        onPeriodChange={setPeriod}
+        canFilter={Boolean(overview.data?.periods)}
       />
 
       {players.loading ? (
@@ -344,7 +351,7 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
             )}
           </PerfilVacio>
           <IndicadoresVacios />
-          <SeccionesVacias conEvolucion />
+          <SeccionesDashboard conEvolucion />
         </>
       ) : (
         <>
@@ -375,9 +382,17 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                     {sample ? 'Ejemplos de interfaz' : 'Indicadores disponibles'}
                   </span>
                 </div>
-                <DashboardMetrics metrics={ready ? overview.data?.metrics : null} sample={sample} />
+                {overview.data?.periods && period === 'all' && (
+                  <p className="text-[13px] text-muted">Elige un periodo para ver la comparación con el anterior.</p>
+                )}
+                <DashboardMetrics
+                  metrics={report?.metrics}
+                  previousMetrics={report?.previousMetrics}
+                  compare={Boolean(report) && period !== 'all'}
+                  sample={sample}
+                />
               </section>
-              {ready && overview.data?.coverage?.incompatibleMatches > 0 && (
+              {report?.coverage?.incompatibleMatches > 0 && (
                 <p className="dashboard-data-notice" role="status">
                   Algunos análisis terminados aún no tienen indicadores disponibles. El resumen
                   incluye únicamente los resultados verificables.
@@ -389,7 +404,9 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                     title={
                       overview.status === 'unavailable'
                         ? 'Los indicadores aún no están disponibles'
-                        : 'Todavía no hay estadísticas para este jugador'
+                        : period === 'all'
+                          ? 'Todavía no hay estadísticas para este jugador'
+                          : 'No hay estadísticas en este periodo'
                     }
                     description="Las métricas disponibles aparecerán aquí cuando se reciban los resultados de sus análisis."
                   />
@@ -397,11 +414,18 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
               )}
               <EvolutionPanel
                 playerId={selected.id}
-                evolution={ready ? overview.data?.evolution : undefined}
+                evolution={report?.evolution}
                 sample={sample}
                 renderEvolution={ready ? renderEvolution : undefined}
               />
-              <SeccionesVacias />
+              <SeccionesDashboard
+                latestMatch={report?.latestMatch?.playerId === selected.id ? report.latestMatch : null}
+                filtered={period !== 'all'}
+                details={report?.details}
+                serveEvolution={report?.serveEvolution}
+                playerId={selected.id}
+                sample={sample}
+              />
             </>
           )}
         </>
@@ -430,7 +454,7 @@ function DashboardSinConexion() {
         </p>
       </PerfilVacio>
       <IndicadoresVacios />
-      <SeccionesVacias conEvolucion />
+      <SeccionesDashboard conEvolucion />
     </section>
   )
 }
@@ -444,23 +468,24 @@ export default function Dashboard({
 }) {
   const uid = session?.uid
   const orgId = session?.orgId
+  const role = session?.role ?? 'coach'
   const hasInjectedServices = playersService != null || overviewService != null
   const liveServices = useMemo(() => {
     if (
       hasInjectedServices ||
-      !db ||
+      !db || !['coach', 'admin'].includes(role) ||
       typeof uid !== 'string' ||
       !uid.trim() ||
       typeof orgId !== 'string' ||
       !orgId.trim()
     )
       return null
-    const identity = { db, orgId, actorId: uid }
+    const identity = { db, orgId, actorId: uid, role }
     return {
       players: createFirestorePlayersService(identity),
       overview: createFirestoreDashboardService(identity),
     }
-  }, [hasInjectedServices, db, uid, orgId])
+  }, [hasInjectedServices, db, uid, orgId, role])
   const players = playersService ?? liveServices?.players
   const overview = overviewService ?? liveServices?.overview
   const mixedScopes =

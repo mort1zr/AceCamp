@@ -75,6 +75,9 @@ export function analysisErrorMessage(error) {
   if (error?.code === 'analysis/player') return 'El jugador ya no está disponible en tu organización. Actualiza la lista.'
   if (error?.code === 'analysis/validation') return 'Revisa los datos y el video antes de continuar.'
   if (error?.code === 'analysis/video-path') return 'La ruta del video no corresponde a este partido. Vuelve a intentar la carga.'
+  if (error?.code === 'analysis/limit') return error.limit
+    ? `Tu organización ya usó los ${error.limit} análisis de su plan este mes. Cambia de plan en Configuración o espera al próximo mes.`
+    : 'Tu organización no tiene un plan con análisis disponibles. Elige un plan en Configuración.'
   if (error?.code === 'permission-denied' || error?.code === 'unauthenticated') return 'Tu sesión no permite realizar esta operación. Vuelve a iniciar sesión o consulta con el administrador.'
   if (error?.code === 'unavailable') return 'No hay conexión con el servicio. Tus datos siguen en el formulario; vuelve a intentarlo.'
   return 'No pudimos completar la operación. Conservamos el formulario para que puedas reintentarlo.'

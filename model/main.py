@@ -1,25 +1,91 @@
 import json
-from copy import deepcopy
+import time
+from dataclasses import dataclass
 
 import cv2
-import pandas as pd
 
-import constants
+from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
+from court import CourtTracker
 from court_line_detector import CourtLineDetector
+from events import detect_bounce_events, detect_hits, detect_points, detect_serves, locate_bounces
 from mini_court import MiniCourt
-from stats import build_model_statistics, renumber_far_near
-from trackers import BallTracker, PlayerTracker
-from utils import (
-    convert_pixel_distance_to_meters,
-    draw_player_stats,
-    get_video_info,
-    measure_distance,
-    read_video,
-    save_video,
-    speed_km_per_hour,
+from stats import (
+    add_serve_and_rally_stats,
+    build_frame_states,
+    build_model_statistics,
+    measure_shots,
+    renumber_far_near,
 )
-from utils.detection_cache import cache_path_for, file_sha256
+from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
+from utils import VideoWriter, get_video_info, iter_frames
+from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
+from utils.player_stats_drawer_utils import StatsBox
+from utils.progress import report_progress
+
+MINI_COURT_BOUNCES = 6  # botes que se ven a la vez en la mini-pista
+
+
+# Con ball_image_size "auto", los vídeos más estrechos que esto se analizan ampliados a
+# AUTO_BALL_IMAGE_SIZE para buscar la pelota (en 640x360 mide 2-3 px y el detector la pierde).
+AUTO_SMALL_VIDEO_WIDTH = 1280
+AUTO_BALL_IMAGE_SIZE = 1280
+
+
+def resolve_ball_image_size(setting, video_width):
+    """Tamaño de imagen para el detector de pelota: un número, None (el de YOLO) o "auto"."""
+    if setting == "auto":
+        return AUTO_BALL_IMAGE_SIZE if video_width < AUTO_SMALL_VIDEO_WIDTH else None
+    return int(setting) if setting else None
+
+
+@dataclass
+class VideoDetections:
+    """Resultado de la primera pasada: una entrada por fotograma (salvo cuts)."""
+
+    players: list
+    ball: list
+    keypoints: list
+    homographies: list
+    court_visible: list
+    cuts: list
+
+
+def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tracker, cut_detector=None,
+                 cached_players=None, cached_ball=None, player_every=1):
+    """Primera pasada (PCIT-146): recorre el vídeo una vez y guarda solo las detecciones.
+
+    Cada fotograma se usa para detectar jugadores, pelota y pista y se descarta: la
+    memoria no crece con la duración del vídeo. Con detecciones en caché no se ejecuta
+    YOLO, pero la pista se sigue detectando (cada N fotogramas, TA-11).
+
+    player_every > 1 detecta a los jugadores en uno de cada N fotogramas; en el resto
+    se dejan vacíos y la selección de jugadores interpola sus cajas.
+
+    Con cut_detector, cada corte de cámara obliga a volver a detectar la pista (TA-15).
+    """
+    result = VideoDetections([], [], [], [], [], [])
+    players, ball = result.players, result.ball
+    for i, frame in enumerate(iter_frames(video_path)):
+        cut = cut_detector.update(frame) if cut_detector is not None else False
+        if cut:
+            result.cuts.append(i)
+        if cached_players is not None and i < len(cached_players):
+            players.append(cached_players[i])
+        elif i % player_every == 0:
+            players.append(player_tracker.detect_frame(frame))
+        else:
+            players.append({})
+        if cached_ball is not None and i < len(cached_ball):
+            ball.append(cached_ball[i])
+        else:
+            ball.append(ball_tracker.detect_frame(frame))
+        frame_keypoints, homography = court_tracker.update(frame, cut=cut)
+        result.keypoints.append(frame_keypoints)
+        result.homographies.append(homography)
+        result.court_visible.append(court_tracker.court_visible)
+        report_progress("Detección", i + 1, num_frames)
+    return result
 
 
 def run_pipeline(config, render=True):
@@ -31,167 +97,188 @@ def run_pipeline(config, render=True):
     """
     paths, models, detection = config["paths"], config["models"], config["detection"]
 
-    # Read Video
     input_video_path = resolve_path(paths["input"])
     if not input_video_path.exists():
         raise FileNotFoundError(f"No existe el vídeo de entrada: {input_video_path}")
     video_info = get_video_info(input_video_path)
-    video_frames = read_video(str(input_video_path))
     video_hash = file_sha256(input_video_path)
     cache_dir = resolve_path(paths["cache_dir"])
 
-    # Detect Players and Ball
+    ball_image_size = resolve_ball_image_size(detection.get("ball_image_size"), video_info.width)
     player_tracker = PlayerTracker(model_path=str(resolve_path(models["players"])), device=detection["device"])
-    ball_tracker = BallTracker(model_path=str(resolve_path(models["ball"])),
-                               conf=detection["ball_confidence"],
-                               device=detection["device"])
+    ball_detector = detection.get("ball_detector", "yolo")
+    if ball_detector == "tracknet":  # TA-14b: detector de pelota que mira 3 fotogramas seguidos
+        ball_model = models["ball_tracknet"]
+        ball_tracker = TrackNetBallTracker(model_path=str(resolve_path(ball_model)), device=detection["device"])
+        ball_cache_params = {"detector": "tracknet"}
+    elif ball_detector == "yolo":
+        ball_model = models["ball"]
+        ball_tracker = BallTracker(model_path=str(resolve_path(ball_model)),
+                                   conf=detection["ball_confidence"],
+                                   device=detection["device"],
+                                   image_size=ball_image_size)
+        ball_cache_params = {"conf": detection["ball_confidence"],
+                             **({"imgsz": ball_image_size} if ball_image_size else {})}
+    else:
+        raise ValueError(f"detection.ball_detector debe ser 'yolo' o 'tracknet', no {ball_detector!r}")
+    court_line_detector = CourtLineDetector(str(resolve_path(models["court_keypoints"])),
+                                            refine=config["court"]["refine_keypoints"])
+    # Puntos clave y homografía imagen → pista (metros), re-detectados cada N fotogramas y suavizados
+    court_tracker = CourtTracker(court_line_detector.predict,
+                                 redetect_every=config["court"]["redetect_every_frames"],
+                                 smoothing=config["court"]["smoothing"])
 
-    player_detections = player_tracker.detect_frames(
-        video_frames,
-        cache_path=cache_path_for(cache_dir, video_hash, "players", models["players"]),
-        video_hash=video_hash,
-        use_cache=config["use_cache"],
-    )
-    ball_detections = ball_tracker.detect_frames(
-        video_frames,
-        cache_path=cache_path_for(cache_dir, video_hash, "ball", models["ball"],
-                                  conf=detection["ball_confidence"]),
-        video_hash=video_hash,
-        use_cache=config["use_cache"],
-    )
-    ball_detections = ball_tracker.interpolate_ball_positions(ball_detections)
+    player_every = int(detection.get("player_every_n_frames", 1))
+    players_cache = cache_path_for(cache_dir, video_hash, "players", models["players"],
+                                   **({"every": player_every} if player_every > 1 else {}))
+    ball_cache = cache_path_for(cache_dir, video_hash, "ball", ball_model, all_candidates=True, **ball_cache_params)
+    cached_players = load_detections(players_cache, video_hash) if config["use_cache"] else None
+    cached_ball = load_detections(ball_cache, video_hash) if config["use_cache"] else None
 
+    detections = detect_video(
+        input_video_path, video_info.frame_count, player_tracker, ball_tracker, court_tracker,
+        cut_detector=CutDetector() if config["cameras"]["detect_cuts"] else None,
+        cached_players=cached_players, cached_ball=cached_ball, player_every=player_every)
+    num_frames = len(detections.ball)
+    if num_frames == 0:
+        raise ValueError(f"El vídeo no tiene fotogramas: {input_video_path}")
+    if cached_players is None or len(cached_players) != num_frames:
+        save_detections(players_cache, detections.players, video_hash)
+    if cached_ball is None or len(cached_ball) != num_frames:
+        save_detections(ball_cache, detections.ball, video_hash)
+    court_keypoints, homography = detections.keypoints, detections.homographies
 
-    # Court Line Detector model
-    court_model_path = str(resolve_path(models["court_keypoints"]))
-    court_line_detector = CourtLineDetector(court_model_path)
-    court_keypoints = court_line_detector.predict(video_frames[0])
+    # Cámara principal (TA-15): fuera de ella (repeticiones, primeros planos) se descartan
+    # jugadores y pelota, así que no generan golpes ni botes ni suman metros.
+    main_camera = main_camera_frames(court_keypoints, detections.court_visible, video_info.width,
+                                     max_shift_fraction=config["cameras"]["max_shift_fraction"])
+    main_segments = segments(main_camera)
+    if not main_segments:
+        raise ValueError("no se reconoció la pista en ningún tramo del vídeo")
+    main_frames = sum(end - start + 1 for start, end in main_segments)
+    if detections.cuts or main_frames < num_frames:
+        print(f"Cámara principal: {main_frames}/{num_frames} fotogramas en {len(main_segments)} tramos; "
+              f"{len(detections.cuts)} cortes de cámara")
+    player_detections = [d if main else {} for d, main in zip(detections.players, main_camera)]
+    ball_candidates = [d if main else {} for d, main in zip(detections.ball, main_camera)]
 
-    # choose players
-    player_detections = player_tracker.choose_and_filter_players(court_keypoints, player_detections)
+    ball_detections = ball_tracker.select_ball_positions(ball_candidates, frame_height=video_info.height,
+                                                         fps=video_info.fps)
+    ball_detections = ball_tracker.interpolate_ball_positions(ball_detections,
+                                                              max_gap=detection["ball_max_interpolation_gap"])
+    ball_detections = [d if main else {} for d, main in zip(ball_detections, main_camera)]
 
-    # MiniCourt
-    mini_court = MiniCourt(video_frames[0]) 
+    first_main = main_segments[0][0]
+    first = homography[first_main]
+    print(f"Homografía: error de reproyección medio {first.mean_reprojection_error(court_keypoints[first_main]):.1f} px, "
+          f"{int(first.inliers.sum())}/{len(first.inliers)} puntos clave coherentes")
+    discarded = [i for i, ok in enumerate(first.inliers) if not ok]
+    if discarded:
+        print(f"  Puntos clave descartados por RANSAC (ver numeración en court/court_model.py): {discarded}")
 
-    # Detect ball shots
-    ball_shot_frames= ball_tracker.get_ball_shot_frames(
-        ball_detections,
-        minimum_change_frames_for_hit=config["shots"]["min_change_frames_for_hit"],
-        rolling_window=config["shots"]["rolling_window"],
-    )
+    # Elegir a los dos jugadores: 1 = lado lejano, 2 = lado cercano
+    player_detections = player_tracker.choose_and_filter_players(homography, player_detections)
+    # La selección interpola las cajas en los huecos; fuera de la cámara principal no hay jugadores.
+    player_detections = [d if main else {} for d, main in zip(player_detections, main_camera)]
 
-    # Convert positions to mini court positions
-    player_mini_court_detections, ball_mini_court_detections = mini_court.convert_bounding_boxes_to_mini_court_coordinates(player_detections, 
-                                                                                                          ball_detections,
-                                                                                                          court_keypoints)
+    # Posiciones en metros sobre la pista
+    player_court_positions, ball_court_positions = MiniCourt.court_positions(player_detections,
+                                                                             ball_detections,
+                                                                             homography)
 
-    player_stats_data = [{
-        'frame_num':0,
-        'player_1_number_of_shots':0,
-        'player_1_total_shot_speed':0,
-        'player_1_last_shot_speed':0,
-        'player_1_total_player_speed':0,
-        'player_1_last_player_speed':0,
+    # Golpes (TA-22a) y saques (TA-18). Los saques se detectan por el lanzamiento y cuentan como
+    # golpes para los botes: si no, el raquetazo del saque parece un bote.
+    hits = detect_hits(ball_detections, player_detections, homography, video_info.fps)
+    serves = detect_serves(ball_detections, player_detections, homography, video_info.fps,
+                           main_camera=main_camera, hits=hits)
+    all_hits = sorted(set(hits) | {s["frame"] for s in serves})
 
-        'player_2_number_of_shots':0,
-        'player_2_total_shot_speed':0,
-        'player_2_last_shot_speed':0,
-        'player_2_total_player_speed':0,
-        'player_2_last_player_speed':0,
-    } ]
-    shots = []
+    # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
+    bounces = detect_bounce_events(ball_detections, player_detections, homography, video_info.fps,
+                                   main_camera=main_camera, hits=all_hits)
+    bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=all_hits,
+                             court_keypoints=court_keypoints)
 
-    for ball_shot_ind in range(len(ball_shot_frames)-1):
-        start_frame = ball_shot_frames[ball_shot_ind]
-        end_frame = ball_shot_frames[ball_shot_ind+1]
-        shot_frames = end_frame - start_frame
+    # División en puntos (TA-17).
+    points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
+                           main_camera=main_camera, serves=serves)
 
-        # Get distance covered by the ball
-        distance_covered_by_ball_pixels = measure_distance(ball_mini_court_detections[start_frame][1],
-                                                           ball_mini_court_detections[end_frame][1])
-        distance_covered_by_ball_meters = convert_pixel_distance_to_meters( distance_covered_by_ball_pixels,
-                                                                           constants.DOUBLE_LINE_WIDTH,
-                                                                           mini_court.get_width_of_mini_court()
-                                                                           ) 
+    # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
+    # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
+    # muy seguidos, con velocidades imposibles.
+    shots = measure_shots(all_hits, ball_detections, player_detections, player_court_positions,
+                          video_info.fps, main_camera=main_camera, hitters={s["frame"]: s["player"] for s in serves})
 
-        # Speed of the ball shot in km/h
-        speed_of_ball_shot = speed_km_per_hour(distance_covered_by_ball_meters, shot_frames, video_info.fps)
-
-        # player who the ball
-        player_positions = player_mini_court_detections[start_frame]
-        player_shot_ball = min( player_positions.keys(), key=lambda player_id: measure_distance(player_positions[player_id],
-                                                                                                 ball_mini_court_detections[start_frame][1]))
-
-        # opponent player speed
-        opponent_player_id = 1 if player_shot_ball == 2 else 2
-        distance_covered_by_opponent_pixels = measure_distance(player_mini_court_detections[start_frame][opponent_player_id],
-                                                                player_mini_court_detections[end_frame][opponent_player_id])
-        distance_covered_by_opponent_meters = convert_pixel_distance_to_meters( distance_covered_by_opponent_pixels,
-                                                                           constants.DOUBLE_LINE_WIDTH,
-                                                                           mini_court.get_width_of_mini_court()
-                                                                           ) 
-
-        speed_of_opponent = speed_km_per_hour(distance_covered_by_opponent_meters, shot_frames, video_info.fps)
-
-        shots.append({"frame": int(start_frame), "endFrame": int(end_frame),
-                      "player": int(player_shot_ball), "speedKmh": float(speed_of_ball_shot)})
-
-        current_player_stats= deepcopy(player_stats_data[-1])
-        current_player_stats['frame_num'] = start_frame
-        current_player_stats[f'player_{player_shot_ball}_number_of_shots'] += 1
-        current_player_stats[f'player_{player_shot_ball}_total_shot_speed'] += speed_of_ball_shot
-        current_player_stats[f'player_{player_shot_ball}_last_shot_speed'] = speed_of_ball_shot
-
-        current_player_stats[f'player_{opponent_player_id}_total_player_speed'] += speed_of_opponent
-        current_player_stats[f'player_{opponent_player_id}_last_player_speed'] = speed_of_opponent
-
-        player_stats_data.append(current_player_stats)
-
-    # Sprint 1: posiciones de la mini-pista (píxeles) pasadas a metros con su escala.
-    meters_per_pixel = constants.DOUBLE_LINE_WIDTH / mini_court.get_width_of_mini_court()
-    player_positions_m = [{pid: (x * meters_per_pixel, y * meters_per_pixel) for pid, (x, y) in frame.items()}
-                          for frame in player_mini_court_detections]
-    stats_shots, stats_positions = renumber_far_near(shots, player_positions_m)
-    model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, len(video_frames))
-    result = {"model_statistics": model_statistics, "shots": stats_shots, "output_video": None}
+    stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
+    model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
+    add_serve_and_rally_stats(model_statistics, points)
+    result = {
+        "model_statistics": model_statistics,
+        "shots": stats_shots,
+        "output_video": None,
+        # Datos intermedios: los usa el pre-etiquetado del set de validación (python -m eval.prelabel).
+        "video_info": video_info,
+        "video_hash": video_hash,
+        "ball_detections": ball_detections,
+        "court_keypoints": court_keypoints,
+        "player_detections": player_detections,
+        "cuts": detections.cuts,
+        "bounces": bounces,
+        "serves": serves,
+        "points": points,
+        "main_camera_segments": main_segments,
+    }
     if not render:
         return result
 
-    player_stats_data_df = pd.DataFrame(player_stats_data)
-    frames_df = pd.DataFrame({'frame_num': list(range(len(video_frames)))})
-    player_stats_data_df = pd.merge(frames_df, player_stats_data_df, on='frame_num', how='left')
-    player_stats_data_df = player_stats_data_df.ffill()
+    # Estadísticas de cada fotograma para el overlay (sin "nan": lo que aún no se mide es None)
+    frame_states = build_frame_states(shots, num_frames)
 
-    player_stats_data_df['player_1_average_shot_speed'] = player_stats_data_df['player_1_total_shot_speed']/player_stats_data_df['player_1_number_of_shots']
-    player_stats_data_df['player_2_average_shot_speed'] = player_stats_data_df['player_2_total_shot_speed']/player_stats_data_df['player_2_number_of_shots']
-    player_stats_data_df['player_1_average_player_speed'] = player_stats_data_df['player_1_total_player_speed']/player_stats_data_df['player_2_number_of_shots']
-    player_stats_data_df['player_2_average_player_speed'] = player_stats_data_df['player_2_total_player_speed']/player_stats_data_df['player_1_number_of_shots']
-
-
-
-    # Draw output
-    ## Draw Player Bounding Boxes
-    output_video_frames= player_tracker.draw_bboxes(video_frames, player_detections)
-    output_video_frames= ball_tracker.draw_bboxes(output_video_frames, ball_detections)
-
-    ## Draw court Keypoints
-    output_video_frames  = court_line_detector.draw_keypoints_on_video(output_video_frames, court_keypoints)
-
-    # Draw Mini Court
-    output_video_frames = mini_court.draw_mini_court(output_video_frames)
-    output_video_frames = mini_court.draw_points_on_mini_court(output_video_frames,player_mini_court_detections)
-    output_video_frames = mini_court.draw_points_on_mini_court(output_video_frames,ball_mini_court_detections, color=(0,255,255))    
-
-    # Draw Player Stats
-    output_video_frames = draw_player_stats(output_video_frames,player_stats_data_df)
-
-    ## Draw frame number on top left corner
-    for i, frame in enumerate(output_video_frames):
-        cv2.putText(frame, f"Frame: {i}",(10,30),cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
+    # Segunda pasada: se vuelve a leer el vídeo y cada fotograma se dibuja y se escribe al momento.
     output_video_path = resolve_path(paths["output"])
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
-    save_video(output_video_frames, str(output_video_path), fps=video_info.fps)
+    mini_court = stats_box = None
+    bounce_marker_frames = max(1, int(round(0.5 * video_info.fps)))
+    with VideoWriter(output_video_path, fps=video_info.fps) as out:
+        for i, frame in enumerate(iter_frames(input_video_path)):
+            if i >= num_frames:
+                break
+            if mini_court is None:
+                mini_court = MiniCourt(frame)
+                stats_box = StatsBox(frame.shape, right=mini_court.end_x, top=mini_court.end_y)
+                text_scale = mini_court.scale
+            frame = player_tracker.draw_frame(frame, player_detections[i])
+            frame = ball_tracker.draw_frame(frame, ball_detections[i])
+            if main_camera[i]:
+                frame = court_line_detector.draw_keypoints(frame, court_keypoints[i])
+            else:
+                cv2.putText(frame, "Otra camara: no se analiza", (int(10 * text_scale), int(70 * text_scale)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 165, 255), max(1, int(round(2 * text_scale))))
+            frame = mini_court.draw_frame(frame, player_court_positions[i], ball_court_positions[i])
+            # Los últimos botes, en su posición de la pista (TA-23).
+            recent = [b for b in bounces if b["frame"] <= i][-MINI_COURT_BOUNCES:]
+            frame = mini_court.draw_bounces(frame, [(b["x_m"], b["y_m"]) for b in recent])
+            for bounce in bounces:  # marca cada bote durante medio segundo
+                if 0 <= i - bounce["frame"] < bounce_marker_frames:
+                    center = (int(bounce["x_px"]), int(bounce["y_px"]))
+                    cv2.circle(frame, center, int(18 * text_scale), (255, 0, 255), max(1, int(round(3 * text_scale))))
+                    cv2.putText(frame, "BOTE", (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7 * text_scale, (255, 0, 255), max(1, int(round(2 * text_scale))))
+            for serve in serves:  # marca cada saque durante medio segundo, sobre el sacador
+                if 0 <= i - serve["frame"] < bounce_marker_frames and serve["player"] in player_detections[i]:
+                    x1, y1, x2, _ = player_detections[i][serve["player"]]
+                    cv2.putText(frame, f"SAQUE ({serve['side']})", (int(x1), int(y1 - 30 * text_scale)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7 * text_scale, (0, 255, 255),
+                                max(1, int(round(2 * text_scale))))
+            current = next((k for k, p in enumerate(points, start=1) if p["start"] <= i <= p["end"]), None)
+            if current is not None:
+                cv2.putText(frame, f"Punto {current}", (int(10 * text_scale), int(110 * text_scale)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 255, 255), max(1, int(round(2 * text_scale))))
+            frame = stats_box.draw(frame, frame_states[i])
+            cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
+                        text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))
+            out.write(frame)
+            report_progress("Vídeo anotado", i + 1, num_frames)
     print(f"Vídeo guardado en {output_video_path}")
     result["output_video"] = output_video_path
     return result
@@ -199,10 +286,15 @@ def run_pipeline(config, render=True):
 
 def main(argv=None):
     config = config_from_args(argv)
+    started = time.perf_counter()
     try:
         result = run_pipeline(config, render=config["render_video"])
     except FileNotFoundError as exc:
         raise SystemExit(str(exc)) from exc
+    elapsed = time.perf_counter() - started
+    video_minutes = result["video_info"].duration_seconds / 60
+    per_minute = f" ({elapsed / video_minutes:.0f} s por minuto de vídeo)" if video_minutes > 0 else ""
+    print(f"Tiempo de proceso: {elapsed:.0f} s{per_minute}")
     stats_path = config["paths"].get("stats_json")
     if stats_path:
         stats_path = resolve_path(stats_path)
@@ -210,6 +302,7 @@ def main(argv=None):
         stats_path.write_text(json.dumps(result["model_statistics"], indent=2, ensure_ascii=False))
         print(f"Estadísticas guardadas en {stats_path}")
     return result
+
 
 if __name__ == "__main__":
     main()

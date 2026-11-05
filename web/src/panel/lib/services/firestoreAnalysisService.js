@@ -1,11 +1,20 @@
 import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { analysisSignature, hashAnalysisSignature, normalizedMatch, throwIfAborted, validateAnalysis } from '../analysis.js'
+import { limitError, nextUsage, planLimit, quotaReached, usageRef } from '../usage.js'
 import { isStorageVideoPath } from '../videoImportProtocol.js'
 
+function checkQuota(org, counter) {
+  const limit = planLimit(org.exists() ? org.data().plan : null)
+  const used = counter.exists() ? counter.data().analyses : 0
+  if (quotaReached(used, limit)) throw limitError(used, limit)
+}
+
 /** Adapters uploadVideo/importVideo return a Storage path, not a public URL. */
-export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo, importVideo, maxBytes }) {
+export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coach', uploadVideo, importVideo, maxBytes }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof uploadVideo !== 'function' || !Number.isFinite(maxBytes) || maxBytes <= 0) throw new Error('Analysis requires database, identity, uploadVideo and maxBytes.')
   const matches = collection(db, 'matches')
+  const organization = doc(db, 'orgs', orgId)
+  if (!['admin', 'coach'].includes(role)) throw new Error('Invalid analysis role.')
   const uploaded = new Map()
   const pending = new Map()
   const capabilities = { maxBytes, supportsLinks: typeof importVideo === 'function', supportsYouTube: typeof importVideo === 'function' && importVideo.supportsYouTube === true }
@@ -26,7 +35,10 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
       return { ...data, id: reference.id }
     }
     const player = await getDoc(doc(db, 'players', input.playerId))
-    if (!player.exists() || player.data().orgId !== orgId) throw Object.assign(new Error('Player not available'), { code: 'analysis/player' })
+    if (!player.exists() || player.data().deletedAt != null || player.data().orgId !== orgId || (role !== 'admin' && player.data().createdBy !== actorId)) throw Object.assign(new Error('Player not available'), { code: 'analysis/player' })
+    // Antes de transferir el video: si el plan ya no tiene análisis este mes, no se sube nada (PCIT-41).
+    const [org, counter] = await Promise.all([getDoc(organization), getDoc(usageRef(db, orgId))])
+    checkQuota(org, counter)
     throwIfAborted(signal)
 
     let video = uploaded.get(requestId)
@@ -49,6 +61,7 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
     throwIfAborted(signal)
     onProgress?.({ phase: 'saving', percent: 100 })
     const match = { ...normalizedMatch(input), orgId, createdBy: actorId, createdAt: serverTimestamp(), videoPath: video.videoPath, inputFingerprint: fingerprint, status: 'en cola' }
+    const usage = usageRef(db, orgId)
     const saved = await runTransaction(db, async transaction => {
       const current = await transaction.get(reference)
       if (current.exists()) {
@@ -56,7 +69,12 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
         if (data.orgId !== orgId || data.createdBy !== actorId || data.inputFingerprint !== fingerprint) throw new Error('Conflicting request')
         return data
       }
+      // El partido y el contador del mes se escriben juntos (PCIT-41).
+      // Se vuelve a revisar el límite por si otro entrenador analizó mientras se subía el video.
+      const counter = await transaction.get(usage)
+      checkQuota(await transaction.get(organization), counter)
       transaction.set(reference, match)
+      transaction.set(usage, nextUsage(counter.exists() ? counter.data() : null, reference.id, serverTimestamp()))
       return match
     })
     uploaded.delete(requestId)
@@ -69,8 +87,10 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, uploadVideo
     ...capabilities,
     createRequestId: () => doc(matches).id,
     subscribe(onMatches, onError) {
-      return onSnapshot(query(matches, where('orgId', '==', orgId)), snapshot => {
-        onMatches(snapshot.docs.map(item => ({ ...item.data(), id: item.id })).sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)))
+      const filters = [where('orgId', '==', orgId)]
+      if (role !== 'admin') filters.push(where('createdBy', '==', actorId))
+      return onSnapshot(query(matches, ...filters), snapshot => {
+        onMatches(snapshot.docs.map(item => ({ ...item.data(), id: item.id })).filter(row => row.orgId === orgId && (role === 'admin' || row.createdBy === actorId)).sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0)))
       }, onError)
     },
     enqueue(input, options) {
