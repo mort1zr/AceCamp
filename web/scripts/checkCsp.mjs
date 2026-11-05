@@ -18,7 +18,7 @@ if (!csp) {
 const scriptSrc = csp.split(';').map(part => part.trim()).find(part => part.startsWith('script-src ')) ?? ''
 
 const missing = []
-for (const [, attrs, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
+for (const [, attrs, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
   if (/\bsrc=/.test(attrs)) continue
   const hash = `'sha256-${createHash('sha256').update(body).digest('base64')}'`
   if (!scriptSrc.split(/\s+/).includes(hash)) missing.push(hash)
