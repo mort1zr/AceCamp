@@ -7,16 +7,18 @@ export const dashboardPeriods = [
   { value: '6', label: 'Últimos 6 meses' },
 ]
 
+export function monthsBefore(date, months) {
+  const first = new Date(date.getFullYear(), date.getMonth() - months, 1)
+  const lastDay = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+  first.setDate(Math.min(date.getDate(), lastDay))
+  return first
+}
+
 export function buildDashboardPeriods(matches, summarize, summarizePrevious, today = new Date()) {
-  const year = today.getFullYear()
-  const month = today.getMonth()
-  const day = today.getDate()
   const end = localDateString(today)
   const dated = matches.filter(match => isValidBirthDate(match?.matchDate, end))
   return Object.fromEntries(dashboardPeriods.slice(1).map(({ value }) => {
-    const first = new Date(year, month - Number(value), 1)
-    const lastDay = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
-    first.setDate(Math.min(day, lastDay))
+    const first = monthsBefore(today, Number(value))
     const start = localDateString(first)
     const report = summarize(dated.filter(match => match.matchDate >= start))
     // ISO date-only values are UTC for counting calendar days, including both ends.

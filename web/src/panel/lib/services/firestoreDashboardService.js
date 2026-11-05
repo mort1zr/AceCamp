@@ -4,8 +4,33 @@ import { buildDashboardEvolution } from '../dashboardEvolution.js'
 import { buildDashboardPeriods } from '../dashboardPeriods.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
+function summarizeDashboard(rows, context) {
+  const { orgId, playerId, decodeStatistics } = context
+  const summarize = matches => {
+    const overview = buildDashboardOverview(matches, context)
+    const evolution = buildDashboardEvolution(matches, context)
+    const point = evolution.points.at(-1)
+    const row = point && matches.find(match => match.id === point.matchId
+      && match.orgId === orgId && match.playerId === playerId
+      && match.status === 'listo' && match.matchDate === point.date)
+    const latestMatch = row ? {
+      ...point,
+      tournament: row.tournament,
+      result: row.result,
+      measuredShots: normalizeDashboardStatistics(decodeStatistics(row, { playerId }), playerId)?.shots?.sampleCount,
+    } : null
+    return { ...overview, evolution, latestMatch }
+  }
+  return {
+    ...summarize(rows),
+    periods: buildDashboardPeriods(rows, summarize, matches => buildDashboardOverview(matches, context)),
+  }
+}
+
 /** No Firebase initialization and no guessed statistics path or player mapping. */
-export function createFirestoreDashboardService({ db, orgId, actorId, onlyOwned = false, decodeStatistics = decodeWorkerDashboardStatistics }) {
+export function createFirestoreDashboardService({
+  db, orgId, actorId, onlyOwned = false, decodeStatistics = decodeWorkerDashboardStatistics, summarizePlayer = summarizeDashboard,
+}) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim() || typeof decodeStatistics !== 'function') throw new TypeError('Dashboard requires database, organization, user and an agreed statistics decoder.')
 
   return {
@@ -45,25 +70,7 @@ export function createFirestoreDashboardService({ db, orgId, actorId, onlyOwned 
                 if (!decoded.has(match)) decoded.set(match, decodeStatistics(match, identity))
                 return decoded.get(match)
               } }
-              const summarize = matches => {
-                const overview = buildDashboardOverview(matches, context)
-                const evolution = buildDashboardEvolution(matches, context)
-                const point = evolution.points.at(-1)
-                const row = point && matches.find(match => match.id === point.matchId
-                  && match.orgId === orgId && match.playerId === playerId
-                  && match.status === 'listo' && match.matchDate === point.date)
-                const latestMatch = row ? {
-                  ...point,
-                  tournament: row.tournament,
-                  result: row.result,
-                  measuredShots: normalizeDashboardStatistics(decoded.get(row), playerId)?.shots?.sampleCount,
-                } : null
-                return { ...overview, evolution, latestMatch }
-              }
-              onData({
-                ...summarize(rows),
-                periods: buildDashboardPeriods(rows, summarize, matches => buildDashboardOverview(matches, context)),
-              })
+              onData(summarizePlayer(rows, context))
             } catch (error) { fail(error) }
           }, fail)
           // Covers an error raised synchronously while attaching a listener.

@@ -27,7 +27,61 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanup()
+  vi.useRealTimers()
   localStorage.removeItem(CLAVE_UNIDADES)
+})
+
+it('compara periodos y partidos del mismo jugador sin volver a consultar', async () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 7, 31, 12))
+  const match = (id, matchDate, speed, fields = {}) => record(id, {
+    ...readyMatch('Ana', speed).data(), matchDate, opponent: id, ...fields,
+  })
+  const history = [
+    match('Actual primero', '2026-05-31', 50),
+    match('Actual último', '2026-08-31', 70),
+    match('Previo', '2026-02-28', 40),
+    match('Hace seis', '2026-02-27', 30),
+    match('Hace nueve', '2025-10-15', 20),
+    match('Sin medición', '2026-02-01', 90, { statistics: null }),
+    match('Ajeno', '2026-08-31', 250, { createdBy: 'coach-b' }),
+    match('En proceso', '2026-08-31', 250, { status: 'procesando' }),
+  ]
+  const stop = vi.fn()
+  onSnapshot.mockImplementation(({ name }, receive) => {
+    receive({ docs: name === 'players' ? [record('Ana', players[0])] : history })
+    return stop
+  })
+
+  const user = userEvent.setup()
+  const { rerender } = render(<Comparador db={db} session={session} />)
+  await user.click(await screen.findByRole('radio', { name: 'Por periodos', exact: true }))
+  await user.selectOptions(screen.getByLabelText('Jugador', { exact: true }), 'Ana')
+  const periods = await screen.findByRole('table', { name: 'Comparación por periodos' })
+  const speedRow = table => within(within(table).getByText('Velocidad media de golpe').closest('tr'))
+  expect(speedRow(periods).getByText('60 km/h')).toBeTruthy()
+  expect(speedRow(periods).getByText('40 km/h')).toBeTruthy()
+  const offset = screen.getByLabelText('Comparar el periodo actual con')
+  await user.selectOptions(offset, '6')
+  expect(speedRow(periods).getByText('30 km/h')).toBeTruthy()
+  await user.selectOptions(offset, '9')
+  expect(speedRow(periods).getByText('20 km/h')).toBeTruthy()
+
+  await user.click(screen.getByRole('radio', { name: 'Partido contra partido', exact: true }))
+  const first = screen.getByLabelText('Partido 1')
+  const second = screen.getByLabelText('Partido 2')
+  expect(within(first).queryByRole('option', { name: /Ajeno|En proceso/ })).toBeNull()
+  await user.selectOptions(first, 'Actual último')
+  expect(within(second).getByRole('option', { name: /Actual último/ }).disabled).toBe(true)
+  await user.selectOptions(second, 'Sin medición')
+  const matches = screen.getByRole('table', { name: 'Comparación de partidos' })
+  expect(speedRow(matches).getByText('70 km/h')).toBeTruthy()
+  expect(speedRow(matches).getByText('Sin datos')).toBeTruthy()
+  expect(speedRow(matches).queryByText('Mejor valor')).toBeNull()
+  expect(onSnapshot).toHaveBeenCalledTimes(2)
+  rerender(<Comparador db={db} />)
+  expect(screen.queryByRole('table')).toBeNull()
+  expect(stop).toHaveBeenCalledTimes(2)
 })
 
 function readyMatch(playerId, speed) {

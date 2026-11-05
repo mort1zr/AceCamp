@@ -26,6 +26,7 @@ import { createFirestorePlayersService } from '../../src/panel/lib/services/fire
 import { createFirestoreMatchesService } from '../../src/panel/lib/services/firestoreMatchesService.js'
 import { createFirestoreMatchNotesService } from '../../src/panel/lib/services/firestoreMatchNotesService.js'
 import { createFirestoreDashboardService } from '../../src/panel/lib/services/firestoreDashboardService.js'
+import { buildPlayerComparisonHistory } from '../../src/panel/lib/comparisonHistory.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -171,16 +172,22 @@ describe('aislamiento por organización', () => {
       await setDoc(doc(db, 'matches', 'm-teammate'), { ...ready, createdBy: teammate, statistics: statistics(90) })
       await setDoc(doc(db, 'players', 'p-teammate'), { orgId: ORG, createdBy: teammate })
     })
-    const service = createFirestoreDashboardService({ db: coachDb(), orgId: ORG, actorId: COACH, onlyOwned: true })
-    const read = playerId => {
+    const identity = { db: coachDb(), orgId: ORG, actorId: COACH, onlyOwned: true }
+    const service = createFirestoreDashboardService(identity)
+    const read = (playerId, selectedService = service) => {
       let stop
       return new Promise((resolve, reject) => {
-        stop = service.subscribePlayer(playerId, resolve, reject)
+        stop = selectedService.subscribePlayer(playerId, resolve, reject)
       }).finally(() => stop?.())
     }
     expect((await read('p-demo')).metrics).toMatchObject({ analyzedMatches: 1, measuredShots: 1, averageShotSpeed: 50 })
     await expect(read('p-teammate')).rejects.toMatchObject({ code: 'permission-denied' })
     await expect(read('p-club')).rejects.toMatchObject({ code: 'permission-denied' })
+    const historyService = createFirestoreDashboardService({ ...identity, summarizePlayer: buildPlayerComparisonHistory })
+    const history = await read('p-demo', historyService)
+    expect(history.matches).toHaveLength(1)
+    expect(history.matches[0]).toMatchObject({ id: 'm-ready', metrics: { averageShotSpeed: 50 } })
+    await expect(read('p-teammate', historyService)).rejects.toMatchObject({ code: 'permission-denied' })
   })
 
   it('una consulta sin filtrar por orgId se rechaza', async () => {
