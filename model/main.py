@@ -20,6 +20,19 @@ from utils.progress import report_progress
 MINI_COURT_BOUNCES = 6  # botes que se ven a la vez en la mini-pista
 
 
+# Con ball_image_size "auto", los vídeos más estrechos que esto se analizan ampliados a
+# AUTO_BALL_IMAGE_SIZE para buscar la pelota (en 640x360 mide 2-3 px y el detector la pierde).
+AUTO_SMALL_VIDEO_WIDTH = 1280
+AUTO_BALL_IMAGE_SIZE = 1280
+
+
+def resolve_ball_image_size(setting, video_width):
+    """Tamaño de imagen para el detector de pelota: un número, None (el de YOLO) o "auto"."""
+    if setting == "auto":
+        return AUTO_BALL_IMAGE_SIZE if video_width < AUTO_SMALL_VIDEO_WIDTH else None
+    return int(setting) if setting else None
+
+
 @dataclass
 class VideoDetections:
     """Resultado de la primera pasada: una entrada por fotograma (salvo cuts)."""
@@ -85,10 +98,12 @@ def run_pipeline(config, render=True):
     video_hash = file_sha256(input_video_path)
     cache_dir = resolve_path(paths["cache_dir"])
 
+    ball_image_size = resolve_ball_image_size(detection.get("ball_image_size"), video_info.width)
     player_tracker = PlayerTracker(model_path=str(resolve_path(models["players"])), device=detection["device"])
     ball_tracker = BallTracker(model_path=str(resolve_path(models["ball"])),
                                conf=detection["ball_confidence"],
-                               device=detection["device"])
+                               device=detection["device"],
+                               image_size=ball_image_size)
     court_line_detector = CourtLineDetector(str(resolve_path(models["court_keypoints"])),
                                             refine=config["court"]["refine_keypoints"])
     # Puntos clave y homografía imagen → pista (metros), re-detectados cada N fotogramas y suavizados
@@ -100,7 +115,8 @@ def run_pipeline(config, render=True):
     players_cache = cache_path_for(cache_dir, video_hash, "players", models["players"],
                                    **({"every": player_every} if player_every > 1 else {}))
     ball_cache = cache_path_for(cache_dir, video_hash, "ball", models["ball"],
-                                conf=detection["ball_confidence"], all_candidates=True)
+                                conf=detection["ball_confidence"], all_candidates=True,
+                                **({"imgsz": ball_image_size} if ball_image_size else {}))
     cached_players = load_detections(players_cache, video_hash) if config["use_cache"] else None
     cached_ball = load_detections(ball_cache, video_hash) if config["use_cache"] else None
 
@@ -131,7 +147,8 @@ def run_pipeline(config, render=True):
     player_detections = [d if main else {} for d, main in zip(detections.players, main_camera)]
     ball_candidates = [d if main else {} for d, main in zip(detections.ball, main_camera)]
 
-    ball_detections = ball_tracker.select_ball_positions(ball_candidates, frame_height=video_info.height)
+    ball_detections = ball_tracker.select_ball_positions(ball_candidates, frame_height=video_info.height,
+                                                         fps=video_info.fps)
     ball_detections = ball_tracker.interpolate_ball_positions(ball_detections,
                                                               max_gap=detection["ball_max_interpolation_gap"])
     ball_detections = [d if main else {} for d, main in zip(ball_detections, main_camera)]

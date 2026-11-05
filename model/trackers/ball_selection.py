@@ -12,6 +12,12 @@ original se quedaba con la última caja. Aquí:
 3. Sin seguimiento activo (al principio o tras perderla), se elige la de mayor
    confianza.
 
+Antes se descartan las detecciones quietas: una marca blanca en la pista, un logo
+o una pelota parada en el suelo aparecen siempre en el mismo sitio, y el
+seguimiento se enganchaba a ellas cuando perdía la pelota real (la pelota se
+quedaba "congelada"). La pelota en juego nunca está quieta más de una fracción de
+segundo.
+
 Las cajas pueden traer la confianza como quinto valor: [x1, y1, x2, y2, conf].
 """
 
@@ -27,6 +33,23 @@ GATE_RADIUS_PX = 150.0
 GATE_GROWTH_PX = 50.0  # cuánto crece el radio por cada fotograma sin pelota
 MAX_MISSED_FRAMES = 10  # sin pelota durante más fotogramas: se reinicia el seguimiento
 MAX_INTERPOLATION_GAP = 5  # huecos más largos no se rellenan (se borrarían botes)
+# Detecciones quietas. Dos reglas (radios en píxeles de un vídeo 1080p):
+# - largo plazo: en ±STATIC_WINDOW_SECONDS hay una detección a menos de STATIC_RADIUS_PX en más de
+#   STATIC_FRACTION de los fotogramas (una marca que se ve casi siempre);
+# - ráfaga: en ±STILL_WINDOW_SECONDS hay una detección a menos de STILL_RADIUS_PX en al menos
+#   STILL_FRACTION de los fotogramas (una marca que se ve a ratos, pero sin moverse nada). La pelota
+#   en juego, incluso lenta, se desplaza varios píxeles por fotograma.
+STATIC_WINDOW_SECONDS = 1.0
+STATIC_RADIUS_PX = 8.0
+STATIC_FRACTION = 0.5
+STILL_WINDOW_SECONDS = 0.1
+STILL_RADIUS_PX = 4.0
+STILL_FRACTION = 0.8
+# - recurrente: en ±RECURRING_WINDOW_SECONDS hay detecciones a menos de STILL_RADIUS_PX durante más
+#   de RECURRING_SECONDS en total (una marca que el detector ve salteada, fotograma sí, fotograma no).
+#   En los highlights reales, las marcas sumaban 22-294 fotogramas en el mismo punto y la pelota, 8 como mucho.
+RECURRING_WINDOW_SECONDS = 10.0
+RECURRING_SECONDS = 0.6
 
 
 def box_center(box):
@@ -61,12 +84,72 @@ class ConstantVelocityKalman:
         self.cov = (np.eye(4) - gain @ self.H) @ self.cov
 
 
-def select_ball(candidates_per_frame, scale=1.0, gate_radius_px=GATE_RADIUS_PX,
+class _Grid:
+    """Fotogramas con alguna detección en cada celda de una rejilla de lado radius."""
+
+    def __init__(self, candidates_per_frame, radius):
+        self.radius = radius
+        self.cells = {}
+        for i, frame in enumerate(candidates_per_frame):
+            for box in frame.values():
+                frames = self.cells.setdefault(self._cell(box_center(box)), [])
+                if not frames or frames[-1] != i:
+                    frames.append(i)
+
+    def _cell(self, point):
+        return int(point[0] // self.radius), int(point[1] // self.radius)
+
+    def frames_near(self, point, first, last):
+        from bisect import bisect_left, bisect_right
+
+        cx, cy = self._cell(point)
+        found = set()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                frames = self.cells.get((cx + dx, cy + dy), [])
+                found.update(frames[bisect_left(frames, first):bisect_right(frames, last)])
+        return found
+
+
+def remove_static_candidates(candidates_per_frame, scale=1.0, fps=30.0):
+    """Quita las detecciones que se repiten en el mismo punto (marcas de la pista, logos, pelotas paradas)."""
+    n = len(candidates_per_frame)
+    still_grid = _Grid(candidates_per_frame, max(1.5, STILL_RADIUS_PX * scale))
+    rules = [(_Grid(candidates_per_frame, max(3.0, STATIC_RADIUS_PX * scale)),
+              max(1, round(STATIC_WINDOW_SECONDS * fps)), STATIC_FRACTION, False),
+             (still_grid, max(2, round(STILL_WINDOW_SECONDS * fps)), STILL_FRACTION, True)]
+    recurring_window = max(1, round(RECURRING_WINDOW_SECONDS * fps))
+    recurring_frames = max(3, round(RECURRING_SECONDS * fps))
+    result = []
+    for i, frame in enumerate(candidates_per_frame):
+        kept = {}
+        for key, box in frame.items():
+            static = False
+            for grid, window, fraction, inclusive in rules:
+                first, last = max(i - window, 0), min(i + window, n - 1)
+                nearby = grid.frames_near(box_center(box), first, last)
+                if not inclusive:
+                    nearby.discard(i)
+                span = last - first + (1 if inclusive else 0)
+                if span > 0 and len(nearby) / span >= fraction and len(nearby) > 1:
+                    static = True
+                    break
+            if not static:
+                first, last = max(i - recurring_window, 0), min(i + recurring_window, n - 1)
+                static = len(still_grid.frames_near(box_center(box), first, last)) > recurring_frames
+            if not static:
+                kept[key] = box
+        result.append(kept)
+    return result
+
+
+def select_ball(candidates_per_frame, scale=1.0, fps=30.0, gate_radius_px=GATE_RADIUS_PX,
                 gate_growth_px=GATE_GROWTH_PX, max_missed_frames=MAX_MISSED_FRAMES):
     """Devuelve, por fotograma, {1: [x1, y1, x2, y2]} con la pelota elegida, o {} si no hay.
 
     scale ajusta los radios a la resolución del vídeo (1.0 = 1080p).
     """
+    candidates_per_frame = remove_static_candidates(candidates_per_frame, scale, fps)
     selected = []
     kalman, missed = None, 0
     for frame in candidates_per_frame:

@@ -8,10 +8,13 @@ from .ball_selection import MAX_INTERPOLATION_GAP, fill_short_gaps, select_ball
 
 
 class BallTracker:
-    def __init__(self, model_path, conf=0.15, device=None):
+    def __init__(self, model_path, conf=0.15, device=None, image_size=None):
         self.model_path = model_path
         self.conf = conf
         self.device = device
+        # Tamaño al que YOLO reescala el fotograma (None = el suyo, 640). Más grande ayuda a ver
+        # la pelota en vídeos de baja resolución, a cambio de más tiempo.
+        self.image_size = image_size
         self._model = None
 
     @property
@@ -23,9 +26,9 @@ class BallTracker:
             self._model = YOLO(self.model_path)
         return self._model
 
-    def select_ball_positions(self, ball_candidates, frame_height=1080):
+    def select_ball_positions(self, ball_candidates, frame_height=1080, fps=30.0):
         """Elige la pelota en cada fotograma entre todas las detecciones (ver ball_selection)."""
-        return select_ball(ball_candidates, scale=frame_height / 1080)
+        return select_ball(ball_candidates, scale=frame_height / 1080, fps=fps)
 
     def interpolate_ball_positions(self, ball_positions, max_gap=MAX_INTERPOLATION_GAP):
         """Rellena solo los huecos cortos; los largos quedan sin pelota para no borrar botes."""
@@ -86,7 +89,8 @@ class BallTracker:
         return ball_detections
 
     def detect_frame(self,frame):
-        results = self.model.predict(frame, conf=self.conf, device=self.device, verbose=False)[0]
+        extra = {"imgsz": self.image_size} if self.image_size else {}
+        results = self.model.predict(frame, conf=self.conf, device=self.device, verbose=False, **extra)[0]
 
         # Todas las detecciones, de mayor a menor confianza: [x1, y1, x2, y2, conf].
         # La pelota se elige después, con seguimiento entre fotogramas (select_ball_positions).

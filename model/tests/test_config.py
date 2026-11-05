@@ -31,3 +31,12 @@ def test_command_line_overrides_config():
 def test_relative_paths_resolve_from_model_dir(tmp_path):
     assert resolve_path("models/x.pt") == MODEL_DIR / "models/x.pt"
     assert resolve_path(tmp_path / "x.pt") == tmp_path / "x.pt"
+
+
+def test_ball_image_size_auto_only_enlarges_small_videos():
+    from main import resolve_ball_image_size
+
+    assert resolve_ball_image_size("auto", 640) == 1280
+    assert resolve_ball_image_size("auto", 1920) is None
+    assert resolve_ball_image_size(None, 640) is None
+    assert resolve_ball_image_size(960, 1920) == 960

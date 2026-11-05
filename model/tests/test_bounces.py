@@ -180,3 +180,33 @@ def test_the_pipeline_handles_bounces_without_a_ball_in_their_frame(monkeypatch,
     # debe dar los mismos botes que el detector directamente.
     _, ball, players, homographies = real_video()
     assert [b["frame"] for b in result["bounces"]] == detect_bounces(ball, players, homographies, data["fps"])
+
+
+def test_bounces_of_a_low_resolution_highlight_with_court_marks():
+    """Highlight de 640x360 con rozaduras blancas en la pista que el detector confunde con la pelota.
+
+    Antes el seguimiento se enganchaba a las marcas (pelota congelada) y casi no había botes.
+    Con las marcas descartadas, criterio de TA-22a frente a los 9 botes marcados a mano.
+    """
+    import json
+    from collections import Counter
+    from pathlib import Path
+
+    from court import CourtHomography
+    from trackers.ball_selection import box_center, fill_short_gaps, select_ball
+
+    data = json.loads((Path(__file__).parent / "data" / "h1_detections.json").read_text())
+    fps = data["fps"]
+    candidates = [dict(enumerate(frame)) for frame in data["ball_candidates"]]
+    players = [{int(k): v for k, v in frame.items()} for frame in data["players"]]
+    homographies = [CourtHomography.from_keypoints(k) for k in data["court_keypoints"]]
+
+    selected = select_ball(candidates, scale=data["size"][1] / 1080, fps=fps)
+    repeated = Counter(tuple(round(v) for v in box_center(f[1])) for f in selected if 1 in f).most_common(1)
+    assert repeated[0][1] <= 3, "la pelota no debe quedarse en una marca de la pista"
+
+    ball = fill_short_gaps(selected, 5)
+    found = detect_bounces(ball, players, homographies, fps)
+    result, _ = match_events(found, data["bounces_labeled"], 2)
+    assert result.recall >= 0.8
+    assert result.f1 >= 0.7

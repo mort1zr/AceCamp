@@ -19,6 +19,11 @@ detection:
   # Dispositivo para la inferencia: null (automático), cpu, cuda:0, mps...
   device: null
   ball_confidence: 0.15
+  # Tamaño al que se reescala cada fotograma para buscar la pelota: auto, null (640, el de YOLO)
+  # o un número. Con auto, los vídeos de menos de 1280 px de ancho se analizan a 1280: en 640x360
+  # la pelota mide 2-3 px y a 640 el detector la pierde (en h2, 45 % frente a 81 % de fotogramas).
+  # A 1280 la detección de la pelota tarda unas 4 veces más; los vídeos de 1080p no cambian.
+  ball_image_size: auto
   # Huecos sin pelota de hasta estos fotogramas se interpolan; los más largos no.
   ball_max_interpolation_gap: 5
   # Detectar jugadores en uno de cada N fotogramas e interpolar el resto (la pelota, en todos).

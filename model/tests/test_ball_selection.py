@@ -103,3 +103,35 @@ def test_shot_detection_tolerates_frames_without_ball():
     shots = BallTracker(model_path="no-se-carga.pt").get_ball_shot_frames(detections)
 
     assert len(shots) >= 3
+
+
+# ---------------------------------------------- detecciones quietas
+
+
+def test_a_static_mark_on_the_court_is_not_taken_for_the_ball():
+    """Una marca de la pista detectada en todos los fotogramas, con más confianza que la pelota:
+    el seguimiento se enganchaba a ella cuando perdía la pelota (pelota "congelada")."""
+    import numpy as np
+    from ball_sim import BroadcastCamera, render_detections, simulate_rally
+
+    from trackers.ball_selection import box_center, select_ball
+
+    rally = simulate_rally(6, seed=4)
+    ball, _ = render_detections(rally, BroadcastCamera(), miss_rate=0.2, seed=4)
+    mark = [1300.0, 800.0, 1310.0, 810.0, 0.95]
+    candidates = [{0: mark, **({1: b[1] + [0.4]} if 1 in b else {})} for b in ball]
+
+    selected = select_ball(candidates)
+
+    on_mark = sum(1 for s in selected if 1 in s and np.hypot(*np.subtract(box_center(s[1]), (1305, 805))) < 5)
+    on_ball = sum(1 for s, b in zip(selected, ball) if 1 in s and 1 in b and s[1] == b[1][:4])
+    assert on_mark == 0
+    assert on_ball >= 0.95 * sum(1 for b in ball if 1 in b)
+
+
+def test_a_moving_ball_is_never_removed_as_static():
+    from trackers.ball_selection import remove_static_candidates
+
+    candidates = [{0: [100 + 6 * i, 500 - 3 * i, 110 + 6 * i, 510 - 3 * i, 0.5]} for i in range(100)]
+
+    assert remove_static_candidates(candidates) == candidates

@@ -24,7 +24,7 @@ DEFAULTS: dict[str, Any] = {
         "court_keypoints": "models/keypoints_model.pth",
     },
     "detection": {"device": None, "ball_confidence": 0.15, "ball_max_interpolation_gap": 5,
-                  "player_every_n_frames": 1},
+                  "player_every_n_frames": 1, "ball_image_size": "auto"},
     "court": {"redetect_every_frames": 30, "smoothing": 0.3, "refine_keypoints": True},
     "cameras": {"detect_cuts": True, "max_shift_fraction": 0.08},
     "shots": {"min_change_frames_for_hit": 25, "rolling_window": 5},
