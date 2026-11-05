@@ -227,7 +227,7 @@ export default function HeroMock() {
 
   useEffect(() => {
     const elemento = caja.current
-    if (!elemento || typeof ResizeObserver === 'undefined') return undefined
+    if (!elemento) return undefined
     const medir = () => {
       const ancho = elemento.clientWidth
       setMedida(

@@ -7,24 +7,12 @@ import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
 
 const textos = {
   es: {
-    anclas: [
-      { href: '#el-problema', label: 'El problema' },
-      { href: '#la-solucion', label: 'La solución' },
-      { href: '#que-mide', label: 'Qué mide' },
-      { href: '#como-funciona', label: 'Cómo funciona' },
-    ],
     navegacion: 'Navegación principal',
     inicio: 'AceCam, ir al inicio',
     precios: 'Precios',
     sesion: 'Iniciar sesión',
   },
   en: {
-    anclas: [
-      { href: '#el-problema', label: 'The problem' },
-      { href: '#la-solucion', label: 'The solution' },
-      { href: '#que-mide', label: 'What it measures' },
-      { href: '#como-funciona', label: 'How it works' },
-    ],
     navegacion: 'Main navigation',
     inicio: 'AceCam, go to home',
     precios: 'Pricing',
@@ -45,16 +33,6 @@ export default function PublicHeader() {
           <Logo rebota />
         </Link>
 
-        <ul className="ml-4 hidden items-center gap-6 lg:flex">
-          {t.anclas.map((anchor) => (
-            <li key={anchor.href}>
-              <a href={anchor.href} className="text-sm text-text2 hover:text-text">
-                {anchor.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <Link
             to="/precios"
@@ -65,7 +43,7 @@ export default function PublicHeader() {
           <LinkDeslizante to="/login" className="text-sm font-medium text-text2 hover:text-text">
             {t.sesion}
           </LinkDeslizante>
-          <ThemeToggle />
+          <ThemeToggle className="inline-flex size-10 items-center justify-center rounded-full border border-line bg-surface text-text2 transition-colors hover:border-line2 hover:text-text" />
         </div>
       </nav>
     </header>
