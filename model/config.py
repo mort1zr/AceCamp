@@ -28,7 +28,7 @@ DEFAULTS: dict[str, Any] = {
     "court": {"redetect_every_frames": 30, "smoothing": 0.3, "refine_keypoints": True},
     "cameras": {"detect_cuts": True, "max_shift_fraction": 0.08},
     "shots": {"min_change_frames_for_hit": 25, "rolling_window": 5},
-    "worker": {"max_duration_seconds": 60},
+    "worker": {"max_duration_seconds": 60, "min_resolution": 720},
     "use_cache": False,
     "render_video": True,
 }

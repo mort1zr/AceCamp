@@ -56,3 +56,6 @@ worker:
   # Duración máxima del vídeo que acepta el worker, en segundos. Los más largos pasan a
   # 'error' antes de cargarlos (PCIT-147). Se puede subir cuando haya procesamiento por tramos.
   max_duration_seconds: 60
+  # Resolución mínima (lado corto, en píxeles): por debajo de 720p la pelota mide 2-3 px y el
+  # modelo la pierde y la confunde con marcas de la pista. Recomendado: 1080p.
+  min_resolution: 720

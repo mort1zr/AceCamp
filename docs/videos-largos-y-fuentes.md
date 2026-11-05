@@ -36,6 +36,7 @@ y un **archivo o carpeta de Google Drive**.
 | --- | --- |
 | **Memoria del modelo** | Desde PCIT-146 el vídeo se procesa fotograma a fotograma: la memoria **no depende de la duración**. Antes, un vídeo de más de ~1 min a 1080p agotaba la RAM. |
 | **Velocidad del modelo** | Medida en un PC sin GPU con el detector por defecto, `yolov8m`: **~12 min de proceso por cada minuto de vídeo**. Con `yolov8x` eran ~19 min. Con GPU (T4) se estima ~1–1,5 h por hora de partido (por confirmar en Colab). |
+| **Resolución mínima en el worker** | `worker.min_resolution` en `model/config.yaml` (**720**, lado corto). Por debajo, el partido pasa a `error` antes de analizarlo. |
 | **Límite de duración en el worker** | `worker.max_duration_seconds` en `model/config.yaml` (hoy **60 s**). Si un vídeo lo supera, el partido pasa a `error` con un mensaje para el usuario, antes de analizarlo. |
 | **Límite de tamaño** | **500 MB** en `MAX_VIDEO_BYTES` (`web/src/panel/lib/videoUpload.js`) y en `firebase/storage.rules`. |
 | **Subida de archivos** | Un archivo por partido (PCIT-27). |
@@ -66,7 +67,7 @@ y un **archivo o carpeta de Google Drive**.
 
 ## Cambios
 
-### A. Límite de duración y tamaño unificados (Fabian, Axel, Aaron)
+### A. Límite de duración, tamaño y resolución unificados (Fabian, Axel, Aaron)
 
 **Problema:** hoy el worker corta en 60 s, la web no comprueba la duración y el tamaño máximo es
 de 500 MB. A 1080p, un móvil graba unos **60–100 MB por minuto**, así que 500 MB son unos
@@ -81,6 +82,23 @@ de 500 MB. A 1080p, un móvil graba unos **60–100 MB por minuto**, así que 50
 | Analizar (PCIT-27) y Postulación (PCIT-54) | Leer la duración en el navegador (`<video>` + `loadedmetadata`) y rechazar los que superen `MAX_VIDEO_SECONDS`, con el mensaje de PCIT-147 | Fabian (Analizar) y Axel (Postulación) |
 | `web/server/video-import/` | Tras `ffprobe`, rechazar por duración con el mismo límite (nuevo código `import/too-long`) | Fabian |
 | `model/config.yaml` | `worker.max_duration_seconds` con el mismo valor | Aaron |
+| `web/src/panel/lib/schema.js` | Nueva constante `MIN_VIDEO_RESOLUTION = 720` (lado corto, en píxeles) | Axel |
+| Analizar y Postulación | Leer `videoWidth` y `videoHeight` en el navegador (mismo `loadedmetadata`) y rechazar si `min(ancho, alto) < MIN_VIDEO_RESOLUTION` | Fabian y Axel |
+| `web/server/video-import/` | Tras `ffprobe`, rechazar con el mismo mínimo (nuevo código `import/low-resolution`). En YouTube, pedir un formato de 720p o más: si no se elige, muchos vídeos llegan a 360p | Fabian |
+| `model/config.yaml` | `worker.min_resolution: 720` (**hecho**): el worker rechaza el vídeo antes de analizarlo | Aaron |
+
+**Resolución (decidido tras probar highlights reales):**
+
+| Resolución | Resultado del modelo | Decisión |
+| --- | --- | --- |
+| 640×360 | La pelota mide 2-3 px: se pierde a menudo y se confunde con marcas de la pista. Hay que analizarla ampliada, unas 2,5 veces más lento | **Se rechaza** |
+| 1280×720 | Seguimiento de la pelota correcto | **Mínimo** |
+| 1920×1080 | El mejor resultado | **Recomendado** |
+
+Fotogramas por segundo: de 25 a 60 (recomendado 30; a 60 fps se procesa el doble de fotogramas).
+Mensaje si no llega al mínimo: *"El video debe tener al menos 720p (1280x720). Grábalo o expórtalo
+en 720p o 1080p y vuelve a subirlo."* (el mismo que da el worker). Se mide el lado corto para que
+un vídeo vertical de 720×1280 también valga.
 
 **Valores propuestos (pendientes de acordar):**
 
@@ -95,12 +113,13 @@ de 500 MB. A 1080p, un móvil graba unos **60–100 MB por minuto**, así que 50
 - sin montaje ni música; si es una transmisión de TV, las repeticiones se descartan solas
   (cuando esté PCIT-59);
 - hasta **{MAX_VIDEO_SECONDS en texto}** y **{MAX_VIDEO_BYTES en texto}**;
-- MP4 o MOV, 720p o 1080p (un vídeo largo a 720p ocupa la mitad y se sube antes).
+- MP4 o MOV, **mínimo 720p** (1280×720), recomendado 1080p; de 25 a 60 fps.
 
 **Criterios de aceptación:**
 
 - web, servidor de importación y worker rechazan un vídeo de duración máxima + 1 s, cada uno con
   un mensaje apto para el usuario;
+- los tres rechazan un vídeo de 640×360 y aceptan uno de 1280×720 y uno vertical de 720×1280;
 - cambiar el límite exige tocar **un solo valor por capa**.
 
 ### B. Subir varios vídeos a la vez (Fabian)

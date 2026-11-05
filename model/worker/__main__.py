@@ -29,7 +29,7 @@ from pathlib import Path
 
 from config import load_config
 
-from .processor import VideoTooLongError, run_forever, run_once
+from .processor import VideoResolutionError, VideoTooLongError, run_forever, run_once
 
 DEFAULT_PROJECT_ID = "acecam-e93a2"
 
@@ -41,12 +41,15 @@ def make_analyzer(config_path=None, device=None):
 
     base = load_config(config_path)
     max_seconds = base["worker"]["max_duration_seconds"]
+    min_short_side = base["worker"].get("min_resolution")
 
     def analyze(video_path: Path):
-        # La duración se lee de la cabecera del vídeo, sin cargar los fotogramas en memoria.
-        duration = get_video_info(video_path).duration_seconds
-        if max_seconds and duration > max_seconds:
-            raise VideoTooLongError(duration, max_seconds)
+        # Duración y resolución se leen de la cabecera del vídeo, sin cargar los fotogramas.
+        info = get_video_info(video_path)
+        if max_seconds and info.duration_seconds > max_seconds:
+            raise VideoTooLongError(info.duration_seconds, max_seconds)
+        if min_short_side and min(info.width, info.height) < min_short_side:
+            raise VideoResolutionError(info.width, info.height, min_short_side)
         config = {**base, "paths": {**base["paths"], "input": str(video_path)},
                   "detection": {**base["detection"], **({"device": device} if device else {})},
                   "use_cache": True}  # mismo vídeo (mismo hash) en un reintento: no repite YOLO

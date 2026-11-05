@@ -270,13 +270,13 @@ def test_the_limit_is_written_for_people(seconds, text):
     assert text in processor.message_too_long(seconds)
 
 
-def write_video(path, seconds, fps=10):
+def write_video(path, seconds, fps=10, size=(64, 48)):
     import cv2
     import numpy as np
 
-    out = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), fps, (64, 48))
+    out = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"MJPG"), fps, size)
     for _ in range(int(seconds * fps)):
-        out.write(np.zeros((48, 64, 3), np.uint8))
+        out.write(np.zeros((size[1], size[0], 3), np.uint8))
     out.release()
     return path
 
@@ -286,7 +286,7 @@ def test_the_analyzer_rejects_long_videos_before_running_the_model(tmp_path, mon
     from worker.__main__ import make_analyzer
 
     config = tmp_path / "config.yaml"
-    config.write_text("worker:\n  max_duration_seconds: 2\n")
+    config.write_text("worker:\n  max_duration_seconds: 2\n  min_resolution: 0\n")
     ran = []
     monkeypatch.setattr(main, "run_pipeline", lambda config, render: ran.append(1) or {"model_statistics": {}})
     analyze = make_analyzer(config)
@@ -298,3 +298,40 @@ def test_the_analyzer_rejects_long_videos_before_running_the_model(tmp_path, mon
 
     analyze(write_video(tmp_path / "corto.avi", seconds=1))
     assert ran == [1]
+
+
+
+# ---------------------------------------------- resolución mínima
+
+
+def test_a_low_resolution_video_ends_in_error_with_the_requirement(tmp_path):
+    def low_resolution(path):
+        raise processor.VideoResolutionError(640, 360, 720)
+
+    store = MemoryStore({"m1": queued_match()})
+
+    assert run_once(store, MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"}), low_resolution, tmp_path,
+                    version="v") == ("m1", "error")
+    assert store.matches["m1"]["errorMessage"] == (
+        "El video debe tener al menos 720p (1280x720). Grábalo o expórtalo en 720p o 1080p y vuelve a subirlo.")
+
+
+@pytest.mark.parametrize(("size", "accepted"), [((640, 360), False), ((1280, 720), True), ((720, 1280), True),
+                                                 ((1920, 1080), True)],
+                         ids=["360p", "720p", "720p-vertical", "1080p"])
+def test_the_analyzer_checks_the_resolution_before_running_the_model(tmp_path, monkeypatch, size, accepted):
+    import main
+    from worker.__main__ import make_analyzer
+
+    ran = []
+    monkeypatch.setattr(main, "run_pipeline", lambda config, render: ran.append(1) or {"model_statistics": {}})
+    analyze = make_analyzer()
+    video = write_video(tmp_path / "v.avi", seconds=0.3, size=size)
+
+    if accepted:
+        analyze(video)
+        assert ran == [1]
+    else:
+        with pytest.raises(processor.VideoResolutionError):
+            analyze(video)
+        assert ran == []
