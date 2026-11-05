@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth'
-import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore'
 import { createFirestoreConfiguracionService } from './firestoreConfiguracionService.js'
 
 vi.mock('firebase/auth', () => ({
@@ -17,6 +17,7 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(),
   where: vi.fn(),
   updateDoc: vi.fn(),
+  setDoc: vi.fn(),
   serverTimestamp: vi.fn(() => 'server-time'),
 }))
 
@@ -78,6 +79,26 @@ describe('Servicio de Configuración con Firestore', () => {
     expect(datos.plan).toEqual({ id: 'basico', trial: true, used: 7, limit: 15 })
     expect(datos.isOrganization).toBe(false)
     expect(datos.team[0]).toMatchObject({ id: 'u1', players: 1 })
+  })
+
+  it('el dueño ve y crea invitaciones pendientes; un entrenador no las escucha (PCIT-40)', async () => {
+    const recibir = vi.fn()
+    crear().subscribe(recibir, vi.fn())
+    emitir('users/u1', documento({ displayName: 'Coach', role: 'coach' }))
+    emitir('users?org', lista([{ id: 'u1', displayName: 'Coach', role: 'coach' }]))
+    emitir('orgs/org-a', documento({ name: 'Club', plan: 'ultra', ownerId: 'otro' }))
+    expect(onSnapshot.mock.calls.some(([ref]) => ref === 'invites?org')).toBe(false)
+    expect(recibir.mock.calls.at(-1)[0].organization.canInvite).toBe(false)
+
+    emitir('orgs/org-a', documento({ name: 'Club', plan: 'ultra', ownerId: 'u1' }))
+    expect(where).toHaveBeenCalledWith('status', '==', 'pendiente')
+    emitir('invites?org', lista([{ id: 'ana@club.pe', email: 'ana@club.pe', role: 'admin' }]))
+    const datos = recibir.mock.calls.at(-1)[0]
+    expect(datos.organization.canInvite).toBe(true)
+    expect(datos.team.at(-1)).toMatchObject({ email: 'ana@club.pe', role: 'admin', status: 'invitado' })
+
+    await crear().inviteMember({ email: 'Luis@Club.pe', role: 'coach' })
+    expect(setDoc).toHaveBeenCalledWith('invites/luis@club.pe', expect.objectContaining({ orgId: 'org-a', invitedBy: 'u1', status: 'pendiente' }))
   })
 
   it('guarda solo los campos que permiten las reglas', async () => {

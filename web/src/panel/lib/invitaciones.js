@@ -37,3 +37,8 @@ export async function invitarMiembro({ db, orgId, uid, email, role = 'coach' }) 
   })
   return correo
 }
+
+/** Enlace de registro para compartir con la persona invitada (el plan Spark no envía correos). */
+export function enlaceInvitacion(origen, correo) {
+  return `${origen}/registro?invitacion=${encodeURIComponent(normalizarCorreo(correo))}`
+}

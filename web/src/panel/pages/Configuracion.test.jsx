@@ -110,8 +110,10 @@ describe('Configuración', () => {
     await user.clear(correo)
     await user.type(correo, 'nuevo@ejemplo.test')
     await user.click(screen.getByRole('button', { name: 'Enviar invitación' }))
-    expect(await screen.findByText('Invitación enviada.')).toBeTruthy()
+    expect(await screen.findByText('Invitación creada.')).toBeTruthy()
     expect(screen.getAllByText('nuevo@ejemplo.test').length).toBeGreaterThan(0)
+    // PCIT-40: sin envío de correos, se comparte el enlace de registro.
+    expect(screen.getByText(/\/registro\?invitacion=nuevo%40ejemplo\.test$/)).toBeTruthy()
   })
 
   it('sin conexión muestra los formularios vacíos y bloqueados', () => {

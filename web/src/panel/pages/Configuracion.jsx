@@ -5,6 +5,7 @@ import { ErrorState, LoadingState } from '../components/ui'
 import { useAvatar } from '../hooks/useAvatar.js'
 import { useConfiguracion } from '../hooks/useConfiguracion.js'
 import { useUnidades } from '../hooks/useUnidades.js'
+import { enlaceInvitacion } from '../lib/invitaciones.js'
 import { guardarUnidades } from '../lib/unidades.js'
 import { useIdioma } from '../../compartido/lib/idioma.jsx'
 import { usePlanVista } from '../context/PlanVistaContext.js'
@@ -65,8 +66,13 @@ const textos = {
     invitar: 'Invitar por correo',
     invitarPlaceholder: 'correo@universidad.edu',
     enviarInvitacion: 'Enviar invitación',
-    invitacionEnviada: 'Invitación enviada.',
+    invitacionEnviada: 'Invitación creada.',
     invitacionesPronto: 'Las invitaciones estarán disponibles muy pronto.',
+    soloInvitan: 'Solo quien creó la organización o un administrador puede invitar.',
+    compartirEnlace: 'Comparte este enlace para que se registre con ese correo y se una a tu equipo:',
+    copiarEnlace: 'Copiar enlace',
+    enlaceCopiado: 'Enlace copiado',
+    invitacionExiste: 'Ese correo ya tiene una invitación o no se puede invitar.',
     correoInvalido: 'Escribe un correo válido.',
     miembro: 'Miembro',
     jugadoresACargo: 'Jugadores a cargo',
@@ -165,8 +171,13 @@ const textos = {
     invitar: 'Invite by email',
     invitarPlaceholder: 'email@university.edu',
     enviarInvitacion: 'Send invitation',
-    invitacionEnviada: 'Invitation sent.',
+    invitacionEnviada: 'Invitation created.',
     invitacionesPronto: 'Invitations will be available very soon.',
+    soloInvitan: 'Only the organization creator or an administrator can invite.',
+    compartirEnlace: 'Share this link so they sign up with that email and join your team:',
+    copiarEnlace: 'Copy link',
+    enlaceCopiado: 'Link copied',
+    invitacionExiste: 'That email already has an invitation or cannot be invited.',
     correoInvalido: 'Enter a valid email.',
     miembro: 'Member',
     jugadoresACargo: 'Players in charge',
@@ -553,23 +564,44 @@ function Organizacion({ t, datos, service, bloqueado }) {
   )
 }
 
-function Equipo({ t, miembros, service, bloqueado }) {
+function Equipo({ t, miembros, service, bloqueado, puedeInvitar = true }) {
   const id = useId()
   const [correo, setCorreo] = useState('')
   const [rol, setRol] = useState('coach')
+  const [enlace, setEnlace] = useState('')
+  const [copiado, setCopiado] = useState(false)
   const { estado, setEstado, ocupado, guardar } = useGuardar(t)
   const sinInvitaciones = !service?.inviteMember
 
   const enviar = async (evento) => {
     evento.preventDefault()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim())) {
+    const invitado = correo.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitado)) {
       return setEstado({ tipo: 'error', texto: t.correoInvalido })
     }
+    setEnlace('')
+    setCopiado(false)
+    let creada = false
     await guardar(
-      () => service.inviteMember({ email: correo.trim(), role: rol }),
+      async () => {
+        await service.inviteMember({ email: invitado, role: rol })
+        creada = true
+      },
       t.invitacionEnviada,
+      (error) => (error?.code === 'permission-denied' ? t.invitacionExiste : undefined),
     )
+    if (!creada) return
+    setEnlace(enlaceInvitacion(window.location.origin, invitado))
     setCorreo('')
+  }
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(enlace)
+      setCopiado(true)
+    } catch {
+      setCopiado(false)
+    }
   }
 
   return (
@@ -579,7 +611,7 @@ function Equipo({ t, miembros, service, bloqueado }) {
       </h2>
       <form noValidate onSubmit={enviar}>
         <fieldset
-          disabled={bloqueado || ocupado || sinInvitaciones}
+          disabled={bloqueado || ocupado || sinInvitaciones || !puedeInvitar}
           className="flex min-w-0 flex-col gap-2"
         >
           <div className="flex flex-wrap items-end gap-2.5">
@@ -612,8 +644,21 @@ function Equipo({ t, miembros, service, bloqueado }) {
           </div>
           {sinInvitaciones && !bloqueado ? (
             <p className="text-[13px] text-muted">{t.invitacionesPronto}</p>
+          ) : !puedeInvitar && !bloqueado ? (
+            <p className="text-[13px] text-muted">{t.soloInvitan}</p>
           ) : (
             <Mensaje estado={estado} />
+          )}
+          {enlace && (
+            <div className="flex flex-col gap-1.5 text-[13px]">
+              <span className="text-muted">{t.compartirEnlace}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-md bg-chip px-2.5 py-1.5">{enlace}</code>
+                <button type="button" onClick={copiar} className="rounded-md border border-line2 px-2.5 py-1.5 font-semibold">
+                  {copiado ? t.enlaceCopiado : t.copiarEnlace}
+                </button>
+              </div>
+            </div>
           )}
         </fieldset>
       </form>
@@ -912,7 +957,15 @@ function Contenido({ seccion, t, datos, service, bloqueado, locale, esOrganizaci
       <Organizacion t={t} datos={datos?.organization} service={service} bloqueado={bloqueado} />
     )
   if (seccion === 'equipo')
-    return <Equipo t={t} miembros={datos?.team ?? []} service={service} bloqueado={bloqueado} />
+    return (
+      <Equipo
+        t={t}
+        miembros={datos?.team ?? []}
+        service={service}
+        bloqueado={bloqueado}
+        puedeInvitar={datos?.organization?.canInvite ?? true}
+      />
+    )
   if (seccion === 'preferencias')
     return <Preferencias t={t} datos={datos?.preferences} service={service} bloqueado={bloqueado} />
   return <Plan t={t} plan={datos?.plan} locale={locale} esOrganizacion={esOrganizacion} />
