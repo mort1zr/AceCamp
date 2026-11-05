@@ -7,7 +7,9 @@ Responsable: Axel. Rama: `panel_web/conexiones`.
 1. En **Configuración > Equipo** (visible con plan Ultra), el dueño de la
    organización o un administrador escribe el correo y el rol (`coach` o `admin`).
 2. Se crea `invites/{correo}` con estado `pendiente`. La tabla del equipo la muestra
-   como *Invitación enviada* y se puede **anular** mientras siga pendiente.
+   como *Invitación enviada* y se puede **anular** mientras siga pendiente. Si el
+   correo ya es de un miembro o ya tiene una invitación pendiente, la pantalla lo
+   explica sin escribir nada.
 3. El plan Spark no envía correos: la pantalla muestra el enlace
    `/registro?invitacion=<correo>` para copiarlo y compartirlo.
 4. Con ese enlace, el registro rellena el correo y no pide organización. Al crear la
@@ -29,7 +31,16 @@ Responsable: Axel. Rama: `panel_web/conexiones`.
 | Crear `users/{uid}` con invitación | `orgId` y `role` iguales a los de la invitación pendiente |
 
 Pruebas: `web/tests/rules/invites.rules.test.js` y `web/tests/auth/register.test.js`
-(`npm run test:rules`).
+(`npm run test:rules`), más las unitarias de `invitaciones.test.js`,
+Configuración y Registro.
+
+## Probarlo con los datos de ejemplo
+
+`npm run seed` crea una invitación pendiente de Universidad Demo para
+`asistente@acecam.test` e imprime su enlace. Abre
+`/registro?invitacion=asistente%40acecam.test`, crea la cuenta y entrarás al equipo
+como coach. Con `coach@acecam.test` (dueño, plan Ultra) se ve la invitación en
+Configuración > Equipo.
 
 ## Límites conocidos (revisar en PCIT-67)
 
