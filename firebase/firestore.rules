@@ -140,9 +140,34 @@ service cloud.firestore {
 
     // ---------- players/{playerId} ----------
 
+    function validBirthDate(value) {
+      let parts = value.split('-');
+      let date = timestamp.date(int(parts[0]), int(parts[1]), int(parts[2]));
+      return date >= timestamp.date(1900, 1, 1) && date <= request.time;
+    }
+
+    function isMinor(value) {
+      let parts = value.split('-');
+      let beforeBirthday = request.time.month() < int(parts[1])
+        || (request.time.month() == int(parts[1]) && request.time.day() < int(parts[2]));
+      return request.time.year() - int(parts[0]) - (beforeBirthday ? 1 : 0) < 18;
+    }
+
+    function validGuardian(data) {
+      let value = data.get('guardian', null);
+      return value == null ? !isMinor(data.birthDate)
+        : value is map && value.keys().hasAll(['name', 'phone', 'email'])
+          && value.keys().hasOnly(['name', 'phone', 'email'])
+          && isText(value.name, 2, 120) && isText(value.phone, 7, 32)
+          && value.phone.matches('^[+0-9 ().-]{7,32}$')
+          && value.phone.matches('.*[0-9].*')
+          && isText(value.email, 3, 254) && value.email.matches('^[^ @]+@[^ @]+[.][^ @]+$');
+    }
+
     function validPlayer(data) {
       return isText(data.fullName, 2, 120)
         && isIsoDate(data.birthDate)
+        && validBirthDate(data.birthDate)
         && optionalText(data, 'academy', 120)
         && optionalIn(data, 'category', ['Sub-14', 'Sub-16', 'Sub-18', 'Adulto'])
         && optionalIn(data, 'dominantHand', ['diestro', 'zurdo'])
@@ -150,9 +175,13 @@ service cloud.firestore {
         && optionalNumber(data, 'utr')
         && optionalNumber(data, 'nationalRanking')
         && optionalNumber(data, 'graduationYear')
+        // Un número finito restado a sí mismo da cero; NaN/Infinity no son válidos.
+        && (data.get('utr', null) == null || (data.utr >= 0 && data.utr - data.utr == 0))
+        && (data.get('nationalRanking', null) == null || (data.nationalRanking is int && data.nationalRanking > 0 && data.nationalRanking <= 9007199254740991))
+        && (data.get('graduationYear', null) == null || (data.graduationYear is int && data.graduationYear >= 1900 && data.graduationYear <= 2100))
         && optionalText(data, 'nationality', 60)
         && optionalText(data, 'coachName', 120)
-        && (data.get('guardian', null) == null || data.get('guardian', null) is map);
+        && validGuardian(data);
     }
 
     match /players/{playerId} {
@@ -172,11 +201,19 @@ service cloud.firestore {
         && validPlayer(request.resource.data);
 
       allow update: if canManage(resource.data)
+        && resource.data.get('deletedAt', null) == null
         && unchanged(['orgId', 'createdBy', 'createdAt', 'consent'])
         && onlyChanges([
              'fullName', 'birthDate', 'academy', 'category', 'dominantHand', 'backhand', 'utr',
              'nationalRanking', 'nationality', 'graduationYear', 'coachName', 'guardian', 'updatedAt'])
         && validPlayer(request.resource.data);
+
+      // PCIT-42: retirar de la plantilla conserva los partidos y su identidad.
+      allow update: if canManage(resource.data)
+        && resource.data.get('deletedAt', null) == null
+        && onlyChanges(['deletedAt', 'updatedAt'])
+        && request.resource.data.deletedAt == request.time
+        && request.resource.data.updatedAt == request.time;
 
       allow delete: if canManage(resource.data);
     }
@@ -208,6 +245,7 @@ service cloud.firestore {
         // El jugador tiene que ser de la misma organización.
         && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.orgId
              == request.resource.data.orgId
+        && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.get('deletedAt', null) == null
         && (isAdmin() || get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.createdBy == request.auth.uid)
         && request.resource.data.playerPosition in ['arriba', 'abajo']
         && isText(request.resource.data.opponent, 2, 120)

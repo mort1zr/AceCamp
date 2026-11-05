@@ -63,7 +63,7 @@ beforeEach(async () => {
     await setDoc(doc(db, 'orgs', OTHER_ORG), { name: 'Club Ejemplo', ownerId: OTHER_COACH, plan: 'free', createdAt: created })
     await setDoc(doc(db, 'users', COACH), { email: 'coach@acecam.test', displayName: 'Coach Ramírez', orgId: ORG, role: 'coach', createdAt: created })
     await setDoc(doc(db, 'users', OTHER_COACH), { email: 'coach2@acecam.test', displayName: 'Coach Paredes', orgId: OTHER_ORG, role: 'coach', createdAt: created })
-    await setDoc(doc(db, 'players', 'p-demo'), { orgId: ORG, fullName: 'Mateo Rojas', birthDate: '2009-05-14', academy: '', consent: consent(COACH), createdBy: COACH, createdAt: created })
+    await setDoc(doc(db, 'players', 'p-demo'), { orgId: ORG, fullName: 'Mateo Rojas', birthDate: '2009-05-14', academy: '', guardian: { name: 'Apoderado Demo', phone: '999999999', email: 'guardian@example.test' }, consent: consent(COACH), createdBy: COACH, createdAt: created })
     await setDoc(doc(db, 'players', 'p-club'), { orgId: OTHER_ORG, fullName: 'Sofía Vega', birthDate: '2007-11-30', academy: '', consent: consent(OTHER_COACH), createdBy: OTHER_COACH, createdAt: created })
     const match = (orgId, playerId, status, extra = {}) => ({
       orgId, playerId, playerPosition: 'abajo', opponent: 'J. Luna', tournament: '', matchDate: '2026-10-31', result: '',
@@ -83,6 +83,7 @@ const anonDb = () => env.unauthenticatedContext().firestore()
 
 const newPlayer = (overrides = {}) => ({
   orgId: ORG, fullName: 'Valentina Quispe', birthDate: '2010-03-02', academy: 'Club Las Lomas',
+  guardian: { name: 'Apoderado Demo', phone: '999999999', email: 'guardian@example.test' },
   createdBy: COACH, createdAt: serverTimestamp(),
   consent: { accepted: true, version: 'players-v1', method: 'coach-attestation', recordedBy: COACH, recordedAt: serverTimestamp() },
   ...overrides,

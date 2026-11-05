@@ -135,7 +135,7 @@ export default function Partidos({ db, storage, session }) {
       || !['coach', 'admin'].includes(role)) return null
     const identity = { db, orgId, actorId: uid, role }
     return {
-      playersService: createFirestorePlayersService({ ...identity, onlyOwned: role === 'coach' }),
+      playersService: createFirestorePlayersService({ ...identity, onlyOwned: role === 'coach', includeDeleted: true }),
       matchesService: createFirestoreMatchesService(identity),
       notesService: createFirestoreMatchNotesService(identity),
       videoService: storage ? createProcessedVideoService({ storage, orgId }) : null,

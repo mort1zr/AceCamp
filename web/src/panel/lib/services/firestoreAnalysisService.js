@@ -27,7 +27,7 @@ export function createFirestoreAnalysisService({ db, orgId, actorId, role = 'coa
       return { ...data, id: reference.id }
     }
     const player = await getDoc(doc(db, 'players', input.playerId))
-    if (!player.exists() || player.data().orgId !== orgId || (role !== 'admin' && player.data().createdBy !== actorId)) throw Object.assign(new Error('Player not available'), { code: 'analysis/player' })
+    if (!player.exists() || player.data().deletedAt != null || player.data().orgId !== orgId || (role !== 'admin' && player.data().createdBy !== actorId)) throw Object.assign(new Error('Player not available'), { code: 'analysis/player' })
     throwIfAborted(signal)
 
     let video = uploaded.get(requestId)

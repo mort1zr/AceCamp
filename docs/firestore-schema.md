@@ -117,6 +117,18 @@ El resto los completa la gestión completa (PCIT-42).
 | `createdBy` | string | sí | `uid` del entrenador |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
+| `deletedAt` | Timestamp | no | Fecha de retirada de la plantilla (PCIT-42) |
+
+PCIT-42 añade la acción **Eliminar de la plantilla**: guarda `deletedAt` y
+`updatedAt`, oculta el jugador en Jugadores, Dashboard y nuevos análisis, y
+conserva su registro y partidos. El historial de Partidos incluye los jugadores
+retirados para conservar sus nombres. El alta de un partido nuevo para un
+jugador retirado se rechaza en las reglas.
+
+La edición valida datos personales, deportivos y el objeto completo del
+apoderado para menores, preserva `orgId`, `createdBy`, `createdAt` y `consent`, y
+usa `updatedAt` para detectar ediciones concurrentes. No hay una operación de
+restauración en esta entrega. Ver `docs/PCIT-42-gestion-completa-jugadores.md`.
 
 **`consent`** (Ley N.° 29733, datos personales y videos):
 

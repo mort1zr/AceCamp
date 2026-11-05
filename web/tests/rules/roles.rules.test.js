@@ -88,3 +88,44 @@ it('adivinar una ruta de video no permite leer ni reemplazar los archivos de otr
   }
   await assertFails(uploadBytes(ref(context('a').storage(), 'orgs/org-a/matches/b/video.mp4'), new Uint8Array([1]), { contentType: 'video/mp4', customMetadata: { uploadedBy: 'a' } }))
 })
+
+it('PCIT-42 actualiza datos con consentimiento inmutable y rechaza una edición obsoleta', async () => {
+  const db = context('a').firestore()
+  const service = createFirestorePlayersService({ db, orgId: 'org-a', actorId: 'a', role: 'coach' })
+  const original = { id: 'a', ...(await getDoc(doc(db, 'players', 'a'))).data() }
+  const input = { fullName: 'Nombre actualizado', birthDate: '2000-01-01', academy: 'Club de prueba', category: 'Adulto', utr: '10.5', orgId: 'forged', createdBy: 'forged' }
+  await service.update(original, input)
+  const saved = (await getDoc(doc(db, 'players', 'a'))).data()
+  expect(saved).toMatchObject({ fullName: 'Nombre actualizado', utr: 10.5, createdBy: 'a', orgId: 'org-a', consent: original.consent })
+  expect(saved).not.toHaveProperty('guardian')
+  await expect(service.update(original, input)).rejects.toMatchObject({ code: 'players/conflict' })
+  const adminDb = context('admin').firestore()
+  const admin = createFirestorePlayersService({ db: adminDb, orgId: 'org-a', actorId: 'admin', role: 'admin' })
+  const other = { id: 'b', ...(await getDoc(doc(adminDb, 'players', 'b'))).data() }
+  await admin.update(other, input)
+  expect((await getDoc(doc(adminDb, 'players', 'b'))).data().createdBy).toBe('b')
+})
+
+it('PCIT-42 valida fecha, apoderado y deporte en el servidor aunque se evite el formulario', async () => {
+  const ref = doc(context('a').firestore(), 'players', 'a')
+  for (const fields of [{ birthDate: '2099-01-01' }, { birthDate: '2025-02-31' }, { birthDate: '2014-01-01', guardian: null }, { guardian: { name: 'A', phone: 'no', email: 'no' } }, { utr: -1 }, { utr: Infinity }, { utr: NaN }, { nationalRanking: 1.5 }, { graduationYear: 2200 }]) {
+    await assertFails(updateDoc(ref, fields))
+  }
+})
+
+it('PCIT-42 elimina de plantilla conservando historial y bloquea nuevos análisis', async () => {
+  const db = context('a').firestore()
+  const identity = { db, orgId: 'org-a', actorId: 'a', role: 'coach' }
+  const service = createFirestorePlayersService(identity)
+  await service.remove({ id: 'a' })
+  const removed = (await getDoc(doc(db, 'players', 'a'))).data()
+  expect(removed.deletedAt).toBeTruthy()
+  await assertSucceeds(getDoc(doc(db, 'matches', 'a')))
+  const readRows = service => new Promise((resolve, reject) => { const stop = service.subscribe(rows => { stop(); resolve(rows) }, reject) })
+  expect(await readRows(service)).toHaveLength(0)
+  expect(await readRows(createFirestorePlayersService({ ...identity, includeDeleted: true }))).toHaveLength(1)
+  const adminDb = context('admin').firestore()
+  await createFirestorePlayersService({ db: adminDb, orgId: 'org-a', actorId: 'admin', role: 'admin' }).remove({ id: 'b' })
+  expect((await getDoc(doc(adminDb, 'players', 'b'))).data().deletedAt).toBeTruthy()
+  await assertFails(setDoc(doc(db, 'matches', 'after-delete'), { orgId: 'org-a', playerId: 'a', playerPosition: 'abajo', createdBy: 'a', createdAt: serverTimestamp(), status: 'en cola', opponent: 'Rival', matchDate: '2026-11-01', videoPath: 'orgs/org-a/matches/after-delete/video.mp4' }))
+})

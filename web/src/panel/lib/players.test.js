@@ -3,6 +3,14 @@ import { normalizePlayer, playerAge, validatePlayer } from './players.js'
 
 const valid = { fullName: '  Ana   Torres  ', birthDate: '2004-11-03', academy: '  Club Central ', consentAccepted: true }
 
+it('normaliza los datos deportivos y rechaza números o categorías inválidos', () => {
+  expect(normalizePlayer({ ...valid, category: 'Adulto', dominantHand: 'diestro', backhand: 'dos manos', utr: '10.4', nationalRanking: '20', graduationYear: '2027', nationality: ' Perú ' }, '2026-11-03')).toMatchObject({ category: 'Adulto', utr: 10.4, nationalRanking: 20, graduationYear: 2027, nationality: 'Perú' })
+  for (const fields of [{ utr: 'Infinity' }, { utr: true }, { category: 'inventada' }, { nationalRanking: '0' }, { nationalRanking: '1.5' }, { graduationYear: '2200' }]) {
+    const key = Object.keys(fields)[0]
+    expect(validatePlayer({ ...valid, ...fields }, '2026-11-03')[key]).toBeTruthy()
+  }
+})
+
 describe('Validación de jugadores', () => {
   it('calcula edad por fecha calendario y conserva el cumpleaños correcto', () => {
     expect(playerAge('2004-11-03', '2026-11-02')).toBe(21)

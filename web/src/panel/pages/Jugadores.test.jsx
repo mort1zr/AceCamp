@@ -184,7 +184,7 @@ describe('Jugadores v1', () => {
     await user.click(await screen.findByRole('button', { name: 'Ver perfil de Camila Ríos' }))
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Camila Ríos' }))
     expect(screen.getByText('zurdo')).toBeTruthy()
-    expect(screen.queryByText('reservado@example.test')).toBeNull()
+    expect(screen.getByText('reservado@example.test')).toBeTruthy()
     expect(await screen.findByRole('alert')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
     const history = await screen.findByRole('table', { name: 'Historial de partidos analizados' })
