@@ -2,7 +2,7 @@ import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from 'f
 import { normalizePlayer, PLAYER_CONSENT_VERSION } from '../players.js'
 
 /** db and identity come from Axel's authenticated app, never from form fields. */
-export function createFirestorePlayersService({ db, orgId, actorId, role }) {
+export function createFirestorePlayersService({ db, orgId, actorId, role, onlyOwned = false }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim()) {
     throw new Error('Players service requires a database, organization and authenticated user.')
   }
@@ -15,7 +15,9 @@ export function createFirestorePlayersService({ db, orgId, actorId, role }) {
     mode: 'live',
     canViewProfile,
     subscribe(onPlayers, onError) {
-      return onSnapshot(query(players, where('orgId', '==', orgId)), snapshot => {
+      const filters = [where('orgId', '==', orgId)]
+      if (onlyOwned) filters.push(where('createdBy', '==', actorId))
+      return onSnapshot(query(players, ...filters), snapshot => {
         const rows = snapshot.docs.map(document => ({ ...document.data(), id: document.id }))
         onPlayers(rows.sort((a, b) => (a.fullName ?? '').localeCompare(b.fullName ?? '', 'es')))
       }, onError)

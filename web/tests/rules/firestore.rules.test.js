@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createFirestorePlayersService } from '../../src/panel/lib/services/firestorePlayersService.js'
+import { createFirestoreMatchesService } from '../../src/panel/lib/services/firestoreMatchesService.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -37,7 +38,7 @@ beforeAll(async () => {
     firestore: {
       rules: readFileSync(fileURLToPath(new URL('../../../firebase/firestore.rules', import.meta.url)), 'utf8'),
       host: '127.0.0.1',
-      port: 8080,
+      port: Number(process.env.FIRESTORE_EMULATOR_HOST?.split(':').at(-1) ?? 8080),
     },
   })
 })
@@ -132,22 +133,27 @@ describe('aislamiento por organización', () => {
       await setDoc(doc(db, 'matches', 'm-teammate'), { ...ready, createdBy: teammate, matchDate: '2026-11-01' })
     })
     const player = { id: 'p-demo', orgId: ORG, createdBy: COACH }
-    const coach = createFirestorePlayersService({ db: coachDb(), orgId: ORG, actorId: COACH, role: 'coach' })
-    const administrator = createFirestorePlayersService({
+    const coachIdentity = { db: coachDb(), orgId: ORG, actorId: COACH, role: 'coach' }
+    const adminIdentity = {
       db: env.authenticatedContext(admin).firestore(), orgId: ORG, actorId: admin, role: 'admin',
-    })
-    const readHistory = (service, currentPlayer) => {
+    }
+    const coach = createFirestorePlayersService(coachIdentity)
+    const administrator = createFirestorePlayersService(adminIdentity)
+    const read = subscribe => {
       let stop
       return new Promise((resolve, reject) => {
-        stop = service.subscribeAnalyzedMatches(currentPlayer, resolve, reject)
+        stop = subscribe(resolve, reject)
       }).finally(() => stop?.())
     }
+    const readHistory = (service, currentPlayer) => read((receive, fail) => service.subscribeAnalyzedMatches(currentPlayer, receive, fail))
 
     const history = await readHistory(coach, player)
     expect(history).toEqual([{ id: 'm-ready', opponent: 'J. Luna', matchDate: '2026-10-31', tournament: '', result: '' }])
     expect((await readHistory(administrator, player)).map(match => match.id)).toEqual(['m-teammate', 'm-ready'])
     await expect(readHistory(coach, { ...player, createdBy: teammate })).rejects.toMatchObject({ code: 'permission-denied' })
     await expect(readHistory(administrator, { ...player, orgId: OTHER_ORG })).rejects.toMatchObject({ code: 'permission-denied' })
+    expect((await read(createFirestoreMatchesService(coachIdentity).subscribe)).map(match => match.id)).toEqual(['m-ready'])
+    expect((await read(createFirestoreMatchesService(adminIdentity).subscribe)).map(match => match.id)).toEqual(['m-teammate', 'm-ready'])
   })
 
   it('una consulta sin filtrar por orgId se rechaza', async () => {

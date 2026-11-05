@@ -1,5 +1,122 @@
-import PageStub from '../../compartido/components/PageStub.jsx'
+import { useMemo, useState } from 'react'
+import { DataTable, EmptyState } from '../components/ui'
+import { useAnalysisQueue } from '../hooks/useAnalysisQueue.js'
+import { usePlayers } from '../hooks/usePlayers.js'
+import { formatMatchDate } from '../lib/dashboardEvolution.js'
+import { createFirestoreMatchesService } from '../lib/services/firestoreMatchesService.js'
+import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
+import './jugadores.css'
 
-export default function Partidos() {
-  return <PageStub title="Partidos" note="La lista y el reporte por partido van en FE-04." />
+function matchesErrorMessage(error) {
+  if (error?.code === 'permission-denied' || error?.code === 'unauthenticated') {
+    return 'Tu sesión no permite consultar los partidos. Vuelve a iniciar sesión o consulta con el administrador.'
+  }
+  return 'No pudimos cargar los partidos. Revisa tu conexión y vuelve a intentarlo.'
+}
+
+function MatchesList({ matchesService, playersService }) {
+  const matches = useAnalysisQueue(matchesService, matchesErrorMessage)
+  const players = usePlayers(playersService)
+  const [playerId, setPlayerId] = useState('')
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const playerNames = new Map(players.rows.map(player => [player.id, player.fullName]))
+  const columns = [
+    { key: 'matchDate', label: 'Fecha', render: value => formatMatchDate(value) },
+    { key: 'playerId', label: 'Jugador', render: id => playerNames.get(id) || 'Jugador no disponible' },
+    { key: 'opponent', label: 'Rival', render: value => value || '—' },
+    { key: 'tournament', label: 'Torneo', render: value => value || '—' },
+    { key: 'result', label: 'Marcador', render: value => value || '—' },
+  ]
+  const loading = players.loading || matches.loading
+  const error = players.error || matches.error
+  const invalidRange = Boolean(start && end && start > end)
+  const showRangeError = invalidRange && !loading && !error
+  const filtered = Boolean(playerId || start || end)
+  const rows = matches.rows.filter(match => (!playerId || match.playerId === playerId)
+    && (!(start || end) || (match.matchDate && (!start || match.matchDate >= start) && (!end || match.matchDate <= end))))
+  const noMatches = filtered && matches.rows.length > 0
+
+  function clearFilters() {
+    setPlayerId('')
+    setStart('')
+    setEnd('')
+  }
+
+  function retry() {
+    if (players.error) players.retry()
+    if (matches.error) matches.retry()
+  }
+
+  return (
+    <>
+      {!loading && !error && (matches.rows.length > 0 || filtered) && (
+        <>
+          <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] items-end gap-3" role="group" aria-label="Filtros de partidos">
+            <div className="players-field">
+              <label htmlFor="matches-player">Jugador</label>
+              <select id="matches-player" value={playerId} onChange={event => setPlayerId(event.target.value)}>
+                <option value="">Todos los jugadores</option>
+                {playerId && !playerNames.has(playerId) && <option value={playerId}>Jugador no disponible</option>}
+                {players.rows.map(player => <option value={player.id} key={player.id}>{player.fullName}</option>)}
+              </select>
+            </div>
+            <div className="players-field">
+              <label htmlFor="matches-start">Desde</label>
+              <input id="matches-start" type="date" value={start} aria-invalid={invalidRange} aria-describedby={invalidRange ? 'matches-range-error' : undefined} onChange={event => setStart(event.target.value)} />
+            </div>
+            <div className="players-field">
+              <label htmlFor="matches-end">Hasta</label>
+              <input id="matches-end" type="date" value={end} aria-invalid={invalidRange} aria-describedby={invalidRange ? 'matches-range-error' : undefined} onChange={event => setEnd(event.target.value)} />
+            </div>
+            <button type="button" className="players-button-secondary" disabled={!filtered} onClick={clearFilters}>Limpiar filtros</button>
+          </div>
+          {invalidRange && <p id="matches-range-error" className="players-field-error" role="alert">La fecha inicial debe ser anterior o igual a la final.</p>}
+        </>
+      )}
+      {!showRangeError && (
+        <section className="mt-5" aria-label="Historial de partidos">
+          {!loading && !error && <p className="mb-3 text-sm text-muted" role="status">{rows.length} {rows.length === 1 ? 'partido' : 'partidos'}</p>}
+          <DataTable
+            caption="Partidos analizados"
+            columns={columns}
+            rows={rows}
+            loading={!error && loading}
+            error={error}
+            onRetry={retry}
+            emptyTitle={noMatches ? 'No hay partidos con esos filtros' : 'Aún no hay partidos analizados'}
+            emptyDescription={noMatches ? 'Cambia el jugador o el rango de fechas.' : 'Los partidos aparecerán aquí cuando termine el análisis del video.'}
+          />
+        </section>
+      )}
+    </>
+  )
+}
+
+export default function Partidos({ db, session }) {
+  const { uid, orgId, role } = session ?? {}
+  const services = useMemo(() => {
+    if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()
+      || !['coach', 'admin'].includes(role)) return null
+    const identity = { db, orgId, actorId: uid, role }
+    return {
+      playersService: createFirestorePlayersService({ ...identity, onlyOwned: role === 'coach' }),
+      matchesService: createFirestoreMatchesService(identity),
+    }
+  }, [db, uid, orgId, role])
+
+  return (
+    <section className="players-page" aria-labelledby="matches-title">
+      <header className="players-page-heading">
+        <div>
+          <p className="players-eyebrow">Del análisis a la cancha</p>
+          <h1 id="matches-title">Partidos<span className="players-title-dot">.</span></h1>
+          <p>Consulta los partidos analizados y su marcador.</p>
+        </div>
+      </header>
+      {services ? <MatchesList key={`${services.playersService.scopeKey}:${role}`} {...services} /> : (
+        <EmptyState title="Los partidos aún no están disponibles" description="Inicia sesión con tu equipo para consultar su historial." />
+      )}
+    </section>
+  )
 }
