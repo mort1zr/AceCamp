@@ -4,6 +4,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react'
 import { collection, getDoc, onSnapshot, query } from 'firebase/firestore'
 import userEvent from '@testing-library/user-event'
 import Dashboard from './Dashboard.jsx'
+import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
 import { buildDashboardOverview } from '../lib/dashboardOverview.js'
 import { CLAVE_UNIDADES, guardarUnidades } from '../lib/unidades.js'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
@@ -77,6 +78,12 @@ it('avisa de resultados incompatibles y no los convierte en estadísticas de saq
   expect(screen.getAllByText('Sin datos')).toHaveLength(3)
 })
 
+it('muestra una diferencia de porcentajes en puntos porcentuales', () => {
+  render(<DashboardMetrics metrics={{ firstServeInRate: 62.5 }} previousMetrics={{ firstServeInRate: 50 }} compare />)
+  const card = within(screen.getByRole('heading', { name: 'Primer saque dentro' }).closest('article'))
+  expect(card.getByText(/\+12[.,]5 p\. p\. vs\. periodo anterior/)).toBeTruthy()
+})
+
 it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo', async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 7, 31, 12))
@@ -128,10 +135,24 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
   act(() => guardarUnidades('kmh'))
 
   const period = screen.getByLabelText('Periodo')
+  expect(screen.getByText('Elige un periodo para ver la comparación con el anterior.')).toBeTruthy()
   await user.selectOptions(period, '1')
   expect(kpi('Partidos analizados').getByText('2')).toBeTruthy()
   expect(kpi('Velocidad media de golpe').getByText('30')).toBeTruthy()
   expect(kpi('Velocidad media de saque').getByText('Sin datos')).toBeTruthy()
+  expect(kpi('Velocidad media de golpe').getByText('Sin datos para comparar')).toBeTruthy()
+  act(() => publish({ docs: [
+    ...dates,
+    match('2026-06-28', 300),
+    match('2026-06-29', 50),
+    match('2026-07-30', 70),
+  ] }))
+  expect(kpi('Partidos analizados').getByText('0 vs. periodo anterior')).toBeTruthy()
+  expect(kpi('Velocidad media de golpe').getByText(/-30 km\/h vs. periodo anterior/)).toBeTruthy()
+  act(() => guardarUnidades('mph'))
+  expect(kpi('Velocidad media de golpe').getByText(/-18[.,]6 mph vs. periodo anterior/)).toBeTruthy()
+  act(() => guardarUnidades('kmh'))
+  act(() => publish({ docs: dates }))
   const evolution = within(screen.getByRole('region', { name: 'Evolución del jugador' }))
   await user.click(evolution.getByText('Ver datos del gráfico'))
   const graphRows = within(evolution.getByRole('table', { name: 'Velocidades de golpe por partido' }))

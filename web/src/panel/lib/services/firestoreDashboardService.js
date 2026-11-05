@@ -56,7 +56,10 @@ export function createFirestoreDashboardService({ db, orgId, actorId, decodeStat
                 } : null
                 return { ...overview, evolution, latestMatch }
               }
-              onData({ ...summarize(rows), periods: buildDashboardPeriods(rows, summarize) })
+              onData({
+                ...summarize(rows),
+                periods: buildDashboardPeriods(rows, summarize, matches => buildDashboardOverview(matches, context)),
+              })
             } catch (error) { fail(error) }
           }, fail)
           // Covers an error raised synchronously while attaching a listener.

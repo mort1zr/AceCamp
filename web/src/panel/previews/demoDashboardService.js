@@ -31,12 +31,15 @@ export function createDemoDashboardService({ scopeKey, scenario = 'data' }) {
         else {
           const evolution = exampleEvolution(playerId, scenario === 'empty')
           const dated = evolution.points.map(point => ({ point, matchDate: point.date }))
-          const periods = buildDashboardPeriods(dated, rows => ({
+          const summarizeCounts = rows => ({
             metrics: { analyzedMatches: rows.length },
             coverage: { compatibleMatches: rows.length },
+          })
+          const periods = buildDashboardPeriods(dated, rows => ({
+            ...summarizeCounts(rows),
             evolution: { playerId, points: rows.map(row => row.point) },
             latestMatch: rows.at(-1)?.point ?? null,
-          }))
+          }), summarizeCounts)
           onData({
             ...(scenario === 'empty' ? { metrics: null } : structuredClone(examples[playerId] ?? { metrics: null })),
             evolution,

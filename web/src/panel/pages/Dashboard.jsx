@@ -389,7 +389,15 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                     {sample ? 'Ejemplos de interfaz' : 'Indicadores disponibles'}
                   </span>
                 </div>
-                <DashboardMetrics metrics={report?.metrics} sample={sample} />
+                {overview.data?.periods && period === 'all' && (
+                  <p className="text-[13px] text-muted">Elige un periodo para ver la comparación con el anterior.</p>
+                )}
+                <DashboardMetrics
+                  metrics={report?.metrics}
+                  previousMetrics={report?.previousMetrics}
+                  compare={Boolean(report) && period !== 'all'}
+                  sample={sample}
+                />
               </section>
               {report?.coverage?.incompatibleMatches > 0 && (
                 <p className="dashboard-data-notice" role="status">
