@@ -300,9 +300,48 @@ describe('registro (users y orgs)', () => {
     await assertFails(updateDoc(doc(db, 'users', COACH), { role: 'admin' }))
   })
 
-  it('el plan de la organización no se cambia desde la web', async () => {
+  it('el plan solo cambia junto con su periodo y fecha, como en el checkout', async () => {
     await assertSucceeds(updateDoc(doc(coachDb(), 'orgs', ORG), { name: 'Universidad Demo Lima' }))
     await assertFails(updateDoc(doc(coachDb(), 'orgs', ORG), { plan: 'ultra' }))
+    await assertFails(updateDoc(doc(coachDb(), 'orgs', ORG), { name: 'Otra', plan: 'ultra', billingCycle: 'mensual', planSince: serverTimestamp() }))
+  })
+
+  describe('checkout simulado (PCIT-158)', () => {
+    const contratar = (db, orgId, cambios = {}) =>
+      updateDoc(doc(db, 'orgs', orgId), { plan: 'pro', billingCycle: 'mensual', planSince: serverTimestamp(), ...cambios })
+
+    it('el dueño contrata Pro o Ultra con su periodo', async () => {
+      await assertSucceeds(contratar(coachDb(), ORG))
+      await assertSucceeds(contratar(coachDb(), ORG, { plan: 'ultra', billingCycle: 'anual' }))
+    })
+
+    it('la prueba de Básico es solo para una organización que nunca contrató', async () => {
+      const otro = env.authenticatedContext(OTHER_COACH, { email: 'coach2@acecam.test' }).firestore()
+      await assertSucceeds(contratar(otro, OTHER_ORG, { plan: 'prueba' }))
+      await assertFails(contratar(otro, OTHER_ORG, { plan: 'prueba' }))
+      await assertSucceeds(contratar(otro, OTHER_ORG, { plan: 'basico' }))
+    })
+
+    it('rechaza planes, periodos o fechas inválidos y campos de más', async () => {
+      const db = coachDb()
+      await assertFails(contratar(db, ORG, { plan: 'free' }))
+      await assertFails(contratar(db, ORG, { plan: 'inventado' }))
+      await assertFails(contratar(db, ORG, { billingCycle: 'semanal' }))
+      await assertFails(contratar(db, ORG, { planSince: new Date('2030-01-01T00:00:00Z') }))
+      await assertFails(contratar(db, ORG, { cardLast4: '4242' }))
+      await assertFails(contratar(db, ORG, { ownerId: OTHER_COACH }))
+    })
+
+    it('solo el dueño de la organización contrata', async () => {
+      await env.withSecurityRulesDisabled(async context => {
+        await setDoc(doc(context.firestore(), 'users', 'coach-colega'), { email: 'colega@acecam.test', displayName: 'Coach Colega', orgId: ORG, role: 'coach', createdAt: new Date() })
+        await setDoc(doc(context.firestore(), 'users', 'admin-demo'), { email: 'admin@acecam.test', displayName: 'Admin Demo', orgId: ORG, role: 'admin', createdAt: new Date() })
+      })
+      await assertFails(contratar(env.authenticatedContext('coach-colega', { email: 'colega@acecam.test' }).firestore(), ORG))
+      await assertFails(contratar(env.authenticatedContext('admin-demo', { email: 'admin@acecam.test' }).firestore(), ORG))
+      await assertFails(contratar(env.authenticatedContext(OTHER_COACH, { email: 'coach2@acecam.test' }).firestore(), ORG))
+      await assertFails(contratar(anonDb(), ORG))
+    })
   })
 })
 

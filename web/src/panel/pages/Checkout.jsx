@@ -58,6 +58,7 @@ const textos = {
     empezarPrueba: 'Empezar prueba gratis',
     procesando: 'Procesando pago…',
     seguro: 'Tus datos de pago no se guardan en AceCam.',
+    fallo: 'No pudimos activar el plan. Revisa tu conexión e inténtalo otra vez; no se hizo ningún cobro.',
     listoTitulo: (plan) => `Tu plan ${plan} está activo`,
     listoPrueba: 'Tu mes de prueba ya empezó.',
     listoTexto: 'Ya puedes entrar al panel y empezar a analizar partidos.',
@@ -119,6 +120,7 @@ const textos = {
     pagar: 'Pay and activate',
     empezarPrueba: 'Start free trial',
     procesando: 'Processing payment…',
+    fallo: 'We could not activate the plan. Check your connection and try again; you were not charged.',
     seguro: 'Your payment details are not stored by AceCam.',
     listoTitulo: (plan) => `Your ${plan} plan is active`,
     listoPrueba: 'Your trial month has started.',
@@ -399,9 +401,8 @@ function Resumen({ t, plan, periodo, procesando }) {
   )
 }
 
-function Confirmacion({ t, plan, periodo, ultimos }) {
+function Confirmacion({ t, plan, periodo, ultimos, prueba }) {
   const opcion = t.planes[plan]
-  const prueba = plan === 'basico'
   return (
     <section className={`${tarjeta} mx-auto flex max-w-lg flex-col items-center gap-5 text-center`}>
       <span className="grid size-16 place-items-center rounded-full bg-accent text-on-accent shadow-[0_8px_30px_-8px_var(--accent)]">
@@ -463,6 +464,7 @@ export default function Checkout({ contratar = async () => {} }) {
   const [errores, setErrores] = useState({})
   const [procesando, setProcesando] = useState(false)
   const [listo, setListo] = useState(null)
+  const [fallo, setFallo] = useState(false)
 
   useEffect(() => {
     entrada?.panelListo()
@@ -500,11 +502,21 @@ export default function Checkout({ contratar = async () => {} }) {
       return
     }
     setProcesando(true)
-    await Promise.all([
-      contratar({ plan, periodo }),
-      new Promise((resolver) => setTimeout(resolver, PROCESAR_MS)),
-    ])
-    setListo({ ultimos: soloDigitos(valores.numero).slice(-4) })
+    setFallo(false)
+    let guardado
+    try {
+      ;[guardado] = await Promise.all([
+        contratar({ plan, periodo }),
+        new Promise((resolver) => setTimeout(resolver, PROCESAR_MS)),
+      ])
+    } catch {
+      setFallo(true)
+      setProcesando(false)
+      return
+    }
+    // Básico es mes de prueba solo la primera vez (PCIT-158).
+    const prueba = guardado ? guardado === 'prueba' : plan === 'basico'
+    setListo({ ultimos: soloDigitos(valores.numero).slice(-4), prueba })
     setValores(VACIA)
     setProcesando(false)
     window.scrollTo({ top: 0 })
@@ -547,7 +559,7 @@ export default function Checkout({ contratar = async () => {} }) {
 
         <div className="mt-8">
           {listo ? (
-            <Confirmacion t={t} plan={plan} periodo={periodo} ultimos={listo.ultimos} />
+            <Confirmacion t={t} plan={plan} periodo={periodo} ultimos={listo.ultimos} prueba={listo.prueba} />
           ) : (
             <div className="grid items-start gap-5 lg:grid-cols-[1fr_380px]">
               <form id="checkout-pago" className="flex flex-col gap-5" onSubmit={pagar} noValidate>
@@ -565,6 +577,11 @@ export default function Checkout({ contratar = async () => {} }) {
                   onCambio={cambiar}
                   bloqueado={procesando}
                 />
+                {fallo && (
+                  <p role="alert" className="rounded-lg border border-bad px-4 py-3 text-sm text-bad">
+                    {t.fallo}
+                  </p>
+                )}
               </form>
               <Resumen t={t} plan={plan} periodo={periodo} procesando={procesando} />
             </div>

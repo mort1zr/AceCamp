@@ -25,7 +25,7 @@ procesado sigue siendo de escritura exclusiva del worker. Ver
 | Colección | Leer | Crear | Modificar | Borrar |
 | --- | --- | --- | --- | --- |
 | `users` | La propia y las de su organización | Solo la propia, en el registro, con rol `coach` y en una organización que crea él mismo | Solo nombre y cargo | No |
-| `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó | No |
+| `orgs` | La suya | En el registro, si todavía no tiene ficha en `users` | Nombre y programa, solo quien la creó. El plan solo lo cambia el dueño desde el checkout, junto con `billingCycle` y `planSince` (PCIT-158) | No |
 | `orgs/{orgId}/usage/{YYYY-MM}` | Miembros de la organización | Solo junto con el alta de un partido nuevo, sumando 1 (PCIT-41) | Igual: +1 por partido nuevo | No |
 | `players` | Admin: su organización; coach: propios | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Admin: su organización; coach: propios. Nunca `orgId`, `createdBy` ni `consent` | Admin: su organización; coach: propios |
 | `matches` | Admin: su organización; coach: propios | En `'en cola'`, sin estadísticas, con un jugador accesible por rol y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola`, dentro del alcance por rol | Dentro del alcance por rol, salvo si está `procesando` |
@@ -92,6 +92,8 @@ Se crea en el registro, junto con el usuario (PCIT-21).
 | `ownerId` | string | sí | `uid` de quien la creó. PCIT-23 lo usa para validar el alta |
 | `program` | string \| null | no | Ej. "Tenis varones" |
 | `plan` | string | sí | `'free'` (sin plan) al registrarse. `'prueba'`, `'basico'`, `'pro'` o `'ultra'` fijan los análisis por mes (PCIT-41, `docs/PCIT-41-limite-de-analisis.md`) |
+| `billingCycle` | string | no | `'mensual'` o `'anual'`, el periodo elegido en el checkout (PCIT-158) |
+| `planSince` | Timestamp | no | Inicio o renovación del plan, hora del servidor. Sin este campo, Básico entra como `'prueba'` (una sola vez) |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
 

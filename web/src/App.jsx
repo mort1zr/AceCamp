@@ -1,9 +1,10 @@
 import { Route, Routes } from 'react-router'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import AppLayout from './panel/components/AppLayout.jsx'
 import PublicLayout from './landing/components/PublicLayout.jsx'
 import RequireAuth from './panel/components/RequireAuth.jsx'
 import { useAuth } from './panel/context/AuthContext.js'
+import { contratarPlan } from './panel/lib/contratarPlan.js'
 import { auth, db, storage } from './panel/lib/firebase.js'
 import { createHttpVideoImporter } from './panel/lib/services/httpVideoImportService.js'
 import { createVideoUploadService, MAX_VIDEO_BYTES } from './panel/lib/videoUpload.js'
@@ -36,6 +37,8 @@ export default function App() {
     endpoint: '/api/video-import',
     getSession: async () => ({ orgId: profile.orgId, actorId: user.uid, token: await user.getIdToken() }),
   }), [user, profile])
+  const orgId = profile?.orgId
+  const contratar = useCallback(({ plan, periodo }) => contratarPlan({ db, orgId, plan, periodo }), [orgId])
 
   return (
     <Routes>
@@ -51,7 +54,7 @@ export default function App() {
         <Route path="/registro" element={<Registro />} />
       </Route>
 
-      <Route path="/checkout" element={<Checkout />} />
+      <Route path="/checkout" element={<Checkout contratar={contratar} />} />
 
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>

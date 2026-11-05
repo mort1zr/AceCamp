@@ -160,12 +160,23 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && getAfter(userPath(request.auth.uid)).data.orgId == orgId;
 
-      // Solo quien la creó cambia el nombre o el programa. El plan lo cambia el cobro (PCIT-41).
+      // Solo quien la creó cambia el nombre o el programa.
       allow update: if inOrg(orgId)
         && resource.data.ownerId == request.auth.uid
         && onlyChanges(['name', 'program', 'updatedAt'])
         && isText(request.resource.data.name, 2, 120)
         && optionalText(request.resource.data, 'program', 120);
+
+      // Checkout simulado (PCIT-158): solo el dueño contrata un plan, y solo cambia
+      // plan, periodo y fecha de inicio. 'free' no se elige: es la cuenta sin plan.
+      // La prueba de Básico se da una sola vez (antes de cualquier planSince).
+      allow update: if inOrg(orgId)
+        && resource.data.ownerId == request.auth.uid
+        && onlyChanges(['plan', 'billingCycle', 'planSince'])
+        && request.resource.data.plan in ['prueba', 'basico', 'pro', 'ultra']
+        && (request.resource.data.plan != 'prueba' || resource.data.get('planSince', null) == null)
+        && request.resource.data.billingCycle in ['mensual', 'anual']
+        && request.resource.data.planSince == request.time;
 
       allow delete: if false;
 
