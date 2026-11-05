@@ -2,8 +2,7 @@ import { Link } from 'react-router'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
 import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
 import Logo from '../../compartido/components/Logo.jsx'
-
-const year = new Date().getFullYear()
+import { correo, redes, textosPie, year } from '../lib/pie.js'
 
 const links = [
   { to: '/precios', clave: 'precios', desliza: true },
@@ -12,32 +11,8 @@ const links = [
   { to: '/privacidad', clave: 'privacidad' },
 ]
 
-const textos = {
-  es: {
-    precios: 'Precios',
-    registro: 'Crear cuenta',
-    terminos: 'Términos',
-    privacidad: 'Privacidad',
-    pie: 'Pie de página',
-    lugar: 'Lima, Perú',
-  },
-  en: {
-    precios: 'Pricing',
-    registro: 'Sign up',
-    terminos: 'Terms',
-    privacidad: 'Privacy',
-    pie: 'Footer',
-    lugar: 'Lima, Peru',
-  },
-}
-
-const redes = [
-  { href: 'https://instagram.com/acecam', label: 'Instagram' },
-  { href: 'https://tiktok.com/@acecam', label: 'TikTok' },
-]
-
 export default function PublicFooter() {
-  const t = useTextos(textos)
+  const t = useTextos(textosPie)
   return (
     <footer className="border-t border-line px-5 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
@@ -65,8 +40,8 @@ export default function PublicFooter() {
         </p>
         <ul className="flex flex-wrap gap-x-5 gap-y-2">
           <li>
-            <a href="mailto:consultas@acecam.com" className="hover:text-text">
-              consultas@acecam.com
+            <a href={`mailto:${correo}`} className="hover:text-text">
+              {correo}
             </a>
           </li>
           {redes.map((red) => (

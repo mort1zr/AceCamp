@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-export default function Reveal({ as: Tag = 'div', delay = 0, className = '', children }) {
+export default function Reveal({ delay = 0, className = '', children }) {
   const ref = useRef(null)
   const [shown, setShown] = useState(
     () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -27,7 +27,7 @@ export default function Reveal({ as: Tag = 'div', delay = 0, className = '', chi
   }, [shown])
 
   return (
-    <Tag
+    <div
       ref={ref}
       style={delay ? { transitionDelay: `${delay}ms` } : undefined}
       className={`transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none ${
@@ -35,6 +35,6 @@ export default function Reveal({ as: Tag = 'div', delay = 0, className = '', chi
       } ${className}`}
     >
       {children}
-    </Tag>
+    </div>
   )
 }

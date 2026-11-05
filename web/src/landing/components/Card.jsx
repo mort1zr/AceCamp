@@ -1,7 +1,7 @@
-export default function Card({ as: Tag = 'div', className = '', children, ...props }) {
+export default function Card({ className = '', children, ...props }) {
   return (
-    <Tag className={`rounded-card border border-line bg-surface ${className}`} {...props}>
+    <div className={`rounded-card border border-line bg-surface ${className}`} {...props}>
       {children}
-    </Tag>
+    </div>
   )
 }

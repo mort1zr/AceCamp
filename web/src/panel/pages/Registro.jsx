@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from 'react'
-import { Navigate, useLocation, useOutletContext, useNavigate } from 'react-router'
+import { Link, Navigate, useLocation, useOutletContext, useNavigate } from 'react-router'
 import { AuthHeader, Field, FormError } from '../components/AuthForm.jsx'
 import Button from '../../compartido/components/Button.jsx'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
@@ -21,6 +21,10 @@ const textos = {
     repetir: 'Repite la contraseña',
     boton: 'Crear cuenta',
     cargando: 'Creando tu cuenta…',
+    aceptas: 'Al crear tu cuenta aceptas los',
+    terminos: 'Términos de uso',
+    y: 'y la',
+    privacidad: 'Política de privacidad',
   },
   en: {
     titulo: 'Sign up',
@@ -34,6 +38,10 @@ const textos = {
     repetir: 'Repeat the password',
     boton: 'Sign up',
     cargando: 'Creating your account…',
+    aceptas: 'By signing up you accept the',
+    terminos: 'Terms of use',
+    y: 'and the',
+    privacidad: 'Privacy policy',
   },
 }
 
@@ -91,6 +99,17 @@ export default function Registro() {
           <Field compacto id="password" label={t.clave} type="password" autoComplete="new-password" placeholder={t.minimo(MIN_PASSWORD_LENGTH)} value={values.password} onChange={change} error={errors.password} />
           <Field compacto id="confirmPassword" label={t.repetir} type="password" autoComplete="new-password" value={values.confirmPassword} onChange={change} error={errors.confirmPassword} />
         </div>
+        <p className="text-xs text-muted">
+          {t.aceptas}{' '}
+          <Link to="/terminos" className="font-medium text-text2 underline underline-offset-2 hover:text-text">
+            {t.terminos}
+          </Link>{' '}
+          {t.y}{' '}
+          <Link to="/privacidad" className="font-medium text-text2 underline underline-offset-2 hover:text-text">
+            {t.privacidad}
+          </Link>
+          .
+        </p>
         {acceso ? null : (
           <Button type="submit" size="lg" className="mt-2" disabled={submitting}>
             {etiqueta}

@@ -53,10 +53,6 @@ const textos = {
 }
 
 function Marca({ activo, t }) {
-  if (typeof activo === 'string') {
-    return <span className="text-xs text-muted">{activo}</span>
-  }
-
   return (
     <span className={activo ? 'text-good' : 'text-bad opacity-80'}>
       <Icon name={activo ? 'check' : 'close'} size={20} className="max-sm:size-[18px]" />

@@ -167,11 +167,7 @@ export default function ParaQuien() {
               <Card className="group flex h-full flex-col overflow-hidden ring-line3 transition hover:border-line3 hover:ring-1">
                 <div
                   aria-hidden="true"
-                  className="flex h-40 items-center border-b border-line bg-surface2 px-6 md:h-48 md:px-8"
-                  style={{
-                    backgroundImage: 'radial-gradient(var(--line2) 1px, transparent 1px)',
-                    backgroundSize: '18px 18px',
-                  }}
+                  className="puntos flex h-40 items-center border-b border-line bg-surface2 px-6 [--puntos:18px] md:h-48 md:px-8"
                 >
                   <div className="w-full transition-transform duration-500 ease-out group-hover:-translate-y-2 group-hover:scale-105">
                     <Vista />

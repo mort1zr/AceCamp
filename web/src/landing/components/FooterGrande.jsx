@@ -2,8 +2,7 @@ import { Link } from 'react-router'
 import { useTextos } from '../../compartido/lib/idioma.jsx'
 import Icon from './Icon.jsx'
 import LinkDeslizante from '../../compartido/components/LinkDeslizante.jsx'
-
-const year = new Date().getFullYear()
+import { correo, redes, textosPie, year } from '../lib/pie.js'
 
 const columnas = [
   [
@@ -14,41 +13,26 @@ const columnas = [
   [
     { to: '/terminos', clave: 'terminos' },
     { to: '/privacidad', clave: 'privacidad' },
-    { href: 'mailto:consultas@acecam.com', clave: 'contacto' },
+    { href: `mailto:${correo}`, clave: 'contacto' },
   ],
 ]
 
 const textos = {
   es: {
+    ...textosPie.es,
     inicio: 'Inicio',
-    precios: 'Precios',
-    registro: 'Crear cuenta',
-    terminos: 'Términos',
-    privacidad: 'Privacidad',
     contacto: 'Contacto',
     sigue: 'Sigue a AceCam',
     novedades: 'con todas sus novedades',
-    pie: 'Pie de página',
-    lugar: 'Lima, Perú',
   },
   en: {
+    ...textosPie.en,
     inicio: 'Home',
-    precios: 'Pricing',
-    registro: 'Sign up',
-    terminos: 'Terms',
-    privacidad: 'Privacy',
     contacto: 'Contact',
     sigue: 'Follow AceCam',
     novedades: 'and all its updates',
-    pie: 'Footer',
-    lugar: 'Lima, Peru',
   },
 }
-
-const redes = [
-  { href: 'https://instagram.com/acecam', label: 'Instagram', icon: 'instagram' },
-  { href: 'https://tiktok.com/@acecam', label: 'TikTok', icon: 'tiktok' },
-]
 
 function Enlace({ enlace, texto }) {
   const clases = `transition-colors ${enlace.actual ? 'text-accent-ink' : 'text-text hover:text-accent-ink'}`

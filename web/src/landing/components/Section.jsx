@@ -5,13 +5,12 @@ export default function Section({
   title,
   lead,
   align = 'left',
-  className = '',
   children,
 }) {
   const centered = align === 'center'
 
   return (
-    <section id={id} className={`relative px-6 py-14 sm:py-20 ${className}`}>
+    <section id={id} className="relative px-6 py-14 sm:py-20">
       <div className="mx-auto max-w-6xl">
         {title || lead ? (
           <Reveal className={`max-w-3xl ${centered ? 'mx-auto text-center' : ''}`}>
