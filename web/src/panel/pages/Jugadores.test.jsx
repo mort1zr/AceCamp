@@ -152,6 +152,34 @@ describe('Jugadores v1', () => {
     expect(screen.queryByRole('button', { name: /Nuevo jugador/ })).toBeNull()
   })
 
+  it('abre el perfil con historial, reintenta y devuelve el foco a la plantilla', async () => {
+    const user = userEvent.setup()
+    const stop = vi.fn()
+    const service = createDemoPlayersService({ initialPlayers: [
+      { id: 'p1', fullName: 'Camila Ríos', birthDate: '2005-04-12', dominantHand: 'zurdo', guardian: { email: 'reservado@example.test' } },
+    ] })
+    service.subscribeAnalyzedMatches = vi.fn()
+      .mockImplementationOnce((_player, _receive, fail) => { fail({ code: 'unavailable' }); return stop })
+      .mockImplementationOnce((_player, receive) => {
+        receive([{ id: 'match-1', matchDate: '2026-10-03', opponent: 'Rival de prueba' }])
+        return stop
+      })
+    render(<Jugadores service={service} />)
+    await user.click(await screen.findByRole('button', { name: 'Ver perfil de Camila Ríos' }))
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Camila Ríos' }))
+    expect(screen.getByText('zurdo')).toBeTruthy()
+    expect(screen.queryByText('reservado@example.test')).toBeNull()
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }))
+    const history = await screen.findByRole('table', { name: 'Historial de partidos analizados' })
+    expect(within(history).getByText('03/10/2026')).toBeTruthy()
+    expect(within(history).getByText('Rival de prueba')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Volver a Jugadores' }))
+    expect(stop).toHaveBeenCalledTimes(2)
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Tu plantilla' }))
+    expect(screen.queryByText('Rival de prueba')).toBeNull()
+  })
+
   it('abre la consulta con la sesión completa y la cierra al salir', async () => {
     const unsubscribe = vi.fn()
     onSnapshot.mockImplementationOnce((_, receive) => {

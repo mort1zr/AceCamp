@@ -15,6 +15,10 @@ export function createDemoPlayersService({ initialPlayers = examples } = {}) {
   return {
     scopeKey: `demo:${crypto.randomUUID()}`,
     mode: 'demo',
+    canViewProfile: () => true,
+    subscribeAnalyzedMatches(_player, onMatches) {
+      onMatches([])
+    },
     subscribe(onPlayers) {
       listeners.add(onPlayers)
       queueMicrotask(() => { if (listeners.has(onPlayers)) onPlayers(players.map(player => ({ ...player }))) })

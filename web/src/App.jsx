@@ -28,7 +28,7 @@ const { uploadVideo } = createVideoUploadService({ storage })
 
 export default function App() {
   const { user, profile } = useAuth()
-  const session = user && profile ? { uid: user.uid, orgId: profile.orgId } : undefined
+  const session = user && profile ? { uid: user.uid, orgId: profile.orgId, role: profile.role } : undefined
   const importVideo = useMemo(() => createHttpVideoImporter({
     enabled: import.meta.env.DEV && import.meta.env.MODE === 'demo' && Boolean(user && profile),
     supportsYouTube: true,

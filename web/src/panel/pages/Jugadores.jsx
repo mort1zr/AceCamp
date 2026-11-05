@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DataTable } from '../components/ui'
 import PlayerForm from '../components/players/PlayerForm.jsx'
+import PlayerProfile from '../components/players/PlayerProfile.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { playerAge } from '../lib/players.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
@@ -29,8 +30,11 @@ function PlayersWorkspace({ service }) {
   const [name, setName] = useState('')
   const [academy, setAcademy] = useState('')
   const [page, setPage] = useState(1)
+  const [profileId, setProfileId] = useState('')
   const addButton = useRef(null)
   const formWasOpen = useRef(false)
+  const listHeading = useRef(null)
+  const profileWasOpen = useRef(false)
   const academyOptions = [...new Set(rows.map(academyName))]
     .sort((a, b) => a.localeCompare(b, 'es'))
   const query = searchName(name.trim())
@@ -43,15 +47,33 @@ function PlayersWorkspace({ service }) {
   const hasPlayers = !loading && !error && rows.length > 0
   const showFilters = hasPlayers || (!loading && !error && filtered)
   const noMatches = hasPlayers && filtered
+  const profilePlayer = rows.find(player => player.id === profileId && service.canViewProfile?.(player))
+  const listColumns = service.canViewProfile ? [...columns, {
+    key: 'profile',
+    label: 'Perfil',
+    render: (_, player) => service.canViewProfile(player) && (
+      <button type="button" className="players-button-secondary" disabled={showForm} aria-label={`Ver perfil de ${player.fullName}`} onClick={() => setProfileId(player.id)}>Ver perfil</button>
+    ),
+  }] : columns
 
   useEffect(() => {
     if (!showForm && formWasOpen.current) addButton.current?.focus()
     formWasOpen.current = showForm
   }, [showForm])
 
+  const profileOpen = Boolean(profilePlayer)
+  useEffect(() => {
+    if (!profileOpen && profileWasOpen.current) listHeading.current?.focus()
+    profileWasOpen.current = profileOpen
+  }, [profileOpen])
+
   function closeForm() {
     setShowForm(false)
   }
+
+  if (profilePlayer) return (
+    <PlayerProfile key={profilePlayer.id} service={service} player={profilePlayer} onBack={() => setProfileId('')} />
+  )
 
   return (
     <section className="players-page" aria-labelledby="players-title">
@@ -60,7 +82,7 @@ function PlayersWorkspace({ service }) {
       <p className="players-notice" role="status">{notice}</p>
       {showForm && <PlayerForm service={service} onCancel={closeForm} onCreated={player => { setNotice(`${player.fullName} se registró correctamente.`); closeForm() }} />}
       <div className="players-list-heading">
-        <h2>Tu plantilla</h2>
+        <h2 ref={listHeading} tabIndex={-1}>Tu plantilla</h2>
         <span role="status">{loading ? 'Cargando…' : error ? 'No disponible' : filtered
           ? `${matchingRows.length} de ${rows.length} jugadores`
           : `${rows.length} ${rows.length === 1 ? 'jugador' : 'jugadores'}`}</span>
@@ -87,7 +109,7 @@ function PlayersWorkspace({ service }) {
       {hasPlayers && matchingRows.length > 0 && <p className="players-table-hint">Desliza la tabla para ver todas las columnas.</p>}
       <DataTable
         caption="Jugadores registrados"
-        columns={columns}
+        columns={listColumns}
         rows={matchingRows.slice(offset, offset + pageSize)}
         loading={loading}
         error={error}
@@ -111,12 +133,13 @@ export default function Jugadores({ service, db, session }) {
   // The authentication provider supplies uid and orgId together from the same verified session.
   const uid = session?.uid
   const orgId = session?.orgId
+  const role = session?.role
   const liveService = useMemo(() => {
     if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()) {
       return null
     }
-    return createFirestorePlayersService({ db, actorId: uid, orgId })
-  }, [db, uid, orgId])
+    return createFirestorePlayersService({ db, actorId: uid, orgId, role })
+  }, [db, uid, orgId, role])
 
   const playersService = service ?? liveService
   if (!playersService) return (
@@ -128,5 +151,5 @@ export default function Jugadores({ service, db, session }) {
       <p className="players-footnote">Cada jugador es una historia. El siguiente paso es analizar su juego.</p>
     </section>
   )
-  return <PlayersWorkspace key={playersService.scopeKey} service={playersService} />
+  return <PlayersWorkspace key={`${playersService.scopeKey}:${role ?? ''}`} service={playersService} />
 }
