@@ -4,6 +4,7 @@
 // Uso (después de npm run build): npm run check:csp
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { JSDOM } from 'jsdom'
 
 const firebase = JSON.parse(readFileSync(new URL('../../firebase.json', import.meta.url), 'utf8'))
 const html = readFileSync(new URL('../dist/index.html', import.meta.url), 'utf8')
@@ -15,13 +16,14 @@ if (!csp) {
   console.error('firebase.json no define Content-Security-Policy en hosting.headers.')
   process.exit(1)
 }
-const scriptSrc = csp.split(';').map(part => part.trim()).find(part => part.startsWith('script-src ')) ?? ''
+const allowed = (csp.split(';').map(part => part.trim()).find(part => part.startsWith('script-src ')) ?? '').split(/\s+/)
 
+// Se usa un parser de HTML (no una expresión regular) para encontrar los scripts igual que el navegador.
+const { document } = new JSDOM(html).window
 const missing = []
-for (const [, attrs, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-  if (/\bsrc=/.test(attrs)) continue
-  const hash = `'sha256-${createHash('sha256').update(body).digest('base64')}'`
-  if (!scriptSrc.split(/\s+/).includes(hash)) missing.push(hash)
+for (const script of document.querySelectorAll('script:not([src])')) {
+  const hash = `'sha256-${createHash('sha256').update(script.textContent).digest('base64')}'`
+  if (!allowed.includes(hash)) missing.push(hash)
 }
 
 if (missing.length) {
