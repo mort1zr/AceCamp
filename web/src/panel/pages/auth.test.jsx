@@ -120,6 +120,33 @@ describe('Registro', () => {
   })
 })
 
+describe('Ver la contraseña', () => {
+  it('en el login, el ojo muestra y vuelve a ocultar la contraseña', async () => {
+    renderApp('/login', session())
+    const user = userEvent.setup()
+    const clave = screen.getByLabelText('Contraseña')
+    await user.type(clave, 'acecam123')
+    expect(clave.getAttribute('type')).toBe('password')
+    await user.click(screen.getByRole('button', { name: 'Mostrar contraseña' }))
+    expect(clave.getAttribute('type')).toBe('text')
+    expect(clave.value).toBe('acecam123')
+    await user.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+    expect(clave.getAttribute('type')).toBe('password')
+  })
+
+  it('en el registro, cada contraseña tiene su propio ojo y no envía el formulario', async () => {
+    const registerCoach = vi.fn()
+    renderApp('/registro', session({ registerCoach }))
+    const user = userEvent.setup()
+    const ojos = screen.getAllByRole('button', { name: 'Mostrar contraseña' })
+    expect(ojos).toHaveLength(2)
+    await user.click(ojos[1])
+    expect(screen.getByLabelText('Repite la contraseña').getAttribute('type')).toBe('text')
+    expect(screen.getByLabelText('Contraseña').getAttribute('type')).toBe('password')
+    expect(registerCoach).not.toHaveBeenCalled()
+  })
+})
+
 describe('Registro con invitación (PCIT-40)', () => {
   it('trae el correo invitado, no pide organización y se registra como invitado', async () => {
     const registerCoach = vi.fn().mockResolvedValue({ joined: true })
