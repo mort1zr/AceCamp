@@ -1,0 +1,55 @@
+# Dependabot (PCIT-165): abre PRs semanales para actualizar dependencias.
+# Cada PR pasa por las mismas CI (model-ci, web-ci, security, codeql) antes de fusionarse.
+# Las alertas de seguridad de Dependabot se activan aparte en Settings > Code security.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /model
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Lima
+    open-pull-requests-limit: 5
+    labels: [dependencias, modelo]
+    commit-message:
+      prefix: "deps(modelo)"
+    ignore:
+      # torch y torchvision se actualizan a mano y validados en GPU (PCIT-168).
+      - dependency-name: torch
+      - dependency-name: torchvision
+    groups:
+      google-cloud:
+        patterns: ["google-cloud-*"]
+      herramientas-dev:
+        patterns: ["pytest*", "ruff", "pre-commit"]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Lima
+    open-pull-requests-limit: 5
+    labels: [dependencias, web]
+    commit-message:
+      prefix: "deps(web)"
+    groups:
+      # Menores y parches juntos en una sola PR; las versiones mayores van solas.
+      menores-y-parches:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: America/Lima
+    labels: [dependencias, ci]
+    commit-message:
+      prefix: "deps(ci)"
+    groups:
+      actions:
+        patterns: ["*"]

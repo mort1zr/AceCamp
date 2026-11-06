@@ -8,6 +8,7 @@
     "demo": "vite --mode demo --host 127.0.0.1 --port 5176 --strictPort",
     "demo:worker": "node scripts/demoWorker.mjs",
     "build": "vite build",
+    "check:csp": "node scripts/checkCsp.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
