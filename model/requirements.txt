@@ -6,7 +6,7 @@ lap==0.5.13
 # En Colab (Python 3.13) estas dos no existen: el notebook usa las que trae Colab.
 torch==2.5.1
 torchvision==0.20.1
-opencv-python==4.14.0.94
+opencv-python==5.0.0.93
 numpy==2.4.6
 pandas==3.0.6
 pyyaml==6.0.3
