@@ -42,7 +42,7 @@ function ejemplo() {
       units: 'kmh',
       notifications: { analysis: true, application: true, alerts: false, weekly: true },
     },
-    plan: { id: 'ultra', trial: false, used: 18, limit: null },
+    plan: { id: 'ultra', trial: false, used: 18, limit: null, cycle: 'anual', renewsAt: '2027-03-01T00:00:00.000Z' },
   }
 }
 
@@ -98,6 +98,14 @@ export function createDemoConfiguracionService({ scenario = 'data', plan } = {})
           ...data.team,
           { id: crypto.randomUUID(), name: email, email, role, players: 0, status: 'invitado' },
         ],
+      }
+      emit()
+    },
+    async cancelInvite({ email }) {
+      await esperar()
+      data = {
+        ...data,
+        team: data.team.filter((miembro) => !(miembro.status === 'invitado' && miembro.email === email)),
       }
       emit()
     },

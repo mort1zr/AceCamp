@@ -10,8 +10,9 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth'
-import { collection, doc, serverTimestamp, writeBatch } from 'firebase/firestore'
-import { COLLECTIONS } from './schema.js'
+import { collection, doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore'
+import { invitacionRef } from './invitaciones.js'
+import { COLLECTIONS, INVITE_STATUS } from './schema.js'
 
 export const MIN_PASSWORD_LENGTH = 6
 const MAX_TEXT_LENGTH = 120
@@ -41,11 +42,12 @@ export function validateLogin({ email, password }) {
   return errors
 }
 
-export function validateRegistration({ name, orgName, email, password, confirmPassword }) {
+/** Con `invited`, la organización sale de la invitación y no se pide su nombre (PCIT-40). */
+export function validateRegistration({ name, orgName, email, password, confirmPassword, invited = false }) {
   const errors = {}
   const nameMessage = textError(clean(name), 'tu nombre')
   if (nameMessage) errors.name = nameMessage
-  const orgMessage = textError(clean(orgName), 'el nombre de tu organización')
+  const orgMessage = invited ? null : textError(clean(orgName), 'el nombre de tu organización')
   if (orgMessage) errors.orgName = orgMessage
   const emailMessage = emailError(normalizeEmail(email))
   if (emailMessage) errors.email = emailMessage
@@ -68,6 +70,8 @@ const ERROR_MESSAGES = {
   'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.',
   'auth/network-request-failed': 'No hay conexión con el servidor. Revisa tu internet.',
   'permission-denied': 'No pudimos crear tu organización. Inténtalo de nuevo.',
+  'invite/not-found':
+    'No encontramos una invitación pendiente para este correo. Pide que te inviten de nuevo o crea tu propia organización.',
 }
 
 /** Mensaje para el usuario; nunca muestra el error técnico. */
@@ -76,16 +80,47 @@ export function authErrorMessage(error) {
 }
 
 export function createAuthService({ auth, db }) {
+  /** Invitación pendiente al correo de la cuenta recién creada, o null (PCIT-40). */
+  async function pendingInvite(user) {
+    const snapshot = await getDoc(invitacionRef(db, user.email))
+    const invite = snapshot.exists() ? snapshot.data() : null
+    return invite?.status === INVITE_STATUS.pending ? invite : null
+  }
+
+  /** Se une a la organización que lo invitó: ficha en users y la invitación aceptada, en un lote. */
+  async function joinInvitedOrg(user, displayName, invite) {
+    const batch = writeBatch(db)
+    batch.set(doc(db, COLLECTIONS.users, user.uid), {
+      email: user.email,
+      displayName,
+      orgId: invite.orgId,
+      role: invite.role,
+      jobTitle: null,
+      createdAt: serverTimestamp(),
+    })
+    batch.update(invitacionRef(db, user.email), {
+      status: INVITE_STATUS.accepted,
+      acceptedBy: user.uid,
+      acceptedAt: serverTimestamp(),
+    })
+    await batch.commit()
+    return { user, orgId: invite.orgId, joined: true }
+  }
+
   /**
-   * Crea la cuenta, su organización y su ficha en users.
+   * Crea la cuenta y su ficha en users. Si su correo tiene una invitación pendiente,
+   * se une a esa organización con el rol invitado (PCIT-40); si no, crea la suya.
    * La organización y la ficha van en el mismo lote, como exigen las reglas.
-   * Si el lote falla, borra la cuenta de Auth para que pueda volver a intentarlo.
+   * Si algo falla, borra la cuenta de Auth para que pueda volver a intentarlo.
    */
-  async function registerCoach({ name, email, password, orgName }) {
+  async function registerCoach({ name, email, password, orgName, invited = false }) {
     const displayName = clean(name)
     const { user } = await createUserWithEmailAndPassword(auth, normalizeEmail(email), password)
     try {
       await updateProfile(user, { displayName })
+      const invite = await pendingInvite(user)
+      if (invite) return await joinInvitedOrg(user, displayName, invite)
+      if (invited) throw Object.assign(new Error('Invite not found'), { code: 'invite/not-found' })
       const orgRef = doc(collection(db, COLLECTIONS.orgs))
       const batch = writeBatch(db)
       batch.set(orgRef, {
@@ -104,7 +139,7 @@ export function createAuthService({ auth, db }) {
         createdAt: serverTimestamp(),
       })
       await batch.commit()
-      return { user, orgId: orgRef.id }
+      return { user, orgId: orgRef.id, joined: false }
     } catch (error) {
       await deleteUser(user).catch(() => signOut(auth))
       throw error

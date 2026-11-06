@@ -31,6 +31,12 @@ const montar = (service, entrada = '/configuracion') =>
   )
 
 describe('Configuración', () => {
+  it('Plan muestra el periodo y la próxima renovación (PCIT-158)', async () => {
+    montar(createDemoConfiguracionService(), '/configuracion?seccion=plan')
+    const linea = await screen.findByText(/Pago anual · Se renueva el/)
+    expect(linea.textContent).toContain('2027')
+  })
+
   it('cambia de pestaña y la refleja en la URL', async () => {
     const user = userEvent.setup()
     montar(createDemoConfiguracionService())
@@ -76,6 +82,13 @@ describe('Configuración', () => {
     montar(createDemoConfiguracionService())
     await user.click(await screen.findByRole('button', { name: 'Cambiar contraseña' }))
     await user.type(screen.getByLabelText('Contraseña actual'), 'otra-clave')
+    // Cada campo tiene su ojo para ver lo escrito.
+    expect(screen.getAllByRole('button', { name: 'Mostrar contraseña' })).toHaveLength(3)
+    await user.click(screen.getAllByRole('button', { name: 'Mostrar contraseña' })[0])
+    expect(screen.getByLabelText('Contraseña actual').getAttribute('type')).toBe('text')
+    expect(screen.getByLabelText('Nueva contraseña').getAttribute('type')).toBe('password')
+    await user.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+    expect(screen.getByLabelText('Contraseña actual').getAttribute('type')).toBe('password')
     await user.type(screen.getByLabelText('Nueva contraseña'), 'corta')
     await user.type(screen.getByLabelText('Repite la nueva contraseña'), 'corta')
     await user.click(screen.getByRole('button', { name: 'Actualizar contraseña' }))
@@ -110,8 +123,22 @@ describe('Configuración', () => {
     await user.clear(correo)
     await user.type(correo, 'nuevo@ejemplo.test')
     await user.click(screen.getByRole('button', { name: 'Enviar invitación' }))
-    expect(await screen.findByText('Invitación enviada.')).toBeTruthy()
+    expect(await screen.findByText('Invitación creada.')).toBeTruthy()
     expect(screen.getAllByText('nuevo@ejemplo.test').length).toBeGreaterThan(0)
+    // PCIT-40: sin envío de correos, se comparte el enlace de registro.
+    expect(screen.getByText(/\/registro\?invitacion=nuevo%40ejemplo\.test$/)).toBeTruthy()
+    // No se invita dos veces al mismo correo ni a alguien que ya es del equipo.
+    await user.type(correo, 'NUEVO@ejemplo.test')
+    await user.click(screen.getByRole('button', { name: 'Enviar invitación' }))
+    expect(await screen.findByText(/ya tiene una invitación pendiente/)).toBeTruthy()
+    await user.clear(correo)
+    await user.type(correo, 'luis@ejemplo.test')
+    await user.click(screen.getByRole('button', { name: 'Enviar invitación' }))
+    expect(await screen.findByText('Esa persona ya es parte de tu equipo.')).toBeTruthy()
+    await user.clear(correo)
+    await user.click(screen.getByRole('button', { name: 'Anular la invitación a nuevo@ejemplo.test' }))
+    expect(await screen.findByText('Invitación anulada.')).toBeTruthy()
+    expect(screen.queryByText('nuevo@ejemplo.test')).toBeNull()
   })
 
   it('sin conexión muestra los formularios vacíos y bloqueados', () => {

@@ -80,7 +80,7 @@ for (const user of data.users) {
 console.log('4/4 Guardando documentos en Firestore…')
 const batch = db.batch()
 for (const user of data.users) batch.set(db.collection('users').doc(user.uid), user.doc)
-for (const name of ['orgs', 'players', 'matches', 'applications']) {
+for (const name of ['orgs', 'players', 'matches', 'applications', 'invites']) {
   for (const item of data[name]) batch.set(db.collection(name).doc(item.id), item.doc)
 }
 for (const item of data.usage) batch.set(db.collection('orgs').doc(item.orgId).collection('usage').doc(item.id), item.doc)
@@ -89,5 +89,6 @@ await batch.commit()
 clearTimeout(watchdog)
 console.log(`Listo. Datos de ejemplo cargados → ${summary}`)
 for (const user of data.users) console.log(`  Inicia sesión con ${user.email} / ${user.password}`)
+for (const invite of data.invites) console.log(`  Invitación pendiente: /registro?invitacion=${encodeURIComponent(invite.id)}`)
 console.log('  Revisa los datos en http://127.0.0.1:4000/firestore')
 process.exit(0)

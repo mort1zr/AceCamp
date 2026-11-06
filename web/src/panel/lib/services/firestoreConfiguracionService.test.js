@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth'
-import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore'
 import { createFirestoreConfiguracionService } from './firestoreConfiguracionService.js'
 
 vi.mock('firebase/auth', () => ({
@@ -17,6 +17,7 @@ vi.mock('firebase/firestore', () => ({
   query: vi.fn(),
   where: vi.fn(),
   updateDoc: vi.fn(),
+  setDoc: vi.fn(),
   serverTimestamp: vi.fn(() => 'server-time'),
 }))
 
@@ -67,7 +68,7 @@ describe('Servicio de Configuración con Firestore', () => {
     emitir('players?org', lista([{ id: 'p1', createdBy: 'u1' }]))
     emitir('orgs/org-a', documento({ name: 'Universidad Demo', plan: 'free', ownerId: 'u1' }))
     // Sin contador todavía: 0 análisis este mes.
-    expect(recibir.mock.calls.at(-1)[0].plan).toEqual({ id: 'ninguno', trial: false, used: 0, limit: 0 })
+    expect(recibir.mock.calls.at(-1)[0].plan).toEqual({ id: 'ninguno', trial: false, used: 0, limit: 0, cycle: null, renewsAt: null })
     // El uso es el contador de la organización del mes, no los partidos visibles (PCIT-41).
     expect(onSnapshot.mock.calls.some(([ref]) => ref === 'matches?org')).toBe(false)
     emitir('orgs/org-a/usage/2026-11', documento({ analyses: 7, lastMatchId: 'm7' }))
@@ -75,9 +76,33 @@ describe('Servicio de Configuración con Firestore', () => {
     const datos = recibir.mock.calls.at(-1)[0]
     expect(datos.account).toMatchObject({ name: 'Coach', email: 'coach@acecam.test' })
     expect(datos.organization).toMatchObject({ name: 'Universidad Demo', canEdit: true })
-    expect(datos.plan).toEqual({ id: 'basico', trial: true, used: 7, limit: 15 })
+    expect(datos.plan).toEqual({ id: 'basico', trial: true, used: 7, limit: 15, cycle: null, renewsAt: null })
+    // PCIT-158: con plan contratado, periodo y fecha de renovación.
+    emitir('orgs/org-a', documento({ name: 'Universidad Demo', plan: 'pro', ownerId: 'u1', billingCycle: 'mensual',
+      planSince: { toDate: () => new Date('2026-10-20T12:00:00Z') } }))
+    expect(recibir.mock.calls.at(-1)[0].plan).toMatchObject({ id: 'pro', cycle: 'mensual', renewsAt: '2026-11-20T12:00:00.000Z' })
     expect(datos.isOrganization).toBe(false)
     expect(datos.team[0]).toMatchObject({ id: 'u1', players: 1 })
+  })
+
+  it('el dueño ve y crea invitaciones pendientes; un entrenador no las escucha (PCIT-40)', async () => {
+    const recibir = vi.fn()
+    crear().subscribe(recibir, vi.fn())
+    emitir('users/u1', documento({ displayName: 'Coach', role: 'coach' }))
+    emitir('users?org', lista([{ id: 'u1', displayName: 'Coach', role: 'coach' }]))
+    emitir('orgs/org-a', documento({ name: 'Club', plan: 'ultra', ownerId: 'otro' }))
+    expect(onSnapshot.mock.calls.some(([ref]) => ref === 'invites?org')).toBe(false)
+    expect(recibir.mock.calls.at(-1)[0].organization.canInvite).toBe(false)
+
+    emitir('orgs/org-a', documento({ name: 'Club', plan: 'ultra', ownerId: 'u1' }))
+    expect(where).toHaveBeenCalledWith('status', '==', 'pendiente')
+    emitir('invites?org', lista([{ id: 'ana@club.pe', email: 'ana@club.pe', role: 'admin' }]))
+    const datos = recibir.mock.calls.at(-1)[0]
+    expect(datos.organization.canInvite).toBe(true)
+    expect(datos.team.at(-1)).toMatchObject({ email: 'ana@club.pe', role: 'admin', status: 'invitado' })
+
+    await crear().inviteMember({ email: 'Luis@Club.pe', role: 'coach' })
+    expect(setDoc).toHaveBeenCalledWith('invites/luis@club.pe', expect.objectContaining({ orgId: 'org-a', invitedBy: 'u1', status: 'pendiente' }))
   })
 
   it('guarda solo los campos que permiten las reglas', async () => {

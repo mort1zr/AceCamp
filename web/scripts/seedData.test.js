@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   BACKHANDS,
   DOMINANT_HANDS,
+  INVITE_STATUS,
   MATCH_STATS_VERSION,
   MATCH_STATUS,
   PLAYER_CATEGORIES,
@@ -11,6 +12,7 @@ import {
   isIsoDate,
   isMatchStatus,
 } from '../src/panel/lib/schema.js'
+import { PLANES } from '../src/panel/lib/planes.js'
 import { buildSeedData } from './seedData.mjs'
 
 const data = buildSeedData()
@@ -92,8 +94,30 @@ describe('datos de ejemplo de Firestore', () => {
     }
   })
 
+  it('planes válidos: contratados con periodo y fecha, y una organización sin plan (PCIT-158)', () => {
+    for (const { doc } of data.orgs) {
+      expect(Object.keys(PLANES)).toContain(doc.plan)
+      if (doc.plan === 'free') continue
+      expect(['mensual', 'anual']).toContain(doc.billingCycle)
+      expect(doc.planSince).toBeInstanceOf(Date)
+    }
+    expect(data.orgs.some(org => org.doc.plan === 'free')).toBe(true)
+  })
+
+  it('invitaciones pendientes con el correo como ID, de un dueño y a alguien sin cuenta (PCIT-40)', () => {
+    expect(data.invites.length).toBeGreaterThan(0)
+    for (const { id, doc } of data.invites) {
+      expect(id).toBe(doc.email)
+      expect(id).toBe(id.toLowerCase())
+      expect(doc.status).toBe(INVITE_STATUS.pending)
+      expect(ROLES).toContain(doc.role)
+      expect(data.orgs.find(org => org.id === doc.orgId)?.doc.ownerId).toBe(doc.invitedBy)
+      expect(data.users.some(user => user.email === doc.email)).toBe(false)
+    }
+  })
+
   it('IDs únicos en cada colección', () => {
-    for (const name of ['orgs', 'players', 'matches', 'applications']) {
+    for (const name of ['orgs', 'players', 'matches', 'applications', 'invites']) {
       const ids = data[name].map(item => item.id)
       expect(new Set(ids).size).toBe(ids.length)
     }

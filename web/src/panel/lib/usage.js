@@ -18,6 +18,17 @@ export function quotaReached(used, limit) {
   return limit != null && (used ?? 0) >= limit
 }
 
+/** Análisis que quedan en el mes; null = sin tope. */
+export function remainingAnalyses(used, limit) {
+  return limit == null ? null : Math.max(0, limit - (used ?? 0))
+}
+
+/** Quedan pocos análisis: el último 20 % del plan, y como mínimo los 3 últimos. */
+export function quotaLow(used, limit) {
+  const quedan = remainingAnalyses(used, limit)
+  return quedan != null && quedan > 0 && quedan <= Math.max(3, Math.ceil(limit * 0.2))
+}
+
 export function limitError(used, limit) {
   return Object.assign(new Error('Plan limit reached'), { code: LIMIT_ERROR_CODE, used, limit })
 }

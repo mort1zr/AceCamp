@@ -9,7 +9,9 @@ import {
   where,
 } from 'firebase/firestore'
 
-import { PLANES } from '../planes.js'
+import { anularInvitacion, invitarMiembro } from '../invitaciones.js'
+import { PLANES, proximaRenovacion } from '../planes.js'
+import { INVITE_STATUS } from '../schema.js'
 import { usagePeriod, usageRef } from '../usage.js'
 
 export { PLANES }
@@ -48,6 +50,7 @@ export function createFirestoreConfiguracionService({
         usuario: null,
         organizacion: null,
         miembros: [],
+        invitaciones: [],
         jugadores: [],
         uso: {},
       }
@@ -69,23 +72,72 @@ export function createFirestoreConfiguracionService({
             name: estado.organizacion.name ?? '',
             program: estado.organizacion.program ?? '',
             canEdit: estado.organizacion.ownerId === uid,
+            // Invitan el dueño y los administradores (PCIT-40), igual que en las reglas.
+            canInvite: puedeInvitar(),
           },
-          team: estado.miembros
-            .map((miembro) => ({
-              id: miembro.id,
-              name: miembro.displayName ?? miembro.email ?? '',
-              email: miembro.email ?? '',
-              role: miembro.role ?? 'coach',
-              players: estado.jugadores.filter((jugador) => jugador.createdBy === miembro.id)
-                .length,
-              status: 'activo',
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name, 'es')),
+          team: [
+            ...estado.miembros
+              .map((miembro) => ({
+                id: miembro.id,
+                name: miembro.displayName ?? miembro.email ?? '',
+                email: miembro.email ?? '',
+                role: miembro.role ?? 'coach',
+                players: estado.jugadores.filter((jugador) => jugador.createdBy === miembro.id)
+                  .length,
+                status: 'activo',
+              }))
+              .sort((a, b) => a.name.localeCompare(b.name, 'es')),
+            ...estado.invitaciones
+              .map((invitacion) => ({
+                id: `invite:${invitacion.id}`,
+                name: invitacion.email ?? invitacion.id,
+                email: invitacion.email ?? invitacion.id,
+                role: invitacion.role ?? 'coach',
+                players: 0,
+                status: 'invitado',
+              }))
+              .sort((a, b) => a.email.localeCompare(b.email, 'es')),
+          ],
           preferences: leerPreferencias(clavePreferencias),
-          plan: { id: plan.id, trial: plan.prueba, used: usados, limit: plan.limite },
+          plan: {
+            id: plan.id,
+            trial: plan.prueba,
+            used: usados,
+            limit: plan.limite,
+            // Periodo y renovación guardados por el checkout (PCIT-158).
+            cycle: estado.organizacion.billingCycle ?? null,
+            renewsAt:
+              proximaRenovacion(
+                {
+                  plan: estado.organizacion.plan,
+                  planSince: estado.organizacion.planSince?.toDate?.() ?? estado.organizacion.planSince,
+                  billingCycle: estado.organizacion.billingCycle,
+                },
+                ahora(),
+              )?.toISOString() ?? null,
+          },
         })
       }
       avisos.add(emitir)
+
+      const puedeInvitar = () => role === 'admin' || estado.organizacion?.ownerId === uid
+      // Las invitaciones solo se escuchan si las reglas dejan leerlas (dueño o admin).
+      let detenerInvitaciones = null
+      const escucharInvitaciones = () => {
+        if (detenerInvitaciones || !puedeInvitar()) return
+        detenerInvitaciones = onSnapshot(
+          query(
+            collection(db, 'invites'),
+            where('orgId', '==', orgId),
+            where('status', '==', INVITE_STATUS.pending),
+          ),
+          (instantanea) => {
+            estado.invitaciones = instantanea.docs.map((documento) => ({ ...documento.data(), id: documento.id }))
+            emitir()
+          },
+          onError,
+        )
+      }
 
       const escuchar = (referencia, clave, lista = false) =>
         onSnapshot(
@@ -96,6 +148,7 @@ export function createFirestoreConfiguracionService({
               : instantanea.exists()
                 ? instantanea.data()
                 : {}
+            if (clave === 'organizacion') escucharInvitaciones()
             emitir()
           },
           onError,
@@ -115,6 +168,7 @@ export function createFirestoreConfiguracionService({
       return () => {
         avisos.delete(emitir)
         detener.forEach((parar) => parar())
+        detenerInvitaciones?.()
       }
     },
     async saveAccount({ name, position }) {
@@ -139,6 +193,12 @@ export function createFirestoreConfiguracionService({
         program: program || null,
         updatedAt: serverTimestamp(),
       })
+    },
+    inviteMember({ email, role: rolInvitado = 'coach' }) {
+      return invitarMiembro({ db, orgId, uid, email, role: rolInvitado })
+    },
+    cancelInvite({ email }) {
+      return anularInvitacion({ db, email })
     },
     async savePreferences(preferencias) {
       localStorage.setItem(clavePreferencias, JSON.stringify(preferencias))

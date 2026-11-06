@@ -63,9 +63,19 @@ export function buildSeedData() {
       doc: { email: 'coach2@acecam.test', displayName: 'Coach Paredes', orgId: orgClub, role: 'coach', jobTitle: null, createdAt: day('2026-10-05') } },
   ]
 
+  // Universidad Demo ya contrató Ultra en el checkout (PCIT-158): panel completo y Equipo.
+  // Club Ejemplo sigue sin plan, para mostrar el panel bloqueado y el checkout.
   const orgs = [
-    { id: orgDemo, doc: { name: 'Universidad Demo', ownerId: coach, program: 'Tenis', plan: 'free', createdAt: day('2026-10-01') } },
+    { id: orgDemo, doc: { name: 'Universidad Demo', ownerId: coach, program: 'Tenis', plan: 'ultra',
+      billingCycle: 'anual', planSince: day('2026-10-01'), createdAt: day('2026-10-01') } },
     { id: orgClub, doc: { name: 'Club Ejemplo', ownerId: coach2, program: null, plan: 'free', createdAt: day('2026-10-05') } },
+  ]
+
+  // Invitación pendiente en Universidad Demo (PCIT-40): regístrate con ese correo
+  // desde /registro?invitacion=asistente%40acecam.test para unirte al equipo.
+  const invites = [
+    { id: 'asistente@acecam.test', doc: { email: 'asistente@acecam.test', orgId: orgDemo, role: 'coach',
+      status: 'pendiente', invitedBy: coach, createdAt: day('2026-11-02') } },
   ]
 
   const player = (id, orgId, createdBy, fields) => ({
@@ -183,5 +193,5 @@ export function buildSeedData() {
     counter.doc = { analyses: counter.doc.analyses + 1, lastMatchId: id, updatedAt: doc.createdAt }
   }
 
-  return { users, orgs, players, matches, applications, usage }
+  return { users, orgs, players, matches, applications, usage, invites }
 }

@@ -30,6 +30,7 @@ procesado sigue siendo de escritura exclusiva del worker. Ver
 | `players` | Admin: su organización; coach: propios | Con `orgId` de su organización, `createdBy` propio y consentimiento aceptado | Admin: su organización; coach: propios. Nunca `orgId`, `createdBy` ni `consent` | Admin: su organización; coach: propios |
 | `matches` | Admin: su organización; coach: propios | En `'en cola'`, sin estadísticas, con un jugador accesible por rol y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola`, dentro del alcance por rol | Dentro del alcance por rol, salvo si está `procesando` |
 | `matches/{matchId}/coachNotes/{uid}` | Nota propia por ID, en un partido Listo accesible | Nota propia con texto y fecha de servidor | Solo su propia nota | Solo su propia nota |
+| `invites/{correo}` | Dueño o admin: las de su organización. Invitado: solo la suya | Dueño o admin, `pendiente`, para su organización (PCIT-40) | Solo la persona invitada la pasa a `aceptada`, junto con su ficha en `users` | Dueño o admin, mientras esté `pendiente` |
 | `applications` | De su organización | Por ahora solo con sesión (el formulario público llega en PCIT-54) | Estado y notas | De su organización |
 
 El worker usa el Admin SDK, que no pasa por las reglas: es el único que escribe
@@ -62,6 +63,7 @@ orgs/{orgId}                Universidad, club o academia
 players/{playerId}          Jugadores de una organización          · orgId
 matches/{matchId}           Partidos subidos y sus estadísticas    · orgId, playerId
 applications/{appId}        Postulaciones de reclutamiento         · orgId
+invites/{correo}            Invitaciones a una organización        · orgId (PCIT-40)
 ```
 
 Ruta del video en Storage (PCIT-24): `orgs/{orgId}/matches/{matchId}/video.{mp4|mov}`.
@@ -334,3 +336,20 @@ cd web && npm run seed
 El script **se niega a correr contra el proyecto real**: solo funciona con los
 emuladores y el proyecto `demo-acecam`. Para ver los datos sin emuladores:
 `npm run seed -- --dry-run`.
+
+## `invites/{correo}` (PCIT-40)
+
+Invitación para unirse a una organización. El ID es el correo invitado en
+minúsculas, así quien se registra la encuentra sin listar las de otros.
+Detalle del flujo: `docs/PCIT-40-invitar-miembros.md`.
+
+| Campo | Tipo | Obligatorio | Notas |
+| --- | --- | --- | --- |
+| `email` | string | sí | Igual al ID |
+| `orgId` | string | sí | Organización que invita |
+| `role` | string | sí | `'coach'` o `'admin'`: el rol con el que entra |
+| `status` | string | sí | `'pendiente'` o `'aceptada'` |
+| `invitedBy` | string | sí | `uid` de quien invita (dueño o admin) |
+| `createdAt` | Timestamp | sí | |
+| `acceptedBy` | string | no | `uid` de la cuenta que la aceptó |
+| `acceptedAt` | Timestamp | no | |

@@ -22,6 +22,11 @@ describe('validateRegistration', () => {
     expect(Object.keys(errors).sort()).toEqual(['email', 'name', 'orgName', 'password'])
     expect(errors.password).toContain('6 caracteres')
   })
+
+  it('con invitación no pide el nombre de la organización (PCIT-40)', () => {
+    expect(validateRegistration({ ...valid, orgName: '', invited: true })).toEqual({})
+    expect(validateRegistration({ ...valid, orgName: '' })).toHaveProperty('orgName')
+  })
 })
 
 describe('validateLogin', () => {
@@ -39,6 +44,7 @@ describe('authErrorMessage', () => {
     expect(authErrorMessage({ code: 'auth/user-not-found' })).toBe('No existe una cuenta con ese correo.')
     expect(authErrorMessage({ code: 'auth/email-already-in-use' })).toContain('Ya existe una cuenta')
     expect(authErrorMessage({ code: 'auth/too-many-requests' })).toContain('Demasiados intentos')
+    expect(authErrorMessage({ code: 'invite/not-found' })).toContain('No encontramos una invitación')
   })
 
   it('no muestra errores técnicos desconocidos', () => {

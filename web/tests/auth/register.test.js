@@ -6,6 +6,7 @@ import { connectAuthEmulator, getAuth } from 'firebase/auth'
 import { connectFirestoreEmulator, doc, getDoc, getFirestore } from 'firebase/firestore'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createAuthService } from '../../src/panel/lib/auth.js'
+import { invitarMiembro } from '../../src/panel/lib/invitaciones.js'
 
 const PROJECT = process.env.ACECAM_RULES_PROJECT || 'demo-acecam'
 const HOST = '127.0.0.1'
@@ -56,5 +57,31 @@ describe('registro con las reglas reales', () => {
     await service.logout()
     await expect(service.registerCoach(account)).rejects.toMatchObject({ code: 'auth/email-already-in-use' })
     await expect(service.login({ email: account.email, password: 'mala-clave' })).rejects.toHaveProperty('code')
+  })
+})
+
+describe('registro con invitación (PCIT-40)', () => {
+  it('la persona invitada se une a la organización con el rol de la invitación', async () => {
+    const { user: owner } = await service.login({ email: account.email, password: account.password })
+    const { orgId } = (await getDoc(doc(db, 'users', owner.uid))).data()
+    await invitarMiembro({ db, orgId, uid: owner.uid, email: 'Invitada@Club.test', role: 'coach' })
+    await service.logout()
+
+    const invitada = { name: 'Coach Invitada', email: 'invitada@club.test', password: 'acecam123', invited: true }
+    const result = await service.registerCoach(invitada)
+    expect(result).toMatchObject({ orgId, joined: true })
+    const profile = (await getDoc(doc(db, 'users', result.user.uid))).data()
+    expect(profile).toMatchObject({ email: 'invitada@club.test', orgId, role: 'coach' })
+    const invite = (await getDoc(doc(db, 'invites', 'invitada@club.test'))).data()
+    expect(invite).toMatchObject({ status: 'aceptada', acceptedBy: result.user.uid })
+  })
+
+  it('con el enlace de invitación pero sin invitación, falla y no deja la cuenta a medias', async () => {
+    await service.logout()
+    const sinInvitacion = { name: 'Sin Invitación', email: 'sininvitacion@club.test', password: 'acecam123', invited: true }
+    await expect(service.registerCoach(sinInvitacion)).rejects.toMatchObject({ code: 'invite/not-found' })
+    expect(auth.currentUser).toBeNull()
+    // La cuenta se borró: puede registrarse con su propia organización.
+    await expect(service.registerCoach({ ...sinInvitacion, invited: false, orgName: 'Club Propio' })).resolves.toMatchObject({ joined: false })
   })
 })

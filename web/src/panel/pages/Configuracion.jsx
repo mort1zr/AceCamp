@@ -1,10 +1,12 @@
 import { useId, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import Avatar from '../components/Avatar.jsx'
+import BotonVerContrasena from '../components/BotonVerContrasena.jsx'
 import { ErrorState, LoadingState } from '../components/ui'
 import { useAvatar } from '../hooks/useAvatar.js'
 import { useConfiguracion } from '../hooks/useConfiguracion.js'
 import { useUnidades } from '../hooks/useUnidades.js'
+import { enlaceInvitacion } from '../lib/invitaciones.js'
 import { guardarUnidades } from '../lib/unidades.js'
 import { useIdioma } from '../../compartido/lib/idioma.jsx'
 import { usePlanVista } from '../context/PlanVistaContext.js'
@@ -65,8 +67,18 @@ const textos = {
     invitar: 'Invitar por correo',
     invitarPlaceholder: 'correo@universidad.edu',
     enviarInvitacion: 'Enviar invitación',
-    invitacionEnviada: 'Invitación enviada.',
+    invitacionEnviada: 'Invitación creada.',
     invitacionesPronto: 'Las invitaciones estarán disponibles muy pronto.',
+    soloInvitan: 'Solo quien creó la organización o un administrador puede invitar.',
+    compartirEnlace: 'Comparte este enlace para que se registre con ese correo y se una a tu equipo:',
+    copiarEnlace: 'Copiar enlace',
+    enlaceCopiado: 'Enlace copiado',
+    invitacionExiste: 'Ese correo ya tiene una invitación o no se puede invitar.',
+    yaEsMiembro: 'Esa persona ya es parte de tu equipo.',
+    yaInvitado: 'Ese correo ya tiene una invitación pendiente. Anúlala para invitarlo con otro rol.',
+    anular: 'Anular',
+    anularInvitacion: (correo) => `Anular la invitación a ${correo}`,
+    invitacionAnulada: 'Invitación anulada.',
     correoInvalido: 'Escribe un correo válido.',
     miembro: 'Miembro',
     jugadoresACargo: 'Jugadores a cargo',
@@ -98,6 +110,8 @@ const textos = {
       'Con Ultra tu organización tiene su propio espacio e invitas a todo tu cuerpo técnico.',
     conocerUltra: 'Conocer Ultra',
     renueva: (fecha) => `Se renueva el ${fecha}`,
+    pruebaTermina: (fecha) => `La prueba termina el ${fecha}`,
+    ciclos: { mensual: 'Pago mensual', anual: 'Pago anual' },
     planes: [
       { id: 'basico', nombre: 'Básico', detalle: 'Para jugadores y padres. Hasta 2 jugadores.' },
       {
@@ -165,8 +179,18 @@ const textos = {
     invitar: 'Invite by email',
     invitarPlaceholder: 'email@university.edu',
     enviarInvitacion: 'Send invitation',
-    invitacionEnviada: 'Invitation sent.',
+    invitacionEnviada: 'Invitation created.',
     invitacionesPronto: 'Invitations will be available very soon.',
+    soloInvitan: 'Only the organization creator or an administrator can invite.',
+    compartirEnlace: 'Share this link so they sign up with that email and join your team:',
+    copiarEnlace: 'Copy link',
+    enlaceCopiado: 'Link copied',
+    invitacionExiste: 'That email already has an invitation or cannot be invited.',
+    yaEsMiembro: 'That person is already on your team.',
+    yaInvitado: 'That email already has a pending invitation. Cancel it to invite them with another role.',
+    anular: 'Cancel',
+    anularInvitacion: (correo) => `Cancel the invitation to ${correo}`,
+    invitacionAnulada: 'Invitation cancelled.',
     correoInvalido: 'Enter a valid email.',
     miembro: 'Member',
     jugadoresACargo: 'Players in charge',
@@ -198,6 +222,8 @@ const textos = {
       'With Ultra your organization gets its own space and you invite your whole coaching staff.',
     conocerUltra: 'Discover Ultra',
     renueva: (fecha) => `Renews on ${fecha}`,
+    pruebaTermina: (fecha) => `Trial ends on ${fecha}`,
+    ciclos: { mensual: 'Billed monthly', anual: 'Billed yearly' },
     planes: [
       { id: 'basico', nombre: 'Basic', detalle: 'For players and parents. Up to 2 players.' },
       { id: 'pro', nombre: 'Pro', detalle: 'For coaches and recruiters. Up to 24 players.' },
@@ -314,6 +340,9 @@ function Contrasena({ t, service, onCerrar }) {
   }
 
   const cambiar = (clave) => (evento) => setValores({ ...valores, [clave]: evento.target.value })
+  // Cada contraseña tiene su propio ojo para ver lo que se escribió.
+  const [visibles, setVisibles] = useState({})
+  const alternar = (clave) => setVisibles((actual) => ({ ...actual, [clave]: !actual[clave] }))
 
   return (
     <form
@@ -328,18 +357,25 @@ function Contrasena({ t, service, onCerrar }) {
           ['nueva', t.contrasenaNueva, 'new-password'],
           ['repetir', t.contrasenaRepetir, 'new-password'],
         ].map(([clave, texto, autocompletar]) => (
-          <label key={clave} htmlFor={`${id}-${clave}`} className={campo}>
-            {texto}
-            <input
-              id={`${id}-${clave}`}
-              type="password"
-              autoComplete={autocompletar}
-              required
-              value={valores[clave]}
-              onChange={cambiar(clave)}
-              className={entrada}
-            />
-          </label>
+          <div key={clave} className={campo}>
+            <label htmlFor={`${id}-${clave}`}>{texto}</label>
+            <div className="relative">
+              <input
+                id={`${id}-${clave}`}
+                type={visibles[clave] ? 'text' : 'password'}
+                autoComplete={autocompletar}
+                required
+                value={valores[clave]}
+                onChange={cambiar(clave)}
+                className={`${entrada} w-full pr-11`}
+              />
+              <BotonVerContrasena
+                visible={Boolean(visibles[clave])}
+                onCambiar={() => alternar(clave)}
+                controla={`${id}-${clave}`}
+              />
+            </div>
+          </div>
         ))}
       </div>
       {error && (
@@ -553,23 +589,56 @@ function Organizacion({ t, datos, service, bloqueado }) {
   )
 }
 
-function Equipo({ t, miembros, service, bloqueado }) {
+function Equipo({ t, miembros, service, bloqueado, puedeInvitar = true }) {
   const id = useId()
   const [correo, setCorreo] = useState('')
   const [rol, setRol] = useState('coach')
+  const [enlace, setEnlace] = useState('')
+  const [copiado, setCopiado] = useState(false)
   const { estado, setEstado, ocupado, guardar } = useGuardar(t)
   const sinInvitaciones = !service?.inviteMember
 
   const enviar = async (evento) => {
     evento.preventDefault()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim())) {
+    const invitado = correo.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(invitado)) {
       return setEstado({ tipo: 'error', texto: t.correoInvalido })
     }
+    // Antes de escribir: ¿ya está en el equipo o ya tiene invitación? (PCIT-40)
+    const existente = miembros.find((miembro) => miembro.email?.toLowerCase() === invitado.toLowerCase())
+    if (existente) {
+      setEnlace('')
+      return setEstado({ tipo: 'error', texto: existente.status === 'invitado' ? t.yaInvitado : t.yaEsMiembro })
+    }
+    setEnlace('')
+    setCopiado(false)
+    let creada = false
     await guardar(
-      () => service.inviteMember({ email: correo.trim(), role: rol }),
+      async () => {
+        await service.inviteMember({ email: invitado, role: rol })
+        creada = true
+      },
       t.invitacionEnviada,
+      (error) => (error?.code === 'permission-denied' ? t.invitacionExiste : undefined),
     )
+    if (!creada) return
+    setEnlace(enlaceInvitacion(window.location.origin, invitado))
     setCorreo('')
+  }
+
+  const puedeAnular = puedeInvitar && !bloqueado && Boolean(service?.cancelInvite)
+  const anular = (email) => {
+    setEnlace('')
+    return guardar(() => service.cancelInvite({ email }), t.invitacionAnulada)
+  }
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(enlace)
+      setCopiado(true)
+    } catch {
+      setCopiado(false)
+    }
   }
 
   return (
@@ -579,7 +648,7 @@ function Equipo({ t, miembros, service, bloqueado }) {
       </h2>
       <form noValidate onSubmit={enviar}>
         <fieldset
-          disabled={bloqueado || ocupado || sinInvitaciones}
+          disabled={bloqueado || ocupado || sinInvitaciones || !puedeInvitar}
           className="flex min-w-0 flex-col gap-2"
         >
           <div className="flex flex-wrap items-end gap-2.5">
@@ -612,8 +681,21 @@ function Equipo({ t, miembros, service, bloqueado }) {
           </div>
           {sinInvitaciones && !bloqueado ? (
             <p className="text-[13px] text-muted">{t.invitacionesPronto}</p>
+          ) : !puedeInvitar && !bloqueado ? (
+            <p className="text-[13px] text-muted">{t.soloInvitan}</p>
           ) : (
             <Mensaje estado={estado} />
+          )}
+          {enlace && (
+            <div className="flex flex-col gap-1.5 text-[13px]">
+              <span className="text-muted">{t.compartirEnlace}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <code className="min-w-0 flex-1 truncate rounded-md bg-chip px-2.5 py-1.5">{enlace}</code>
+                <button type="button" onClick={copiar} className="rounded-md border border-line2 px-2.5 py-1.5 font-semibold">
+                  {copiado ? t.enlaceCopiado : t.copiarEnlace}
+                </button>
+              </div>
+            </div>
           )}
         </fieldset>
       </form>
@@ -682,6 +764,17 @@ function Equipo({ t, miembros, service, bloqueado }) {
                       />
                       {t.estados[miembro.status] ?? miembro.status}
                     </span>
+                    {miembro.status === 'invitado' && puedeAnular && (
+                      <button
+                        type="button"
+                        disabled={ocupado}
+                        onClick={() => anular(miembro.email)}
+                        aria-label={t.anularInvitacion(miembro.email)}
+                        className="ml-2 text-xs font-semibold text-muted underline-offset-2 hover:text-text hover:underline"
+                      >
+                        {t.anular}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -806,9 +899,16 @@ function Plan({ t, plan, locale, esOrganizacion }) {
   const tieneUso = typeof plan?.used === 'number'
   const renovacion =
     plan?.renewsAt &&
-    new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+    new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
       new Date(plan.renewsAt),
     )
+  // PCIT-158: periodo y renovación del plan contratado; en la prueba, cuándo termina.
+  const facturacion = [
+    !plan?.trial && plan?.cycle ? t.ciclos[plan.cycle] : null,
+    renovacion ? (plan?.trial ? t.pruebaTermina(renovacion) : t.renueva(renovacion)) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <section className={`${tarjeta} flex flex-col gap-4.5`} aria-labelledby={`${id}-titulo`}>
@@ -827,6 +927,7 @@ function Plan({ t, plan, locale, esOrganizacion }) {
             )}
           </p>
           <p className="mt-1 text-sm text-muted">{actual ? actual.detalle : t.sinPlanTexto}</p>
+          {facturacion && <p className="mt-1 text-xs text-muted">{facturacion}</p>}
         </div>
         {tieneUso && !plan.limit ? (
           <span className="text-sm">{t.usadosSinLimite(plan.used)}</span>
@@ -846,7 +947,6 @@ function Plan({ t, plan, locale, esOrganizacion }) {
                 style={{ width: `${porcentaje}%` }}
               />
             </div>
-            {renovacion && <span className="text-xs text-muted">{t.renueva(renovacion)}</span>}
           </div>
         ) : (
           <Link to="/inicio" className={botonPrincipal}>
@@ -912,7 +1012,15 @@ function Contenido({ seccion, t, datos, service, bloqueado, locale, esOrganizaci
       <Organizacion t={t} datos={datos?.organization} service={service} bloqueado={bloqueado} />
     )
   if (seccion === 'equipo')
-    return <Equipo t={t} miembros={datos?.team ?? []} service={service} bloqueado={bloqueado} />
+    return (
+      <Equipo
+        t={t}
+        miembros={datos?.team ?? []}
+        service={service}
+        bloqueado={bloqueado}
+        puedeInvitar={datos?.organization?.canInvite ?? true}
+      />
+    )
   if (seccion === 'preferencias')
     return <Preferencias t={t} datos={datos?.preferences} service={service} bloqueado={bloqueado} />
   return <Plan t={t} plan={datos?.plan} locale={locale} esOrganizacion={esOrganizacion} />

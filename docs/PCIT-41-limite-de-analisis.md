@@ -16,7 +16,8 @@ llegar al límite del plan no se pueden crear más análisis y la web lo avisa.
 | `ultra` | Sin tope |
 
 Los valores están en `web/src/panel/lib/planes.js` y en `withinPlan` de
-`firebase/firestore.rules`. Si cambian, hay que cambiar los dos.
+`firebase/firestore.rules`. Si cambian, hay que cambiar los dos:
+`planes.test.js` lee las reglas y falla si no coinciden.
 
 ## Cómo funciona
 
@@ -34,8 +35,9 @@ Los valores están en `web/src/panel/lib/planes.js` y en `withinPlan` de
   la transacción lo vuelve a revisar, por si otro entrenador usó el último
   análisis mientras se subía el video.
 - **Pantallas:** la barra lateral y Configuración → Plan leen el contador de la
-  organización (el mismo número para admin y coach). Analizar muestra un aviso y
-  desactiva el formulario cuando se llega al límite.
+  organización (el mismo número para admin y coach). En el último 20 % del plan
+  (como mínimo los 3 últimos análisis), Analizar avisa cuántos quedan sin bloquear
+  nada; al llegar al límite muestra otro aviso y desactiva el formulario.
 
 Reintentar un partido con `error` no suma; borrar un partido no devuelve el
 análisis. `npm run seed` carga el contador que corresponde a los partidos de
@@ -44,15 +46,18 @@ ejemplo.
 ## Pruebas
 
 - Unitarias: contador, límite antes de subir y en la transacción, mensajes,
-  aviso en Analizar, Configuración y datos de ejemplo.
+  avisos en Analizar (quedan pocos y límite alcanzado), Configuración, datos de
+  ejemplo y que los límites de la web coincidan con las reglas.
 - Reglas (`npm run test:rules`): suma de a uno, partido sin contador, contador sin
   partido, saltos, otro mes, otra organización, límites de `prueba`, `basico` y
   `pro`, sin plan, plan desconocido, Ultra sin tope y el contador compartido entre
   entrenadores.
 
-## Pendiente fuera de esta historia
+## Relación con otras historias
 
-- PCIT-158 guarda el plan pagado en el checkout. Mientras tanto, las cuentas
-  nuevas quedan en `free` (0 análisis), igual que el panel bloqueado de "Sin plan".
+- **PCIT-158** guarda el plan pagado en el checkout (`docs/PCIT-158-plan-del-checkout.md`).
+  Una cuenta nueva queda en `free` (0 análisis, panel bloqueado) hasta que paga.
 - El "plan de vista" local de la barra lateral cambia lo que se muestra, pero no el
   límite real, que siempre sale del plan guardado en Firestore.
+- `npm run seed`: Universidad Demo tiene Ultra (sin tope) y Club Ejemplo no tiene
+  plan, así se ven los dos casos.
