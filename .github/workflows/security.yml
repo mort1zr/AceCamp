@@ -57,7 +57,8 @@ jobs:
       # y se audita lo instalado, incluidas las dependencias indirectas.
       - name: Instalar el entorno del worker
         run: |
-          python -m pip install --upgrade pip
+          # pip y setuptools vienen con el Python del runner: se actualizan para no auditar herramientas viejas.
+          python -m pip install --upgrade pip setuptools
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1 torchvision==0.20.1
           pip install -r model/requirements-worker.txt -r model/requirements-dev.txt
           pip install pip-audit==2.10.1
