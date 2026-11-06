@@ -82,6 +82,13 @@ describe('Configuración', () => {
     montar(createDemoConfiguracionService())
     await user.click(await screen.findByRole('button', { name: 'Cambiar contraseña' }))
     await user.type(screen.getByLabelText('Contraseña actual'), 'otra-clave')
+    // Cada campo tiene su ojo para ver lo escrito.
+    expect(screen.getAllByRole('button', { name: 'Mostrar contraseña' })).toHaveLength(3)
+    await user.click(screen.getAllByRole('button', { name: 'Mostrar contraseña' })[0])
+    expect(screen.getByLabelText('Contraseña actual').getAttribute('type')).toBe('text')
+    expect(screen.getByLabelText('Nueva contraseña').getAttribute('type')).toBe('password')
+    await user.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+    expect(screen.getByLabelText('Contraseña actual').getAttribute('type')).toBe('password')
     await user.type(screen.getByLabelText('Nueva contraseña'), 'corta')
     await user.type(screen.getByLabelText('Repite la nueva contraseña'), 'corta')
     await user.click(screen.getByRole('button', { name: 'Actualizar contraseña' }))

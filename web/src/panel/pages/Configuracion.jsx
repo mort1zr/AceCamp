@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import Avatar from '../components/Avatar.jsx'
+import BotonVerContrasena from '../components/BotonVerContrasena.jsx'
 import { ErrorState, LoadingState } from '../components/ui'
 import { useAvatar } from '../hooks/useAvatar.js'
 import { useConfiguracion } from '../hooks/useConfiguracion.js'
@@ -339,6 +340,9 @@ function Contrasena({ t, service, onCerrar }) {
   }
 
   const cambiar = (clave) => (evento) => setValores({ ...valores, [clave]: evento.target.value })
+  // Cada contraseña tiene su propio ojo para ver lo que se escribió.
+  const [visibles, setVisibles] = useState({})
+  const alternar = (clave) => setVisibles((actual) => ({ ...actual, [clave]: !actual[clave] }))
 
   return (
     <form
@@ -353,18 +357,25 @@ function Contrasena({ t, service, onCerrar }) {
           ['nueva', t.contrasenaNueva, 'new-password'],
           ['repetir', t.contrasenaRepetir, 'new-password'],
         ].map(([clave, texto, autocompletar]) => (
-          <label key={clave} htmlFor={`${id}-${clave}`} className={campo}>
-            {texto}
-            <input
-              id={`${id}-${clave}`}
-              type="password"
-              autoComplete={autocompletar}
-              required
-              value={valores[clave]}
-              onChange={cambiar(clave)}
-              className={entrada}
-            />
-          </label>
+          <div key={clave} className={campo}>
+            <label htmlFor={`${id}-${clave}`}>{texto}</label>
+            <div className="relative">
+              <input
+                id={`${id}-${clave}`}
+                type={visibles[clave] ? 'text' : 'password'}
+                autoComplete={autocompletar}
+                required
+                value={valores[clave]}
+                onChange={cambiar(clave)}
+                className={`${entrada} w-full pr-11`}
+              />
+              <BotonVerContrasena
+                visible={Boolean(visibles[clave])}
+                onCambiar={() => alternar(clave)}
+                controla={`${id}-${clave}`}
+              />
+            </div>
+          </div>
         ))}
       </div>
       {error && (
