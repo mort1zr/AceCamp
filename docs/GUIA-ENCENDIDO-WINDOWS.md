@@ -284,6 +284,7 @@ Consulta [PCIT-41](PCIT-41-limite-de-analisis.md) para el detalle del contador.
 | Procesando sin cambios visibles | Revisa el progreso en la terminal Python; la barra en la web aún es un pendiente de PCIT-159. |
 | No existe el video | Un dato de ejemplo puede apuntar a un archivo que nunca se subió. Prueba una carga nueva. |
 | Falta un `.pt` o `.pth` | Ejecuta `scripts/download_models.py --no-video` con el Python del worker. |
+| `sha256 ... no coincide` | El archivo no es el original: no lo uses. Vuelve a descargarlo con `scripts/download_models.py --no-video --force`; si se repite, avisa al equipo (PCIT-166). |
 | Error de FFmpeg | Comprueba que instalaste `requirements-worker.txt` en ese mismo entorno; incluye `imageio-ffmpeg`. |
 | Ya hice pull pero usa el modelo anterior | Detén y vuelve a iniciar el worker. |
 | npm run demo falla pidiendo ffprobe/yt-dlp | Ese comando enciende la API opcional de enlaces. Para archivos locales usa el arranque de esta guía. |

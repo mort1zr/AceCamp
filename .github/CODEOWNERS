@@ -1,0 +1,23 @@
+# Revisión obligatoria en los archivos sensibles (PCIT-167).
+# Se aplica cuando main exige "Require review from Code Owners" (ver docs/devsecops.md).
+
+# Pipeline, Dependabot y scripts de la CI
+/.github/                         @mort1zr
+
+# Reglas e índices de Firebase y configuración de Hosting (CSP y cabeceras)
+/firebase/                        @mort1zr
+/firebase.json                    @mort1zr
+/.firebaserc                      @mort1zr
+
+# Dependencias
+/model/requirements*.txt          @mort1zr
+/web/package.json                 @mort1zr
+/web/package-lock.json            @mort1zr
+
+# Hooks locales y verificación de los modelos
+/.pre-commit-config.yaml          @mort1zr
+/model/scripts/download_models.py @mort1zr
+
+# Política de seguridad
+/SECURITY.md                      @mort1zr
+/docs/devsecops.md                @mort1zr
