@@ -1,6 +1,6 @@
 # Dependencias del modelo. Python 3.11.
 # Versiones fijadas: cambiarlas solo con una PR que pase la CI.
-ultralytics==8.4.190
+ultralytics==8.4.198
 # Lo usa el seguimiento de jugadores de Ultralytics (model.track); si falta, lo instala solo a mitad de la ejecución.
 lap==0.5.13
 # En Colab (Python 3.13) estas dos no existen: el notebook usa las que trae Colab.
