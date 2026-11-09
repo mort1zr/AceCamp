@@ -64,11 +64,13 @@ export function buildSeedData() {
   ]
 
   // Universidad Demo ya contrató Ultra en el checkout (PCIT-158): panel completo y Equipo.
-  // Club Ejemplo sigue sin plan, para mostrar el panel bloqueado y el checkout.
+  // Club Ejemplo usó la prueba de Básico y se le venció (PCIT-173): muestra el panel
+  // bloqueado como Sin plan y un checkout que ya no ofrece la prueba gratis.
   const orgs = [
     { id: orgDemo, doc: { name: 'Universidad Demo', ownerId: coach, program: 'Tenis', plan: 'ultra',
       billingCycle: 'anual', planSince: day('2026-10-01'), createdAt: day('2026-10-01') } },
-    { id: orgClub, doc: { name: 'Club Ejemplo', ownerId: coach2, program: null, plan: 'free', createdAt: day('2026-10-05') } },
+    { id: orgClub, doc: { name: 'Club Ejemplo', ownerId: coach2, program: null, plan: 'prueba',
+      billingCycle: 'mensual', planSince: day('2026-10-05'), createdAt: day('2026-10-05') } },
   ]
 
   // Invitación pendiente en Universidad Demo (PCIT-40): regístrate con ese correo

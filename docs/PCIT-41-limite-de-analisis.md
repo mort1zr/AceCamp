@@ -10,7 +10,7 @@ llegar al límite del plan no se pueden crear más análisis y la web lo avisa.
 | Plan (`orgs/{orgId}.plan`) | Análisis por mes |
 | --- | --- |
 | `free` (sin plan) | 0 |
-| `prueba` (Básico de prueba) | 15 |
+| `prueba` (Básico de prueba, 30 días; vencida = 0) | 15 |
 | `basico` | 30 |
 | `pro` | 150 |
 | `ultra` | Sin tope |
@@ -59,5 +59,7 @@ ejemplo.
   Una cuenta nueva queda en `free` (0 análisis, panel bloqueado) hasta que paga.
 - El "plan de vista" local de la barra lateral cambia lo que se muestra, pero no el
   límite real, que siempre sale del plan guardado en Firestore.
-- `npm run seed`: Universidad Demo tiene Ultra (sin tope) y Club Ejemplo no tiene
-  plan, así se ven los dos casos.
+- `npm run seed`: Universidad Demo tiene Ultra (sin tope) y Club Ejemplo tiene la
+  prueba de Básico vencida (0 análisis, panel bloqueado), así se ven los dos casos.
+- La prueba vence a los 30 días desde `planSince` (PCIT-170 en la web, PCIT-171 en
+  las reglas): `trialExpired` en `firestore.rules` y `planVigente` en `planes.js`.

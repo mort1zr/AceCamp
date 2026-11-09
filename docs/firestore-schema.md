@@ -95,7 +95,7 @@ Se crea en el registro, junto con el usuario (PCIT-21).
 | `program` | string \| null | no | Ej. "Tenis varones" |
 | `plan` | string | sí | `'free'` (sin plan) al registrarse. `'prueba'`, `'basico'`, `'pro'` o `'ultra'` fijan los análisis por mes (PCIT-41, `docs/PCIT-41-limite-de-analisis.md`) |
 | `billingCycle` | string | no | `'mensual'` o `'anual'`, el periodo elegido en el checkout (PCIT-158) |
-| `planSince` | Timestamp | no | Inicio o renovación del plan, hora del servidor. Sin este campo, Básico entra como `'prueba'` (una sola vez) |
+| `planSince` | Timestamp | no | Inicio o renovación del plan, hora del servidor. Sin este campo, Básico entra como `'prueba'` (una sola vez). La prueba vence 30 días después de `planSince` y la organización vuelve a contar como sin plan (PCIT-170, PCIT-171) |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
 
@@ -331,7 +331,7 @@ cd web && npm run seed
 | Usuario | Contraseña | Organización |
 | --- | --- | --- |
 | `coach@acecam.test` | `acecam123` | Universidad Demo |
-| `coach2@acecam.test` | `acecam123` | Club Ejemplo |
+| `coach2@acecam.test` | `acecam123` | Club Ejemplo (prueba de Básico vencida: panel bloqueado) |
 
 El script **se niega a correr contra el proyecto real**: solo funciona con los
 emuladores y el proyecto `demo-acecam`. Para ver los datos sin emuladores:
