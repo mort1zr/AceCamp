@@ -9,6 +9,7 @@ import Icon from '../../landing/components/Icon.jsx'
 import { Field } from '../components/AuthForm.jsx'
 import { useAuth } from '../context/AuthContext.js'
 import { useEntrada } from '../context/EntradaContext.js'
+import { usePruebaDisponible } from '../hooks/usePruebaDisponible.js'
 import {
   formatearNumero,
   formatearVencimiento,
@@ -191,7 +192,7 @@ function Pasos({ t, paso }) {
   )
 }
 
-function ElegirPlan({ t, plan, onPlan, periodo, onPeriodo }) {
+function ElegirPlan({ t, plan, onPlan, periodo, onPeriodo, conPrueba }) {
   const id = useId()
   return (
     <section className={tarjeta} aria-labelledby={`${id}-plan`}>
@@ -251,7 +252,7 @@ function ElegirPlan({ t, plan, onPlan, periodo, onPeriodo }) {
                 </span>
               </span>
               <span className="text-[13px] leading-snug text-muted">{opcion.para}</span>
-              {clave === 'basico' && (
+              {clave === 'basico' && conPrueba && (
                 <span className="mt-1 self-start rounded-full bg-electric/15 px-2 py-0.5 text-[11px] font-semibold text-electric-ink">
                   {t.prueba}
                 </span>
@@ -332,9 +333,10 @@ function Pago({ t, valores, errores, onCambio, bloqueado }) {
   )
 }
 
-function Resumen({ t, plan, periodo, procesando }) {
+function Resumen({ t, plan, periodo, procesando, conPrueba }) {
   const opcion = t.planes[plan]
-  const prueba = plan === 'basico'
+  // Solo se ofrece la prueba si la organización todavía no la usó (PCIT-172).
+  const prueba = plan === 'basico' && conPrueba
   const porPeriodo = periodo === 'anual' ? t.porAnio : t.porMes
   return (
     <aside className={`${tarjeta} flex flex-col gap-5 lg:sticky lg:top-20`}>
@@ -450,7 +452,7 @@ function Confirmacion({ t, plan, periodo, ultimos, prueba }) {
   )
 }
 
-export default function Checkout({ contratar = async () => {} }) {
+export default function Checkout({ contratar = async () => {}, db, session }) {
   const { user, loading } = useAuth()
   const location = useLocation()
   const entrada = useEntrada()
@@ -464,6 +466,8 @@ export default function Checkout({ contratar = async () => {} }) {
   const [errores, setErrores] = useState({})
   const [procesando, setProcesando] = useState(false)
   const [listo, setListo] = useState(null)
+  // null mientras carga: se muestra la prueba, que es el caso de una cuenta nueva.
+  const pruebaDisponible = usePruebaDisponible(db, session?.orgId)
   const [fallo, setFallo] = useState(false)
 
   useEffect(() => {
@@ -515,7 +519,7 @@ export default function Checkout({ contratar = async () => {} }) {
       return
     }
     // Básico es mes de prueba solo la primera vez (PCIT-158).
-    const prueba = guardado ? guardado === 'prueba' : plan === 'basico'
+    const prueba = guardado ? guardado === 'prueba' : plan === 'basico' && pruebaDisponible !== false
     setListo({ ultimos: soloDigitos(valores.numero).slice(-4), prueba })
     setValores(VACIA)
     setProcesando(false)
@@ -564,6 +568,7 @@ export default function Checkout({ contratar = async () => {} }) {
             <div className="grid items-start gap-5 lg:grid-cols-[1fr_380px]">
               <form id="checkout-pago" className="flex flex-col gap-5" onSubmit={pagar} noValidate>
                 <ElegirPlan
+                  conPrueba={pruebaDisponible !== false}
                   t={t}
                   plan={plan}
                   onPlan={(valor) => cambiarParametro('plan', valor)}
@@ -583,7 +588,13 @@ export default function Checkout({ contratar = async () => {} }) {
                   </p>
                 )}
               </form>
-              <Resumen t={t} plan={plan} periodo={periodo} procesando={procesando} />
+              <Resumen
+                t={t}
+                plan={plan}
+                periodo={periodo}
+                procesando={procesando}
+                conPrueba={pruebaDisponible !== false}
+              />
             </div>
           )}
         </div>

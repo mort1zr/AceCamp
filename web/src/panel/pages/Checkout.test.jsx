@@ -3,15 +3,18 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { useAuth } from '../context/AuthContext.js'
+import { usePruebaDisponible } from '../hooks/usePruebaDisponible.js'
 import Checkout from './Checkout.jsx'
 
 vi.mock('../context/AuthContext.js', () => ({ useAuth: vi.fn() }))
+vi.mock('../hooks/usePruebaDisponible.js', () => ({ usePruebaDisponible: vi.fn() }))
 vi.mock('../../compartido/components/ControlsPill.jsx', () => ({ default: () => null }))
 vi.mock('../../compartido/hooks/useAterrizaje.js', () => ({ useAterrizaje: () => ({}) }))
 vi.mock('../../compartido/lib/idioma.jsx', () => ({ useIdioma: () => ({ idioma: 'es' }), useTextos: t => t.es }))
 
 beforeEach(() => {
   useAuth.mockReturnValue({ user: { uid: 'u1' }, profile: { orgId: 'org-1' }, loading: false })
+  usePruebaDisponible.mockReturnValue(true)
   window.scrollTo = vi.fn()
 })
 afterEach(cleanup)
@@ -45,4 +48,19 @@ it('si no se puede guardar el plan, avisa y deja reintentar', async () => {
   pagar(vi.fn().mockRejectedValue(new Error('permission-denied')))
   expect((await screen.findByRole('alert', {}, { timeout: 3000 })).textContent).toContain('No pudimos activar el plan')
   expect(screen.queryByText(/está activo/)).toBeNull()
+})
+
+it('Básico ofrece la prueba gratis a una organización que todavía no la usó (PCIT-172)', () => {
+  render(<MemoryRouter initialEntries={['/checkout?plan=basico']}><Checkout session={{ orgId: 'org-1' }} /></MemoryRouter>)
+  expect(usePruebaDisponible).toHaveBeenCalledWith(undefined, 'org-1')
+  expect(screen.getAllByText('1 mes de prueba gratis').length).toBeGreaterThan(0)
+  expect(screen.getByRole('button', { name: /Empezar prueba gratis/ })).toBeTruthy()
+})
+
+it('Básico se cobra sin prueba si la organización ya contrató antes (PCIT-172)', () => {
+  usePruebaDisponible.mockReturnValue(false)
+  render(<MemoryRouter initialEntries={['/checkout?plan=basico']}><Checkout session={{ orgId: 'org-1' }} /></MemoryRouter>)
+  expect(screen.queryByText('1 mes de prueba gratis')).toBeNull()
+  expect(screen.queryByRole('button', { name: /Empezar prueba gratis/ })).toBeNull()
+  expect(screen.getByRole('button', { name: /Pagar y activar/ })).toBeTruthy()
 })
