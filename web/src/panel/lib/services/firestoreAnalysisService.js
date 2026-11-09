@@ -2,9 +2,11 @@ import { collection, doc, getDoc, onSnapshot, query, runTransaction, serverTimes
 import { analysisSignature, hashAnalysisSignature, normalizedMatch, throwIfAborted, validateAnalysis } from '../analysis.js'
 import { limitError, nextUsage, planLimit, quotaReached, usageRef } from '../usage.js'
 import { isStorageVideoPath } from '../videoImportProtocol.js'
+import { planVigente } from '../planes.js'
 
 function checkQuota(org, counter) {
-  const limit = planLimit(org.exists() ? org.data().plan : null)
+  // Una prueba vencida no tiene análisis (PCIT-170), igual que withinPlan en las reglas.
+  const limit = planLimit(org.exists() ? planVigente(org.data()) : null)
   const used = counter.exists() ? counter.data().analyses : 0
   if (quotaReached(used, limit)) throw limitError(used, limit)
 }

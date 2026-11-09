@@ -37,6 +37,18 @@ describe('Configuración', () => {
     expect(linea.textContent).toContain('2027')
   })
 
+  it('con la prueba vencida avisa cuándo terminó (PCIT-170)', async () => {
+    montar(
+      createDemoConfiguracionService({
+        plan: { id: 'ninguno', trial: false, used: 3, limit: 0, cycle: null, renewsAt: null, trialEndedAt: '2026-10-31T12:00:00.000Z' },
+      }),
+      '/configuracion?seccion=plan',
+    )
+    const aviso = await screen.findByText(/Tu mes de prueba terminó el/)
+    expect(aviso.textContent).toContain('2026')
+    expect(screen.getAllByRole('link', { name: 'Elegir plan' }).length).toBeGreaterThan(0)
+  })
+
   it('cambia de pestaña y la refleja en la URL', async () => {
     const user = userEvent.setup()
     montar(createDemoConfiguracionService())

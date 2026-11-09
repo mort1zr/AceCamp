@@ -111,6 +111,7 @@ const textos = {
     conocerUltra: 'Conocer Ultra',
     renueva: (fecha) => `Se renueva el ${fecha}`,
     pruebaTermina: (fecha) => `La prueba termina el ${fecha}`,
+    pruebaTermino: (fecha) => `Tu mes de prueba terminó el ${fecha}. Elige un plan para seguir analizando partidos.`,
     ciclos: { mensual: 'Pago mensual', anual: 'Pago anual' },
     planes: [
       { id: 'basico', nombre: 'Básico', detalle: 'Para jugadores y padres. Hasta 2 jugadores.' },
@@ -223,6 +224,7 @@ const textos = {
     conocerUltra: 'Discover Ultra',
     renueva: (fecha) => `Renews on ${fecha}`,
     pruebaTermina: (fecha) => `Trial ends on ${fecha}`,
+    pruebaTermino: (fecha) => `Your trial ended on ${fecha}. Choose a plan to keep analyzing matches.`,
     ciclos: { mensual: 'Billed monthly', anual: 'Billed yearly' },
     planes: [
       { id: 'basico', nombre: 'Basic', detalle: 'For players and parents. Up to 2 players.' },
@@ -902,6 +904,12 @@ function Plan({ t, plan, locale, esOrganizacion }) {
     new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
       new Date(plan.renewsAt),
     )
+  // PCIT-170: si la prueba ya venció, cuándo terminó.
+  const terminoPrueba =
+    plan?.trialEndedAt &&
+    new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+      new Date(plan.trialEndedAt),
+    )
   // PCIT-158: periodo y renovación del plan contratado; en la prueba, cuándo termina.
   const facturacion = [
     !plan?.trial && plan?.cycle ? t.ciclos[plan.cycle] : null,
@@ -926,7 +934,9 @@ function Plan({ t, plan, locale, esOrganizacion }) {
               </span>
             )}
           </p>
-          <p className="mt-1 text-sm text-muted">{actual ? actual.detalle : t.sinPlanTexto}</p>
+          <p className="mt-1 text-sm text-muted">
+            {actual ? actual.detalle : terminoPrueba ? t.pruebaTermino(terminoPrueba) : t.sinPlanTexto}
+          </p>
           {facturacion && <p className="mt-1 text-xs text-muted">{facturacion}</p>}
         </div>
         {tieneUso && !plan.limit ? (

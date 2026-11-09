@@ -1,6 +1,6 @@
 import { doc, onSnapshot } from 'firebase/firestore'
 import { useEffect, useState } from 'react'
-import { PLANES } from '../lib/planes.js'
+import { PLANES, planVigente } from '../lib/planes.js'
 import { usageRef } from '../lib/usage.js'
 
 // Plan de la organización y análisis usados en el mes (PCIT-41).
@@ -14,7 +14,8 @@ export function usePlanOrganizacion(db, orgId) {
     if (!db || !orgId) return undefined
     const detenerPlan = onSnapshot(
       doc(db, 'orgs', orgId),
-      (instantanea) => setPlan(PLANES[instantanea.data()?.plan] ?? PLANES.free),
+      // Con la prueba vencida cuenta como Sin plan (PCIT-170).
+      (instantanea) => setPlan(PLANES[planVigente(instantanea.data())]),
       () => setPlan(null),
     )
     const detenerUso = onSnapshot(

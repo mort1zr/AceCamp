@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { PLANES, proximaRenovacion } from './planes.js'
+import { DIAS_PRUEBA, finDePrueba, PLANES, planVigente, proximaRenovacion, pruebaVencida } from './planes.js'
 
 const reglas = readFileSync(fileURLToPath(new URL('../../../../firebase/firestore.rules', import.meta.url)), 'utf8')
 
@@ -59,5 +59,34 @@ describe('proximaRenovacion (PCIT-158)', () => {
     expect(proximaRenovacion({ plan: 'pro', planSince: null })).toBeNull()
     expect(proximaRenovacion({ plan: 'inventado', planSince: inicio })).toBeNull()
     expect(proximaRenovacion({ plan: 'pro', planSince: 'no-es-fecha' })).toBeNull()
+  })
+})
+
+describe('vencimiento de la prueba (PCIT-170)', () => {
+  const inicio = new Date('2026-11-05T15:00:00Z')
+  const dia = (n) => new Date(inicio.getTime() + n * 24 * 60 * 60 * 1000)
+
+  it('la prueba dura 30 días desde planSince', () => {
+    expect(DIAS_PRUEBA).toBe(30)
+    expect(finDePrueba(inicio).toISOString()).toBe('2026-12-05T15:00:00.000Z')
+    expect(finDePrueba({ toDate: () => inicio }).toISOString()).toBe('2026-12-05T15:00:00.000Z')
+    expect(finDePrueba(null)).toBeNull()
+  })
+
+  it('vigente hasta el último instante; vencida desde el día 30', () => {
+    const org = { plan: 'prueba', planSince: inicio }
+    expect(planVigente(org, dia(29))).toBe('prueba')
+    expect(planVigente(org, dia(30))).toBe('free')
+    expect(pruebaVencida(org, dia(29))).toBe(false)
+    expect(pruebaVencida(org, dia(45))).toBe(true)
+  })
+
+  it('los demás planes no vencen; sin fecha la prueba sigue; lo desconocido es free', () => {
+    expect(planVigente({ plan: 'pro', planSince: inicio }, dia(400))).toBe('pro')
+    expect(planVigente({ plan: 'basico', planSince: inicio }, dia(400))).toBe('basico')
+    expect(planVigente({ plan: 'prueba' }, dia(400))).toBe('prueba')
+    expect(planVigente({ plan: 'inventado' })).toBe('free')
+    expect(planVigente(undefined)).toBe('free')
+    expect(pruebaVencida({ plan: 'pro', planSince: inicio }, dia(400))).toBe(false)
   })
 })

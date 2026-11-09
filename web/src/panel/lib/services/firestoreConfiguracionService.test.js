@@ -68,7 +68,7 @@ describe('Servicio de Configuración con Firestore', () => {
     emitir('players?org', lista([{ id: 'p1', createdBy: 'u1' }]))
     emitir('orgs/org-a', documento({ name: 'Universidad Demo', plan: 'free', ownerId: 'u1' }))
     // Sin contador todavía: 0 análisis este mes.
-    expect(recibir.mock.calls.at(-1)[0].plan).toEqual({ id: 'ninguno', trial: false, used: 0, limit: 0, cycle: null, renewsAt: null })
+    expect(recibir.mock.calls.at(-1)[0].plan).toEqual({ id: 'ninguno', trial: false, used: 0, limit: 0, cycle: null, renewsAt: null, trialEndedAt: null })
     // El uso es el contador de la organización del mes, no los partidos visibles (PCIT-41).
     expect(onSnapshot.mock.calls.some(([ref]) => ref === 'matches?org')).toBe(false)
     emitir('orgs/org-a/usage/2026-11', documento({ analyses: 7, lastMatchId: 'm7' }))
@@ -76,7 +76,7 @@ describe('Servicio de Configuración con Firestore', () => {
     const datos = recibir.mock.calls.at(-1)[0]
     expect(datos.account).toMatchObject({ name: 'Coach', email: 'coach@acecam.test' })
     expect(datos.organization).toMatchObject({ name: 'Universidad Demo', canEdit: true })
-    expect(datos.plan).toEqual({ id: 'basico', trial: true, used: 7, limit: 15, cycle: null, renewsAt: null })
+    expect(datos.plan).toEqual({ id: 'basico', trial: true, used: 7, limit: 15, cycle: null, renewsAt: null, trialEndedAt: null })
     // PCIT-158: con plan contratado, periodo y fecha de renovación.
     emitir('orgs/org-a', documento({ name: 'Universidad Demo', plan: 'pro', ownerId: 'u1', billingCycle: 'mensual',
       planSince: { toDate: () => new Date('2026-10-20T12:00:00Z') } }))
@@ -103,6 +103,23 @@ describe('Servicio de Configuración con Firestore', () => {
 
     await crear().inviteMember({ email: 'Luis@Club.pe', role: 'coach' })
     expect(setDoc).toHaveBeenCalledWith('invites/luis@club.pe', expect.objectContaining({ orgId: 'org-a', invitedBy: 'u1', status: 'pendiente' }))
+  })
+
+  it('con la prueba vencida muestra Sin plan y cuándo terminó (PCIT-170)', () => {
+    const recibir = vi.fn()
+    crear().subscribe(recibir, vi.fn())
+    emitir('users/u1', documento({ displayName: 'Coach', role: 'coach' }))
+    emitir('users?org', lista([{ id: 'u1', displayName: 'Coach', role: 'coach' }]))
+    // ahora = 15 de noviembre de 2026; la prueba empezó el 1 de octubre (vence el 31).
+    emitir('orgs/org-a', documento({ name: 'Club', plan: 'prueba', ownerId: 'u1', billingCycle: 'mensual',
+      planSince: { toDate: () => new Date('2026-10-01T12:00:00Z') } }))
+    expect(recibir.mock.calls.at(-1)[0].plan).toEqual({
+      id: 'ninguno', trial: false, used: 0, limit: 0, cycle: null, renewsAt: null, trialEndedAt: '2026-10-31T12:00:00.000Z',
+    })
+    // Prueba vigente: sigue como Básico de prueba, con su fecha de fin.
+    emitir('orgs/org-a', documento({ name: 'Club', plan: 'prueba', ownerId: 'u1', billingCycle: 'mensual',
+      planSince: { toDate: () => new Date('2026-11-10T12:00:00Z') } }))
+    expect(recibir.mock.calls.at(-1)[0].plan).toMatchObject({ id: 'basico', trial: true, limit: 15, trialEndedAt: null, renewsAt: '2026-12-10T12:00:00.000Z' })
   })
 
   it('guarda solo los campos que permiten las reglas', async () => {
