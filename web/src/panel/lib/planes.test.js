@@ -30,6 +30,11 @@ describe('planes de la web y de las reglas', () => {
     expect(PLANES.free.limite).toBe(0)
   })
 
+  it('la prueba dura lo mismo en la web y en las reglas (PCIT-171)', () => {
+    const dias = Number(funcion('trialExpired').match(/duration\.value\((\d+), 'd'\)/)[1])
+    expect(dias).toBe(DIAS_PRUEBA)
+  })
+
   it('el checkout solo puede guardar planes que existen en PLANES (PCIT-158)', () => {
     const lista = reglas.match(/request\.resource\.data\.plan in \[([^\]]*)\]/)[1]
     const permitidos = [...lista.matchAll(/'(\w+)'/g)].map(([, plan]) => plan)

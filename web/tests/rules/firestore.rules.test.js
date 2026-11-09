@@ -11,6 +11,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -456,6 +457,22 @@ describe('uso mensual de análisis (PCIT-41)', () => {
       const db = context.firestore()
       await updateDoc(doc(db, 'orgs', ORG), { plan })
       if (analyses != null) await setDoc(usageDoc(db), { analyses, lastMatchId: 'previo', updatedAt: new Date() })
+    })
+
+    it('la prueba de Básico vence a los 30 días; sin fecha sigue vigente (PCIT-171)', async () => {
+      const hace = dias => new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+      const prueba = planSince => env.withSecurityRulesDisabled(context =>
+        updateDoc(doc(context.firestore(), 'orgs', ORG), { plan: 'prueba', billingCycle: 'mensual', planSince }))
+      await prueba(hace(29))
+      await assertSucceeds(createMatch(coachDb(), 'm-vigente'))
+      await prueba(hace(31))
+      await assertFails(createMatch(coachDb(), 'm-vencida'))
+      // Después de vencida, contratar Básico normal vuelve a permitir análisis.
+      await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'orgs', ORG), { plan: 'basico' }))
+      await assertSucceeds(createMatch(coachDb(), 'm-basico'))
+      // Una prueba cargada a mano, sin planSince, no vence.
+      await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'orgs', ORG), { plan: 'prueba', planSince: deleteField() }))
+      await assertSucceeds(createMatch(coachDb(), 'm-sin-fecha'))
     })
 
     it('permite llegar justo al límite y niega el siguiente análisis', async () => {

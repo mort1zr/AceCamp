@@ -59,13 +59,23 @@ service cloud.firestore {
       return /databases/$(database)/documents/matches/$(matchId);
     }
 
+    // La prueba de Básico dura 30 días desde planSince (DIAS_PRUEBA en planes.js, PCIT-171).
+    // Vencida, la organización no tiene análisis, como "Sin plan". Sin planSince sigue vigente.
+    function trialExpired(org) {
+      return org.get('plan', 'free') == 'prueba'
+        && org.get('planSince', null) is timestamp
+        && request.time >= org.planSince + duration.value(30, 'd');
+    }
+
     // Análisis por mes según orgs/{orgId}.plan. Mismos valores que PLANES en
     // web/src/panel/lib/planes.js: cambiar ambos a la vez (lo comprueba planes.test.js).
     // 'free' (sin plan) y cualquier valor desconocido no permiten análisis; 'ultra' no tiene tope.
     function withinPlan(orgId, analyses) {
-      let plan = get(/databases/$(database)/documents/orgs/$(orgId)).data.get('plan', 'free');
-      return plan == 'ultra'
-        || analyses <= {'prueba': 15, 'basico': 30, 'pro': 150}.get(plan, 0);
+      let org = get(/databases/$(database)/documents/orgs/$(orgId)).data;
+      let plan = org.get('plan', 'free');
+      return !trialExpired(org)
+        && (plan == 'ultra'
+          || analyses <= {'prueba': 15, 'basico': 30, 'pro': 150}.get(plan, 0));
     }
 
     // El partido nuevo suma exactamente uno al contador del mes, en la misma escritura.
