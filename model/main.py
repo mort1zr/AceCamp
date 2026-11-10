@@ -212,6 +212,7 @@ def run_pipeline(config, render=True):
         "main_camera_segments": main_segments,
         # Informe del partido (TA-30): lo escribe main() en --report-dir.
         "report": build_report(analysis, video_info.fps, video=input_video_path.name),
+        "positions": analysis["positions"],
     }
     if not render:
         return result
@@ -316,8 +317,9 @@ def main(argv=None):
         stats_path.parent.mkdir(parents=True, exist_ok=True)
         stats_path.write_text(json.dumps(result["model_statistics"], indent=2, ensure_ascii=False))
         print(f"Estadísticas guardadas en {stats_path}")
-    report_dir = write_report(result["report"], resolve_path(config["paths"]["report_dir"]))
-    print(f"Informe del partido en {report_dir} (report.json, points.csv, bounces.csv)")
+    report_dir = write_report(result["report"], resolve_path(config["paths"]["report_dir"]),
+                              positions=result["positions"])
+    print(f"Informe del partido en {report_dir} (report.json, points.csv, bounces.csv, positions.csv)")
     return result
 
 

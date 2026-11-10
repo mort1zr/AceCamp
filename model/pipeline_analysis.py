@@ -19,6 +19,7 @@ from events import (
     locate_bounces,
 )
 from mini_court import MiniCourt
+from report.positions import position_rows
 from scoreboard import load_corrections, review_list, score_points
 from stats import add_serve_and_rally_stats, build_model_statistics, measure_shots, renumber_far_near
 
@@ -87,4 +88,6 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
         "serves": serves,
         "points": points,
         "match": match,
+        # Posiciones de los jugadores durante los puntos, con punto, juego y set (TA-32).
+        "positions": position_rows(player_court_positions, points, fps, main_camera),
     }

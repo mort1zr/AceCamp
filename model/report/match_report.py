@@ -6,7 +6,8 @@ dice el informe coincide con lo que muestra el marcador del vídeo.
 Archivos (en la carpeta del informe, --report-dir):
 - report.json: todo el informe (esquema REPORT_VERSION, ver build_report);
 - points.csv: una fila por punto (POINT_COLUMNS);
-- bounces.csv: una fila por bote, con su posición y cantada (BOUNCE_COLUMNS, TA-25).
+- bounces.csv: una fila por bote, con su posición y cantada (BOUNCE_COLUMNS, TA-25);
+- positions.csv: posición de cada jugador en cada fotograma de juego (TA-32).
 
 El JSON del worker (matches.statistics) sigue siendo el resumen por jugador de
 stats.to_match_statistics, que ahora incluye el marcador y los puntos ganados (ver
@@ -20,6 +21,8 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+
+from .positions import POSITION_COLUMNS
 
 REPORT_VERSION = "acecam.match-report.v1"
 POINT_COLUMNS = (
@@ -156,13 +159,16 @@ def write_csv(path, rows, columns):
         writer.writerows(rows)
 
 
-def write_report(report, out_dir):
-    """Escribe report.json y points.csv en out_dir. Devuelve la carpeta."""
+def write_report(report, out_dir, positions=None):
+    """Escribe report.json, points.csv y bounces.csv en out_dir; con positions, también
+    positions.csv (TA-32). Devuelve la carpeta."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     write_csv(out_dir / "points.csv", report["points"], POINT_COLUMNS)
     write_csv(out_dir / "bounces.csv", report["bounces"], BOUNCE_COLUMNS)
+    if positions is not None:
+        write_csv(out_dir / "positions.csv", positions, POSITION_COLUMNS)
     return out_dir
 
 
