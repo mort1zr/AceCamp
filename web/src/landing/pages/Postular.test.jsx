@@ -89,6 +89,23 @@ describe('Formulario público de postulación', () => {
     expect(addDoc).not.toHaveBeenCalled()
   })
 
+  it('ignora en silencio un envío con el campo trampa lleno (PCIT-185)', async () => {
+    const user = userEvent.setup()
+    getDocFromServer.mockResolvedValueOnce({ exists: () => true })
+    renderForm()
+    await fill(user, '2000-02-15')
+    await user.click(screen.getByRole('checkbox'))
+    const trampa = document.getElementById('website')
+    // Oculto para personas: fuera del orden del teclado y de los lectores de pantalla.
+    expect(trampa.tabIndex).toBe(-1)
+    expect(trampa.closest('[aria-hidden="true"]')).toBeTruthy()
+    expect(screen.queryByRole('textbox', { name: 'Sitio web' })).toBeNull()
+    fireEvent.change(trampa, { target: { value: 'https://spam.example' } })
+    await user.click(screen.getByRole('button', { name: 'Enviar postulación' }))
+    expect(await screen.findByText(/Recibimos tu postulación/)).toBeTruthy()
+    expect(addDoc).not.toHaveBeenCalled()
+  })
+
   it('oculta los campos cuando el enlace fue desactivado', async () => {
     getDocFromServer.mockRejectedValueOnce({ code: 'permission-denied' })
     renderForm()

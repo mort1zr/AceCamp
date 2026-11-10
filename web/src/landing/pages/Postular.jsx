@@ -22,6 +22,18 @@ const guardianFields = [
   ['guardianEmail', 'Correo del apoderado', 'email', { required: true, maxLength: 254 }],
 ]
 const inputClass = 'w-full rounded-lg border border-line bg-bg px-3 py-2 text-text'
+// PCIT-185: campo trampa (honeypot). Las personas no lo ven ni llegan a él con el
+// teclado ni con lector de pantalla; los bots que llenan todo lo completan.
+const TRAMPA = 'website'
+
+function CampoTrampa() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute -left-[9999px] h-px w-px overflow-hidden">
+      <label htmlFor={TRAMPA}>Sitio web</label>
+      <input id={TRAMPA} name={TRAMPA} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+    </div>
+  )
+}
 
 function Field({ definition: [name, label, type, options], error, onChange }) {
   return (
@@ -93,6 +105,14 @@ function Formulario({ orgId, formId }) {
     const file = videoEnabled ? form.elements.namedItem('video')?.files?.[0] : null
     const data = new FormData(form)
     data.delete('video')
+    // Un bot llenó el campo trampa: no se guarda nada y se muestra el mismo
+    // "recibido" que a una persona, para no darle pistas.
+    const trampa = String(data.get(TRAMPA) ?? '').trim()
+    data.delete(TRAMPA)
+    if (trampa) {
+      setSubmitted(true)
+      return
+    }
     const input = { ...Object.fromEntries(data), attachVideo: Boolean(file), consentAccepted: data.has('consent') }
     locked.current = true
     setSending(true)
@@ -163,7 +183,8 @@ function Formulario({ orgId, formId }) {
     </form>
   )
   return (
-    <form onSubmit={submit} aria-label="Formulario de postulación" aria-busy={sending}>
+    <form onSubmit={submit} aria-label="Formulario de postulación" aria-busy={sending} className="relative">
+      <CampoTrampa />
       <fieldset disabled={sending} className="grid gap-4 sm:grid-cols-2">
         {fields.map((definition) => (
           <Field key={definition[0]} definition={definition} error={errors[definition[0]]}
