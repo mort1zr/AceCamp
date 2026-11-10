@@ -434,6 +434,14 @@ service cloud.firestore {
     // ---------- applications/{applicationId} ----------
     // El formulario público (PCIT-54, sprint 3) tendrá su propia regla de alta.
 
+    function validApplicationTransition(from, to) {
+      return from == to
+        || (from == 'nueva' && to == 'en revisión')
+        || (from == 'en revisión' && to == 'analizada')
+        || (from == 'analizada' && to in ['contactada', 'descartada'])
+        || (from == 'contactada' && to == 'descartada');
+    }
+
     match /applications/{applicationId} {
       allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
       allow list: if inOrg(resource.data.orgId);
@@ -448,7 +456,8 @@ service cloud.firestore {
 
       allow update: if inOrg(resource.data.orgId)
         && unchanged(['orgId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email'])
-        && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada'];
+        && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada']
+        && validApplicationTransition(resource.data.status, request.resource.data.status);
 
       allow delete: if inOrg(resource.data.orgId);
     }

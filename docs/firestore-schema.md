@@ -312,6 +312,9 @@ de ser jugador del equipo.
 | `updatedAt` | Timestamp | no | |
 
 **Estados:** `nueva` → `en revisión` → `analizada` → `contactada` o `descartada`.
+También se puede descartar una postulación contactada. Las reglas rechazan
+saltos y retrocesos. La bandeja escribe el estado con una transacción y registra
+quién lo cambió y cuándo en `reviewedBy` y `updatedAt`.
 
 ---
 

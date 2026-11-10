@@ -523,4 +523,13 @@ describe('applications', () => {
     await assertFails(updateDoc(doc(coachDb(), 'applications', 'a-demo'), { status: 'aprobada' }))
     await assertFails(updateDoc(doc(coachDb(), 'applications', 'a-club'), { status: 'en revisión' }))
   })
+
+  it('impide saltar estados o reabrir una postulación descartada', async () => {
+    const ref = doc(coachDb(), 'applications', 'a-demo')
+    await assertFails(updateDoc(ref, { status: 'contactada' }))
+    await assertSucceeds(updateDoc(ref, { status: 'en revisión' }))
+    await assertSucceeds(updateDoc(ref, { status: 'analizada' }))
+    await assertSucceeds(updateDoc(ref, { status: 'descartada' }))
+    await assertFails(updateDoc(ref, { status: 'en revisión' }))
+  })
 })

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { collection, onSnapshot, query, runTransaction, where } from 'firebase/firestore'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlanVistaContexto } from '../context/PlanVistaContext.js'
@@ -12,6 +12,9 @@ vi.mock('firebase/firestore', () => ({
   where: vi.fn(() => 'org-filter'),
   query: vi.fn(() => 'org-applications'),
   onSnapshot: vi.fn(() => vi.fn()),
+  doc: vi.fn((_, collection, id) => `${collection}/${id}`),
+  runTransaction: vi.fn(),
+  serverTimestamp: vi.fn(() => 'server-time'),
 }))
 
 const db = { app: { options: { projectId: 'prueba' } } }
@@ -98,5 +101,42 @@ describe('Bandeja de reclutamiento', () => {
     rerender(page(session, 'basico'))
     expect(screen.getByRole('link', { name: 'Ver mi plan' })).toBeTruthy()
     expect(onSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('guarda una transición permitida y actualiza el estado desde Firestore', async () => {
+    const user = userEvent.setup()
+    const transaction = {
+      get: vi.fn(async () => application('1', 'Lucía Pérez', 'Lima', 'nueva')),
+      update: vi.fn(),
+    }
+    runTransaction.mockImplementationOnce((_, update) => update(transaction))
+    render(page())
+    publish(application('1', 'Lucía Pérez', 'Lima', 'nueva'))
+
+    const select = screen.getByLabelText('Nuevo estado de Lucía Pérez')
+    expect(within(select).getAllByRole('option').map((option) => option.value)).toEqual(['', 'en revisión'])
+    await user.selectOptions(select, 'en revisión')
+    await user.click(screen.getByRole('button', { name: 'Guardar estado de Lucía Pérez' }))
+    expect(await screen.findByText('Se guardó el estado de Lucía Pérez: en revisión.')).toBeTruthy()
+    expect(transaction.update).toHaveBeenCalledExactlyOnceWith('applications/1', {
+      status: 'en revisión', reviewedBy: session.uid, updatedAt: 'server-time',
+    })
+    publish(application('1', 'Lucía Pérez', 'Lima', 'en revisión'))
+    expect(screen.getByRole('cell', { name: 'En revisión' })).toBeTruthy()
+  })
+
+  it('avisa si alguien cambió el estado mientras se editaba y evita sobrescribirlo', async () => {
+    const user = userEvent.setup()
+    const transaction = {
+      get: vi.fn(async () => application('1', 'Lucía Pérez', 'Lima', 'analizada')),
+      update: vi.fn(),
+    }
+    runTransaction.mockImplementationOnce((_, update) => update(transaction))
+    render(page())
+    publish(application('1', 'Lucía Pérez', 'Lima', 'nueva'))
+    await user.selectOptions(screen.getByLabelText('Nuevo estado de Lucía Pérez'), 'en revisión')
+    await user.click(screen.getByRole('button', { name: 'Guardar estado de Lucía Pérez' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('cambió en otra sesión')
+    expect(transaction.update).not.toHaveBeenCalled()
   })
 })

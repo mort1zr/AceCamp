@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
 import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
+import { nextApplicationStates, updateApplicationStatus } from '../lib/applicationStatus.js'
 import { APPLICATION_STATUS, COLLECTIONS } from '../lib/schema.js'
 import './jugadores.css'
 
@@ -14,12 +15,53 @@ const columns = [
   { key: 'status', label: 'Estado', render: (status) => <StatusBadge status={status} /> },
 ]
 const normalize = (text) => String(text ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+const statusLabel = (state) => state[0].toUpperCase() + state.slice(1)
 
-function Bandeja({ db, orgId }) {
+function CambiarEstado({ application, onSave }) {
+  const [selection, setSelection] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const options = nextApplicationStates(application.status)
+  if (options.length === 0) return '—'
+  const selected = options.includes(selection) ? selection : ''
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!selected || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      await onSave(application, selected)
+      setSelection('')
+    } catch (error) {
+      setError(error.message === 'application/status-conflict'
+        ? 'La postulación cambió en otra sesión. Revisa el estado actual.'
+        : 'No se pudo guardar el estado. Inténtalo de nuevo.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="players-field" onSubmit={submit}>
+      <select aria-label={`Nuevo estado de ${application.fullName}`} value={selected} disabled={saving} onChange={(e) => setSelection(e.target.value)}>
+        <option value="">Cambiar estado</option>
+        {options.map((state) => <option key={state} value={state}>{statusLabel(state)}</option>)}
+      </select>
+      <button type="submit" className="players-button-secondary mt-2" disabled={!selected || saving} aria-label={`Guardar estado de ${application.fullName}`}>
+        {saving ? 'Guardando…' : 'Guardar'}
+      </button>
+      {error && <p className="players-field-error" role="alert">{error}</p>}
+    </form>
+  )
+}
+
+function Bandeja({ db, orgId, uid }) {
   const [result, setResult] = useState(null)
   const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     let active = true
@@ -52,6 +94,17 @@ function Bandeja({ db, orgId }) {
     (!status || row.status === status) &&
     [row.fullName, row.city].some((value) => normalize(value).includes(term)),
   )
+  async function saveStatus(application, nextStatus) {
+    setNotice('')
+    await updateApplicationStatus(db, { uid, orgId }, application, nextStatus)
+    setNotice(`Se guardó el estado de ${application.fullName}: ${nextStatus}.`)
+  }
+
+  const editableColumns = [...columns, {
+    key: 'action',
+    label: 'Cambiar estado',
+    render: (_, application) => <CambiarEstado application={application} onSave={saveStatus} />,
+  }]
   return (
     <>
       {rows.length > 0 && (
@@ -65,15 +118,16 @@ function Bandeja({ db, orgId }) {
             <select id="application-status" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">Todos los estados</option>
               {states.map((state) => (
-                <option key={state} value={state}>{state[0].toUpperCase() + state.slice(1)}</option>
+                <option key={state} value={state}>{statusLabel(state)}</option>
               ))}
             </select>
           </div>
         </div>
       )}
+      <p className="players-notice" role="status">{notice}</p>
       <DataTable
         caption="Bandeja de postulaciones"
-        columns={columns}
+        columns={editableColumns}
         rows={filtered}
         loading={!result}
         error={result?.error}
@@ -109,7 +163,7 @@ export default function Reclutamiento({ db, session }) {
           <Link to="/configuracion?seccion=plan">Ver mi plan</Link>
         </aside>
       ) : db && uid && orgId && ['coach', 'admin'].includes(role) ? (
-        <Bandeja key={JSON.stringify([db.app?.options?.projectId, uid, orgId, role])} db={db} orgId={orgId} />
+        <Bandeja key={JSON.stringify([db.app?.options?.projectId, uid, orgId, role])} db={db} orgId={orgId} uid={uid} />
       ) : (
         <p role="status">La bandeja se habilitará cuando tu sesión de equipo esté disponible.</p>
       )}
