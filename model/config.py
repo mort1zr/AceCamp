@@ -75,6 +75,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-video", action="store_true", help="no dibujar ni guardar el vídeo anotado (más rápido)")
     parser.add_argument("--match-config", help="match.yaml con el formato, el sacador y el marcador inicial (TA-29)")
     parser.add_argument("--report-dir", help="carpeta del informe del partido: report.json, points.csv... (TA-30)")
+    parser.add_argument("--heatmap-set", type=int, help="generar los mapas de calor solo de este set (TA-34)")
     parser.add_argument("--corrections", help="corrections.json con el ganador correcto de algunos puntos (TA-29)")
     return parser
 
@@ -103,6 +104,8 @@ def config_from_args(argv: list[str] | None = None) -> dict[str, Any]:
         overrides["match"] = match.get("match", match)  # con o sin la clave match:
     if args.report_dir:
         overrides["paths"]["report_dir"] = str(Path(args.report_dir).resolve())
+    if args.heatmap_set is not None:
+        overrides["heatmap_set"] = args.heatmap_set
     if args.corrections:
         overrides["paths"]["corrections"] = str(Path(args.corrections).resolve())
     return _merge(config, overrides)

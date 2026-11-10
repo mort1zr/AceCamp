@@ -12,6 +12,7 @@ from mini_court import MiniCourt
 from pipeline_analysis import analyze_detections
 from report import build_report, draw_scoreboard, scoreboard_states, serve_states, write_report
 from report.heatmap import write_heatmaps
+from report.html_report import write_html
 from stats import build_frame_states
 from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
 from utils import VideoWriter, get_video_info, iter_frames
@@ -321,9 +322,14 @@ def main(argv=None):
     report_dir = write_report(result["report"], resolve_path(config["paths"]["report_dir"]),
                               positions=result["positions"])
     print(f"Informe del partido en {report_dir} (report.json, points.csv, bounces.csv, positions.csv)")
-    # Mapas de calor de cada jugador (TA-33), con escala de color común.
-    maps = write_heatmaps(result["positions"], result["video_info"].fps, report_dir)
+    # Mapas de calor de cada jugador (TA-33) del partido y de cada set (TA-34; con --heatmap-set N,
+    # solo de ese set), con escala de color común, y el informe HTML con selector de jugador y set.
+    sets = sorted({row["set"] for row in result["positions"]})
+    if config.get("heatmap_set") is not None:
+        sets = [int(config["heatmap_set"])]
+    maps = write_heatmaps(result["positions"], result["video_info"].fps, report_dir, sets=sets)
     print(f"Mapas de calor: {', '.join(sorted(maps))}")
+    print(f"Informe HTML: {write_html(result['report'], maps, report_dir)}")
     return result
 
 
