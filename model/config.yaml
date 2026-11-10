@@ -58,3 +58,6 @@ worker:
   # Resolución mínima (lado corto, en píxeles): por debajo de 720p la pelota mide 2-3 px y el
   # modelo la pierde y la confunde con marcas de la pista. Recomendado: 1080p.
   min_resolution: 720
+  # Fotogramas por segundo admitidos por el worker (ambos extremos incluidos).
+  min_fps: 25
+  max_fps: 60

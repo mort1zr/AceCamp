@@ -17,8 +17,8 @@ store y storage son interfaces: en producción, Firestore y Cloud Storage
     storage.upload_processed(origen, ruta_storage) -> sube el MP4 privado
     analyze(ruta_local) -> AnalysisResult (estadísticas y MP4); admite también
         estadísticas sin vídeo para consumidores anteriores. Lanza VideoTooLongError si el vídeo
-        supera la duración máxima y VideoResolutionError si no llega a la resolución
-        mínima (las dos cosas se comprueban antes de analizarlo)
+        supera la duración máxima, VideoResolutionError si no llega a la resolución
+        mínima o VideoFrameRateError si no cumple el rango de FPS.
 """
 
 from __future__ import annotations
@@ -82,6 +82,18 @@ class VideoResolutionError(Exception):
     def __init__(self, width: int, height: int, min_short_side: int):
         super().__init__(f"el vídeo es de {width}x{height} y el mínimo es {min_short_side}p")
         self.width, self.height, self.min_short_side = width, height, min_short_side
+
+
+class VideoFrameRateError(Exception):
+    """El vídeo no informa de sus FPS o están fuera del rango admitido."""
+
+    def __init__(self, fps: float | None, min_fps: float, max_fps: float):
+        self.user_message = (
+            f"No se pudieron verificar los FPS del video. Expórtalo entre {min_fps:g} y {max_fps:g} FPS."
+            if fps is None else
+            f"El video debe tener entre {min_fps:g} y {max_fps:g} FPS. Grábalo o expórtalo dentro de ese rango."
+        )
+        super().__init__(self.user_message if fps is None else f"el vídeo tiene {fps:g} FPS. {self.user_message}")
 
 
 def message_low_resolution(min_short_side: int) -> str:
@@ -149,6 +161,10 @@ def process_match(match_id, match, store, storage, analyze, workdir: Path) -> st
         return "error"
     except VideoResolutionError as exc:
         store.mark_error(match_id, message_low_resolution(exc.min_short_side))
+        log.warning("%s: %s", match_id, exc)
+        return "error"
+    except VideoFrameRateError as exc:
+        store.mark_error(match_id, exc.user_message)
         log.warning("%s: %s", match_id, exc)
         return "error"
     except ProcessedVideoError:

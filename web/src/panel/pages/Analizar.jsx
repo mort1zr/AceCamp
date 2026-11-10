@@ -132,6 +132,9 @@ function AnalysisWorkspace({ service, playersService }) {
       render: (status, match) => (
         <>
           <StatusBadge status={status} />
+          {status === MATCH_STATUS.error && typeof match.errorMessage === 'string' && match.errorMessage.trim() && (
+            <p className="analysis-muted">{match.errorMessage}</p>
+          )}
           {status === MATCH_STATUS.processing && (
             <div className="analysis-processing">
               <div

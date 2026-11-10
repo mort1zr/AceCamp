@@ -29,7 +29,7 @@ DEFAULTS: dict[str, Any] = {
                   "ball_detector": "yolo"},
     "court": {"redetect_every_frames": 30, "smoothing": 0.3, "refine_keypoints": True},
     "cameras": {"detect_cuts": True, "max_shift_fraction": 0.08},
-    "worker": {"max_duration_seconds": 60, "min_resolution": 720},
+    "worker": {"max_duration_seconds": 60, "min_resolution": 720, "min_fps": 25, "max_fps": 60},
     "use_cache": False,
     "render_video": True,
 }

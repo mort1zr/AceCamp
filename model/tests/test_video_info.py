@@ -21,6 +21,7 @@ def test_reads_fps_resolution_and_frame_count(tmp_path, fps):
     info = get_video_info(path)
 
     assert info.fps == pytest.approx(fps)
+    assert info.fps_reported is True
     assert (info.width, info.height) == (64, 48)
     assert info.frame_count == fps * 2
     assert info.duration_seconds == pytest.approx(2.0)
@@ -47,3 +48,22 @@ def test_saved_video_keeps_the_input_fps(tmp_path):
 def test_unreadable_video_raises(tmp_path):
     with pytest.raises(ValueError):
         get_video_info(tmp_path / "no-existe.mp4")
+
+
+def test_fallback_fps_is_marked_as_unreported(tmp_path, monkeypatch):
+    class CaptureWithoutFps:
+        def isOpened(self):
+            return True
+
+        def get(self, prop):
+            return 0 if prop == cv2.CAP_PROP_FPS else 64
+
+        def release(self):
+            pass
+
+    monkeypatch.setattr(cv2, "VideoCapture", lambda path: CaptureWithoutFps())
+
+    with pytest.warns(UserWarning, match="no informa de sus fps"):
+        info = get_video_info(tmp_path / "sin-fps.mp4")
+    assert info.fps == 24
+    assert info.fps_reported is False

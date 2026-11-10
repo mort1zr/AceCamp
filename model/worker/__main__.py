@@ -29,7 +29,14 @@ from pathlib import Path
 
 from config import load_config
 
-from .processor import AnalysisResult, VideoResolutionError, VideoTooLongError, run_forever, run_once
+from .processor import (
+    AnalysisResult,
+    VideoFrameRateError,
+    VideoResolutionError,
+    VideoTooLongError,
+    run_forever,
+    run_once,
+)
 from .video import encode_browser_video
 
 DEFAULT_PROJECT_ID = "acecam-e93a2"
@@ -43,14 +50,20 @@ def make_analyzer(config_path=None, device=None, render_video=True):
     base = load_config(config_path)
     max_seconds = base["worker"]["max_duration_seconds"]
     min_short_side = base["worker"].get("min_resolution")
+    min_fps = base["worker"]["min_fps"]
+    max_fps = base["worker"]["max_fps"]
 
     def analyze(video_path: Path):
-        # Duración y resolución se leen de la cabecera del vídeo, sin cargar los fotogramas.
+        # Los metadatos se leen sin cargar los fotogramas.
         info = get_video_info(video_path)
+        if not info.fps_reported:
+            raise VideoFrameRateError(None, min_fps, max_fps)
         if max_seconds and info.duration_seconds > max_seconds:
             raise VideoTooLongError(info.duration_seconds, max_seconds)
         if min_short_side and min(info.width, info.height) < min_short_side:
             raise VideoResolutionError(info.width, info.height, min_short_side)
+        if not min_fps <= info.fps <= max_fps:
+            raise VideoFrameRateError(info.fps, min_fps, max_fps)
         config = {**base, "paths": {**base["paths"], "input": str(video_path),
                                   "output": str(video_path.parent / "annotated.avi")},
                   "detection": {**base["detection"], **({"device": device} if device else {})},

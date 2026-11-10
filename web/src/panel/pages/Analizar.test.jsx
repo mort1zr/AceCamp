@@ -86,9 +86,9 @@ describe('Analizar video v1', () => {
     const [receivePlayers, receiveMatches] = onSnapshot.mock.calls.slice(-2).map(([, receive]) => receive)
     const base = { orgId: 'equipo-1', createdBy: 'coach-1' }
     const player = { id: 'player-1', data: () => ({ ...base, fullName: 'Valeria Torres' }) }
-    const match = (id, opponent, status) => ({
+    const match = (id, opponent, status, errorMessage) => ({
       id,
-      data: () => ({ ...base, opponent, status, playerId: player.id, matchDate: '2026-01-01' }),
+      data: () => ({ ...base, opponent, status, errorMessage, playerId: player.id, matchDate: '2026-01-01' }),
     })
 
     act(() => {
@@ -103,10 +103,12 @@ describe('Analizar video v1', () => {
     expect(within(first.closest('tr')).getByText(/El modelo está analizando/)).toBeTruthy()
     expect(screen.getAllByRole('progressbar')).toHaveLength(2)
 
-    act(() => receiveMatches({ docs: [match('a', 'Rival A', 'listo'), match('b', 'Rival B', 'error')] }))
+    const fpsError = 'El video debe tener entre 25 y 60 FPS. Grábalo o expórtalo dentro de ese rango.'
+    act(() => receiveMatches({ docs: [match('a', 'Rival A', 'listo'), match('b', 'Rival B', 'error', fpsError)] }))
     expect(screen.queryByRole('progressbar')).toBeNull()
     expect(screen.getByRole('cell', { name: 'Listo' })).toBeTruthy()
-    expect(screen.getByRole('cell', { name: 'Error' })).toBeTruthy()
+    const errorCell = screen.getByRole('cell', { name: /Error El video debe tener/ })
+    expect(within(errorCell).getByText(fpsError)).toBeTruthy()
   })
 
   it('conserva el enlace y los datos si YouTube no ofrece un video público', async () => {
