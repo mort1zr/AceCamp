@@ -102,3 +102,25 @@ def test_simulated_match_serve_statistics_match_the_truth():
         real = min(match.serves, key=lambda s: abs(s["frame"] - measured["frame"]))
         errors.append(measured["speedKmh"] / real["speedKmh"] - 1)
     assert np.mean(np.abs(errors)) < 0.05
+
+
+def test_every_serve_speed_is_within_15_percent():
+    """Criterio de TA-20: < 15 % de diferencia en al menos 10 saques, cada uno por separado,
+    frente a la velocidad media real hasta el bote (la de la retransmisión convertida a media)."""
+    camera = BroadcastCamera()
+    homography = camera.homography()
+    errors = []
+    for seed in range(3):
+        match = simulate_match(8, seed=seed + 10, fault_points=(3,))
+        ball, players = render_detections(match, camera, seed=seed + 10)
+        hits = detect_hits(ball, players, homography, 30)
+        serves = detect_serves(ball, players, homography, 30, hits=hits)
+        all_hits = sorted(set(hits) | {s["frame"] for s in serves})
+        bounces = locate_bounces(detect_bounce_events(ball, players, homography, 30, hits=all_hits), ball,
+                                 homography, 30, hits=all_hits)
+        points = detect_points(ball, players, hits, bounces, 30, serves=serves)
+        for measured in (a for p in points for a in p["serve_attempts"] if a["speedKmh"] is not None):
+            real = min(match.serves, key=lambda s: abs(s["frame"] - measured["frame"]))
+            errors.append(abs(measured["speedKmh"] / real["speedKmh"] - 1))
+    assert len(errors) >= 10
+    assert max(errors) < 0.15, sorted(errors)[-3:]

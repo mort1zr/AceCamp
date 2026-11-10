@@ -242,6 +242,16 @@ def run_pipeline(config, render=True):
                     cv2.circle(frame, center, int(18 * text_scale), color, max(1, int(round(3 * text_scale))))
                     cv2.putText(frame, label, (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.7 * text_scale, color, max(1, int(round(2 * text_scale))))
+            # Velocidad del saque desde que bota, durante 1,5 s (TA-20). Es la velocidad media entre el
+            # golpe y el bote, no la máxima de un radar: se indica en el texto.
+            serve_speed = next((a for p in points for a in p["serve_attempts"] if a.get("speedKmh")
+                                and a.get("bounce_frame") is not None
+                                and 0 <= i - a["bounce_frame"] < winner_label_frames), None)
+            if serve_speed is not None:
+                cv2.putText(frame, f"Saque J{serve_speed['player']}: {serve_speed['speedKmh']:.0f} km/h "
+                            f"(media hasta el bote)", (int(10 * text_scale), int(150 * text_scale)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 255, 255),
+                            max(1, int(round(2 * text_scale))))
             for serve in serves:  # marca cada saque durante medio segundo, sobre el sacador
                 if 0 <= i - serve["frame"] < bounce_marker_frames and serve["player"] in player_detections[i]:
                     x1, y1, x2, _ = player_detections[i][serve["player"]]
