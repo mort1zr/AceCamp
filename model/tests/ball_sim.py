@@ -56,11 +56,13 @@ class Rally:
 
 
 def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derecha", serve_fault=False,
-                   last_out=False):
+                   last_out=False, last_net=False):
     """Peloteo entre el jugador 1 (fondo lejano) y el 2 (fondo cercano). Empieza golpeando el 2.
 
     last_out: el último golpe bota fuera de la pista de individuales (por un lado o largo), a
     0,4-2 m de la línea.
+    last_net: el último golpe se queda en la red: cae y bota en el lado de quien golpeó, a 0,5-2 m
+    de la red.
     """
     rng = np.random.default_rng(seed)
     dt_sub = 1.0 / (fps * 20)
@@ -101,6 +103,9 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
                 target[0] = DOUBLES_WIDTH - ALLEY_WIDTH + miss
             else:  # larga
                 target[1] = -miss if receiver == 1 else COURT_LENGTH + miss
+        if last_net and shot_index == num_shots - 1:
+            short = rng.uniform(0.5, 2.0)
+            target[1] = NET_Y + short if hitter == 2 else NET_Y - short
         flight = rng.uniform(0.55, 0.9) if not (serve and shot_index == 0) else 0.55
         vel = np.array([(target[0] - pos[0]) / flight, (target[1] - pos[1]) / flight,
                         (0.5 * G * flight ** 2 - pos[2]) / flight])
@@ -192,7 +197,7 @@ def _mirror(rally):
 
 
 def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=(), out_points=(),
-                   double_fault_points=()):
+                   double_fault_points=(), net_points=()):
     """Varios puntos seguidos: pausa sin pelota, lanzamiento del saque y peloteo.
 
     Saca el jugador 2 dos puntos y luego el 1 otros dos, desde la derecha y la izquierda
@@ -204,7 +209,8 @@ def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=(),
     Cada punto lleva su ganador real (winner) y cómo acabó (how):
     - "ganador": el último golpe bota dentro y el rival no llega (gana quien lo dio);
     - "fuera": en out_points el último golpe bota fuera (gana el rival de quien lo dio);
-    - "doble falta": en double_fault_points los dos saques son falta (gana el receptor).
+    - "doble falta": en double_fault_points los dos saques son falta (gana el receptor);
+    - "red": en net_points el último golpe se queda en la red (gana el rival de quien lo dio).
     """
     rng = np.random.default_rng(seed + 1000)
     match = Match(fps, [], [])
@@ -229,16 +235,16 @@ def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=(),
             start = _append_serve(match, second, server, serve_side, pause, fps, fault=True)
             winner, how = receiver, "doble falta"
         else:
-            out = point in out_points
-            # Un golpe fuera necesita al menos el saque y un resto (si no, sería una falta).
-            shots = int(rng.integers(2 if out else 1, max_shots + 1))
+            out, net = point in out_points, point in net_points
+            # Un golpe fuera o a la red necesita al menos el saque y un resto (si no, sería una falta).
+            shots = int(rng.integers(2 if out or net else 1, max_shots + 1))
             rally = simulate_rally(shots, fps=fps, seed=seed * 100 + point, serve=True, serve_side=serve_side,
-                                   last_out=out)
+                                   last_out=out, last_net=net)
             if server == 1:
                 rally = _mirror(rally)
             start = _append_serve(match, rally, server, serve_side, pause, fps, fault=False)
             last = rally.shots[-1]["player"]
-            winner, how = (3 - last, "fuera") if out else (last, "ganador")
+            winner, how = (3 - last, "fuera") if out else (3 - last, "red") if net else (last, "ganador")
         match.points.append({"start": start if point_start is None else point_start,
                              "end": len(match.ball_3d) - 1, "server": server, "winner": winner, "how": how})
     for _ in range(int(2 * fps)):

@@ -9,8 +9,12 @@ Reglas, en este orden, con lo que ya detecta el modelo (saques, golpes, botes y 
      el fondo cuenta como su lado);
    - dentro o dudoso → pierde el jugador de ese lado, que no la devolvió: con doble bote visto
      (más fiable) o porque la pelota dejó de verse.
-4. Sin bote tras el último golpe (pelota en la red o fuera sin ver el bote, TA-26): lo más
-   probable es que el golpe fallara → gana el rival de quien golpeó.
+   Pelota en la red (TA-26): si ese primer bote cae en el lado de quien golpeó, la pelota no
+   cruzó la red → gana el rival de quien golpeó. Quien golpeó se decide por el jugador más
+   cercano a la pelota y, si hay un bote anterior, debe coincidir con su lado (si no, no se
+   marca como red).
+4. Sin bote tras el último golpe (pelota en la red o fuera sin ver el bote): lo más probable es
+   que el golpe fallara → gana el rival de quien golpeó.
 
 Cada decisión lleva una confianza entre 0 y 1: una base según la regla (cuánto se fía de ella)
 multiplicada por la de la cantada del bote que decide, si lo hay. Un bote dudoso, o cuya
@@ -39,6 +43,7 @@ BASE_CONFIDENCE = {
     "saque no devuelto": 0.7,
     "no devuelta": 0.55,
     "golpe fallado": 0.3,
+    "red": 0.6,  # depende de saber quién golpeó: como mucho, confianza media
 }
 HIGH_CONFIDENCE, MEDIUM_CONFIDENCE = 0.75, 0.5
 INCONSISTENT_FACTOR = 0.7
@@ -97,6 +102,19 @@ def _consistent(point_hits, located, fps):
     return True
 
 
+def _striker(last_hit, located, ball_detections, player_detections):
+    """Quién dio el último golpe, solo si las dos pistas coinciden: el jugador más cercano a la
+    pelota y el lado del bote anterior (el golpe lo da quien estaba en ese lado). Si no hay bote
+    anterior, basta el jugador más cercano. None si no se sabe o no coinciden."""
+    if last_hit is None or ball_detections is None or player_detections is None:
+        return None
+    nearest = hitter(last_hit, ball_detections, player_detections)
+    before = [b for b in located if b["frame"] < last_hit]
+    if before and nearest is not None and _side_of(before[-1]) != nearest:
+        return None
+    return nearest
+
+
 def decide_point(point, bounces, hits, fps, ball_detections=None, player_detections=None):
     """Ganador de un punto: {"winner", "win_reason", "confidence", "confidence_level"}.
 
@@ -129,6 +147,9 @@ def decide_point(point, bounces, hits, fps, ball_detections=None, player_detecti
     if after_last_hit:
         first = after_last_hit[0]
         side = _side_of(first)
+        striker = _striker(last_hit, located, ball_detections, player_detections)
+        if striker is not None and striker == side:
+            return _decision(_other(striker), "red", first, consistent)
         if first.get("call") == OUT:
             return _decision(side, "fuera", first, consistent)
         reason = "doble bote" if point.get("end_reason") == "doble bote" else "no devuelta"
