@@ -5,7 +5,8 @@ dice el informe coincide con lo que muestra el marcador del vídeo.
 
 Archivos (en la carpeta del informe, --report-dir):
 - report.json: todo el informe (esquema REPORT_VERSION, ver build_report);
-- points.csv: una fila por punto (POINT_COLUMNS).
+- points.csv: una fila por punto (POINT_COLUMNS);
+- bounces.csv: una fila por bote, con su posición y cantada (BOUNCE_COLUMNS, TA-25).
 
 El JSON del worker (matches.statistics) sigue siendo el resumen por jugador de
 stats.to_match_statistics, que ahora incluye el marcador y los puntos ganados (ver
@@ -26,6 +27,24 @@ POINT_COLUMNS = (
     "shots", "bounces", "end_reason", "winner", "model_winner", "corrected", "win_reason", "confidence",
     "confidence_level", "score_after",
 )
+
+
+BOUNCE_COLUMNS = ("frame", "time_s", "point", "x_m", "y_m", "call", "area", "line_distance_cm", "uncertainty_cm",
+                  "inferred")
+
+
+def bounce_rows(bounces, points, fps):
+    """Lista de botes del informe (TA-25): dónde botó, su cantada y en qué punto."""
+    rows = []
+    for b in bounces:
+        if "x_m" not in b:
+            continue
+        point = next((p["number"] for p in points if p["start"] <= b["frame"] <= p["end"]), None)
+        rows.append({"frame": b["frame"], "time_s": _seconds(b["frame"], fps), "point": point, "x_m": b["x_m"],
+                     "y_m": b["y_m"], "call": b.get("call"), "area": b.get("area"),
+                     "line_distance_cm": b.get("line_distance_cm"), "uncertainty_cm": b.get("uncertainty_cm"),
+                     "inferred": bool(b.get("inferred"))})
+    return rows
 
 
 def _seconds(frame, fps):
@@ -125,6 +144,7 @@ def build_report(analysis, fps, video=None):
         "players": {str(p): player_summary(statistics, points, p) for p in (1, 2)},
         "mostServes": _most_serves(statistics),
         "points": [point_row(p, bounces, fps) for p in points],
+        "bounces": bounce_rows(bounces, points, fps),
         "toReview": statistics.get("points", {}).get("toReview", []),
     }
 
@@ -142,6 +162,7 @@ def write_report(report, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     write_csv(out_dir / "points.csv", report["points"], POINT_COLUMNS)
+    write_csv(out_dir / "bounces.csv", report["bounces"], BOUNCE_COLUMNS)
     return out_dir
 
 

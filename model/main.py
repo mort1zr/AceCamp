@@ -29,6 +29,18 @@ AUTO_SMALL_VIDEO_WIDTH = 1280
 AUTO_BALL_IMAGE_SIZE = 1280
 
 
+def draw_out_banner(frame, scale):
+    """Cartel «OUT» rojo arriba en el centro del fotograma (TA-25)."""
+    text, font = "OUT", cv2.FONT_HERSHEY_DUPLEX
+    size, thickness = 2.2 * scale, max(2, int(round(5 * scale)))
+    (w, h), _ = cv2.getTextSize(text, font, size, thickness)
+    x, y = (frame.shape[1] - w) // 2, int(40 * scale) + h
+    pad = int(12 * scale)
+    cv2.rectangle(frame, (x - pad, y - h - pad), (x + w + pad, y + pad), (0, 0, 180), -1)
+    cv2.putText(frame, text, (x, y), font, size, (255, 255, 255), thickness, cv2.LINE_AA)
+    return frame
+
+
 def resolve_ball_image_size(setting, video_width):
     """Tamaño de imagen para el detector de pelota: un número, None (el de YOLO) o "auto"."""
     if setting == "auto":
@@ -216,6 +228,7 @@ def run_pipeline(config, render=True):
     mini_court = stats_box = None
     bounce_marker_frames = max(1, int(round(0.5 * video_info.fps)))
     winner_label_frames = max(1, int(round(1.5 * video_info.fps)))
+    out_banner_frames = max(1, int(round(1.0 * video_info.fps)))
     with VideoWriter(output_video_path, fps=video_info.fps) as out:
         for i, frame in enumerate(iter_frames(input_video_path)):
             if i >= num_frames:
@@ -234,7 +247,12 @@ def run_pipeline(config, render=True):
             frame = mini_court.draw_frame(frame, player_court_positions[i], ball_court_positions[i])
             # Los últimos botes, en su posición de la pista (TA-23).
             recent = [b for b in bounces if b["frame"] <= i][-MINI_COURT_BOUNCES:]
-            frame = mini_court.draw_bounces(frame, [(b["x_m"], b["y_m"]) for b in recent])
+            # En la mini-pista, cada bote con el color de su cantada (TA-25).
+            frame = mini_court.draw_bounces(frame, [(b["x_m"], b["y_m"]) for b in recent],
+                                            colors=[CALL_COLORS.get(b.get("call"), (255, 0, 255)) for b in recent])
+            # Cartel OUT durante 1 s cuando un bote cae fuera (TA-25).
+            if any(b.get("call") == "fuera" and 0 <= i - b["frame"] < out_banner_frames for b in bounces):
+                draw_out_banner(frame, text_scale)
             for bounce in bounces:  # marca cada bote durante medio segundo
                 if 0 <= i - bounce["frame"] < bounce_marker_frames:
                     center = (int(bounce["x_px"]), int(bounce["y_px"]))
@@ -299,7 +317,7 @@ def main(argv=None):
         stats_path.write_text(json.dumps(result["model_statistics"], indent=2, ensure_ascii=False))
         print(f"Estadísticas guardadas en {stats_path}")
     report_dir = write_report(result["report"], resolve_path(config["paths"]["report_dir"]))
-    print(f"Informe del partido en {report_dir} (report.json, points.csv)")
+    print(f"Informe del partido en {report_dir} (report.json, points.csv, bounces.csv)")
     return result
 
 

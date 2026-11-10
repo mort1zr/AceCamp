@@ -98,3 +98,29 @@ def test_serve_summary_and_overlay_counts():
     assert states[5][2] == {"count": 0, "firstPct": None}
     assert states[50][2] == {"count": 2, "firstPct": 0}
     assert states[95][2] == {"count": 3, "firstPct": 50} and states[95][1]["count"] == 0
+
+
+def test_bounce_list_in_the_report(tmp_path):
+    """TA-25: la lista de botes del informe, con su cantada y el punto en que ocurrió."""
+    data, analysis = sample_analysis()
+    report = build_report(analysis, data["fps"])
+    write_report(report, tmp_path)
+    rows = list(csv.DictReader((tmp_path / "bounces.csv").open(encoding="utf-8")))
+    located = [b for b in analysis["bounces"] if "x_m" in b]
+    assert len(rows) == len(report["bounces"]) == len(located) == 5
+    assert {r["call"] for r in rows} <= {"dentro", "fuera", "dudoso"}
+    assert all(r["point"] == "1" for r in rows)
+
+
+def test_mini_court_bounces_take_the_color_of_their_call():
+    from main import CALL_COLORS, draw_out_banner
+    from mini_court import MiniCourt
+
+    frame = np.zeros((720, 1280, 3), np.uint8)
+    mini = MiniCourt(frame)
+    mini.draw_bounces(frame, [(2.0, 3.0), (8.0, 20.0)], colors=[CALL_COLORS["dentro"], CALL_COLORS["fuera"]])
+    for (x_m, y_m), color in (((2.0, 3.0), CALL_COLORS["dentro"]), ((8.0, 20.0), CALL_COLORS["fuera"])):
+        x, y = mini.meters_to_mini((x_m, y_m))
+        assert (frame[y, x] == color).all()
+    banner = draw_out_banner(np.zeros((720, 1280, 3), np.uint8), 2 / 3)
+    assert banner[:120, 560:720].any() and not banner[300:].any()  # arriba en el centro
