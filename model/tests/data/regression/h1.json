@@ -164,6 +164,8 @@
      "fromLeft": 1,
      "sumSpeedKmh": 0.0,
      "sampleCount": 0,
+     "faults": 0,
+     "aces": 0,
      "firstServeAttempts": 1,
      "firstServeIn": 1,
      "doubleFaults": 0

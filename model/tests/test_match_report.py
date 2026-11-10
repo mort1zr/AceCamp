@@ -8,7 +8,7 @@ from test_regression import load_case
 
 from config import DEFAULTS
 from pipeline_analysis import analyze_detections
-from report import POINT_COLUMNS, build_report, draw_scoreboard, scoreboard_states, write_report
+from report import POINT_COLUMNS, build_report, draw_scoreboard, scoreboard_states, serve_states, write_report
 from report.scoreboard_drawer import score_cells
 from scoreboard import score_points
 from stats import to_match_statistics
@@ -77,3 +77,24 @@ def test_worker_statistics_get_the_score_from_the_player_side():
     assert near["points"] == {"count": 3, "playerWon": 1, "opponentWon": 2, "lowConfidence": 1, "toReview": 1}
     far = to_match_statistics({**stats, "score": {**stats["score"], "winner": 1}}, "arriba")
     assert far["score"]["sets"] == [[6, 4]] and far["score"]["winner"] == "player"
+
+
+def test_serve_summary_and_overlay_counts():
+    """TA-21: % de primeros saques, velocidad media, quién sacó más y saques acumulados por fotograma."""
+    from report.match_report import _most_serves, _serve_summary
+
+    summary = _serve_summary({"count": 4, "sumSpeedKmh": 300.0, "sampleCount": 3, "firstServeAttempts": 4,
+                              "firstServeIn": 3})
+    assert summary["avgSpeedKmh"] == 100.0 and summary["firstServePct"] == 75.0
+    assert "firstServePct" not in _serve_summary({"count": 0})
+    stats = {"players": {"1": {"serve": {"count": 2}}, "2": {"serve": {"count": 5}}}}
+    assert _most_serves(stats) == 2
+    assert _most_serves({"players": {"1": {}, "2": {}}}) is None
+
+    points = [{"serve_attempts": [{"frame": 10, "player": 2, "fault": True},
+                                  {"frame": 40, "player": 2, "fault": False}]},
+              {"serve_attempts": [{"frame": 90, "player": 2, "fault": False}]}]
+    states = serve_states(points, 100)
+    assert states[5][2] == {"count": 0, "firstPct": None}
+    assert states[50][2] == {"count": 2, "firstPct": 0}
+    assert states[95][2] == {"count": 3, "firstPct": 50} and states[95][1]["count"] == 0

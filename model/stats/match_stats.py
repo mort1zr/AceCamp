@@ -148,6 +148,14 @@ def serve_stats(points, player):
     }
     if speeds:
         stats["maxSpeedKmh"] = _round(max(speeds))
+    # Faltas (TA-21): solo si se supo de todos los saques si entraron.
+    if attempts and all(a["fault"] is not None for a in attempts):
+        stats["faults"] = sum(a["fault"] is True for a in attempts)
+    # Aces: puntos que ganó con el saque sin que el rival la devolviera (TA-28: "saque no devuelto").
+    # Incluye los saques que el rival toca sin devolverlos; la cámara no distingue un ace de uno así.
+    own = [p for p in points if p.get("serve_attempts") and p["serve_attempts"][0]["player"] == player]
+    if own and all("win_reason" in p for p in own):
+        stats["aces"] = sum(p.get("winner") == player and p["win_reason"] == "saque no devuelto" for p in own)
     served = [p["serve_attempts"] for p in points if p.get("serve_attempts") and p["serve_attempts"][0]["player"] == player]
     if served and all(s[0]["fault"] is not None for s in served):
         stats["firstServeAttempts"] = len(served)

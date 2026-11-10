@@ -59,6 +59,16 @@ def point_row(point, bounces, fps):
     }
 
 
+def _serve_summary(serve):
+    """Estadísticas de saque del modelo más los porcentajes y la velocidad media (TA-21)."""
+    summary = dict(serve)
+    if serve.get("sampleCount"):
+        summary["avgSpeedKmh"] = round(serve["sumSpeedKmh"] / serve["sampleCount"], 1)
+    if serve.get("firstServeAttempts"):
+        summary["firstServePct"] = round(100 * serve["firstServeIn"] / serve["firstServeAttempts"], 1)
+    return summary
+
+
 def player_summary(model_statistics, points, player):
     """Resumen de un jugador: golpes, saques, desplazamiento y puntos ganados."""
     stats = model_statistics["players"][str(player)]
@@ -70,11 +80,38 @@ def player_summary(model_statistics, points, player):
         "pointsWon": sum(p.get("winner") == player and p.get("counted") for p in points),
         "pointsWonOnServe": sum(p.get("winner") == player and p.get("counted") and p.get("server") == player
                                 for p in points),
-        "serve": stats.get("serve", {}),
+        "serve": _serve_summary(stats.get("serve", {})),
     }
     if "movement" in stats:
         summary["movement"] = stats["movement"]
     return summary
+
+
+def _most_serves(statistics):
+    """Quién sacó más (1 o 2), o None si empataron."""
+    counts = {p: statistics["players"][str(p)].get("serve", {}).get("count", 0) for p in (1, 2)}
+    return None if counts[1] == counts[2] else max(counts, key=counts.get)
+
+
+def serve_states(points, num_frames):
+    """Saques acumulados de cada jugador en cada fotograma, para el overlay (TA-21):
+    {1: {"count", "firstPct"}, 2: {...}}; firstPct es None hasta que se sepa algún primer saque."""
+    firsts = []  # (fotograma, jugador, entró)
+    attempts = []
+    for point in points:
+        for k, attempt in enumerate(point.get("serve_attempts", [])):
+            attempts.append((attempt["frame"], attempt["player"]))
+            if k == 0 and attempt["fault"] is not None:
+                firsts.append((attempt["frame"], attempt["player"], attempt["fault"] is False))
+    states = []
+    for i in range(num_frames):
+        state = {}
+        for player in (1, 2):
+            known = [ok for frame, p, ok in firsts if p == player and frame <= i]
+            state[player] = {"count": sum(1 for frame, p in attempts if p == player and frame <= i),
+                             "firstPct": round(100 * sum(known) / len(known)) if known else None}
+        states.append(state)
+    return states
 
 
 def build_report(analysis, fps, video=None):
@@ -86,6 +123,7 @@ def build_report(analysis, fps, video=None):
         "video": {"name": video, "fps": fps, "durationSeconds": statistics.get("durationSeconds")},
         "score": statistics.get("score"),
         "players": {str(p): player_summary(statistics, points, p) for p in (1, 2)},
+        "mostServes": _most_serves(statistics),
         "points": [point_row(p, bounces, fps) for p in points],
         "toReview": statistics.get("points", {}).get("toReview", []),
     }

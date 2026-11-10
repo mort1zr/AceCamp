@@ -233,6 +233,7 @@ statistics: {
       sumSpeedKmh: 110, sampleCount: 1, maxSpeedKmh: 110,  // velocidad media hasta el bote
       firstServeAttempts: 1, firstServeIn: 0,       // primeros saques y cuántos entraron
       doubleFaults: 0,
+      faults: 1, aces: 0,                           // opcionales (PCIT-72)
     },
   },
   opponent: { /* mismas claves */ },
@@ -251,6 +252,8 @@ statistics: {
 | `serve.sumSpeedKmh`, `serve.sampleCount`, `serve.maxSpeedKmh` | Velocidad media del saque **hasta el bote**, solo de los saques con bote visto. Es menor que la de un radar, que mide la salida de la raqueta | `maxSpeedKmh` falta si `sampleCount` es 0 |
 | `serve.firstServeAttempts`, `serve.firstServeIn` | Primeros saques y cuántos entraron en el cuadro cruzado | Si de algún primer saque no se supo si entró |
 | `serve.doubleFaults` | Dobles faltas | Si de algún segundo saque no se supo si entró |
+| `serve.faults` | Saques fuera (primeros y segundos) | Si de algún saque no se supo si entró |
+| `serve.aces` | Puntos ganados con el saque sin que el rival la devolviera (incluye saques que toca sin devolver: la cámara no los distingue de un ace) | En partidos analizados antes de PCIT-84 |
 | `rallies.count`, `rallies.sumShots`, `rallies.longestShots` | Puntos (peloteos) del partido, golpes en total y el más largo | Nunca |
 | `rallies.short`, `rallies.medium`, `rallies.long` | Peloteos de 0-4, 5-8 y 9 o más golpes | Nunca |
 | `score.sets`, `score.games`, `score.points` | Marcador final que propone el modelo, `[player, opponent]`: sets terminados, juegos del set en curso y puntos del juego (`'0'`, `'15'`, `'30'`, `'40'`, `'AD'` o los del tie-break) | Si el modelo no se actualizó (partidos anteriores) |

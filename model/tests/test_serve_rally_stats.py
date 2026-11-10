@@ -33,7 +33,8 @@ def test_serve_stats_count_sides_speeds_first_serves_and_double_faults():
     stats = serve_stats(points, player=2)
 
     assert stats == {"count": 5, "fromRight": 3, "fromLeft": 2, "sumSpeedKmh": 270.0, "sampleCount": 2,
-                     "maxSpeedKmh": 150.0, "firstServeAttempts": 3, "firstServeIn": 1, "doubleFaults": 1}
+                     "maxSpeedKmh": 150.0, "faults": 3, "firstServeAttempts": 3, "firstServeIn": 1,
+                     "doubleFaults": 1}
 
 
 def test_unknown_results_are_omitted_never_zero():
@@ -124,3 +125,17 @@ def test_every_serve_speed_is_within_15_percent():
             errors.append(abs(measured["speedKmh"] / real["speedKmh"] - 1))
     assert len(errors) >= 10
     assert max(errors) < 0.15, sorted(errors)[-3:]
+
+
+def test_aces_and_faults():
+    """TA-21: aces = puntos ganados con el saque sin resto (TA-28) y faltas = saques fuera."""
+    points = [
+        {**point(attempt(), shots=1), "winner": 2, "win_reason": "saque no devuelto"},
+        {**point(attempt(fault=True), attempt(), shots=2), "winner": 2, "win_reason": "saque no devuelto"},
+        {**point(attempt(), shots=5), "winner": 1, "win_reason": "no devuelta"},
+    ]
+    stats = serve_stats(points, player=2)
+    assert stats["aces"] == 2 and stats["faults"] == 1
+    without_winners = serve_stats([point(attempt())], player=2)
+    assert "aces" not in without_winners  # sin TA-28 no se sabe: se omite, nunca 0
+    assert "faults" not in serve_stats([point(attempt(fault=None))], player=2)
