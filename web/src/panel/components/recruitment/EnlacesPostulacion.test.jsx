@@ -38,3 +38,19 @@ it('el dueño puede crear, compartir y desactivar enlaces', async () => {
   await user.click(screen.getByRole('button', { name: 'Desactivar' }))
   expect(deleteDoc).toHaveBeenCalledExactlyOnceWith(`${collection}/${id}`)
 })
+
+it('copia el enlace con un clic y avisa si el navegador no lo permite (PCIT-184)', async () => {
+  const user = userEvent.setup()
+  const writeText = vi.fn().mockResolvedValueOnce().mockRejectedValueOnce(new Error('denied'))
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  render(<EnlacesPostulacion db={{}} orgId="org-demo" uid="admin-1" role="admin" />)
+  await waitFor(() => expect(onSnapshot).toHaveBeenCalled())
+  const id = 'AcecamFormDemoABC123'
+  act(() => onSnapshot.mock.lastCall[1]({ docs: [{ id }] }))
+  await user.click(screen.getByRole('button', { name: 'Copiar enlace' }))
+  expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/postular/org-demo/${id}`)
+  expect(screen.getByRole('button', { name: 'Enlace copiado' })).toBeTruthy()
+  await user.click(screen.getByRole('button', { name: 'Enlace copiado' }))
+  expect((await screen.findByRole('alert')).textContent).toContain('cópialo a mano')
+  expect(screen.getByRole('button', { name: 'Copiar enlace' })).toBeTruthy()
+})
