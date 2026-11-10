@@ -61,6 +61,13 @@ line_calls:
   # Comparar los botes del peloteo con la pista de dobles (true) o la de individuales (false).
   doubles: false
 
+bounces:
+  # Detector de botes: rules (TA-22a, por defecto) o trained (clasificador de TA-22b, entrenado con
+  # peloteos simulados: python training/train_bounce_classifier.py). Con los botes marcados a mano,
+  # el entrenado no mejora a las reglas (ver README del modelo): queda como alternativa.
+  detector: rules
+  classifier: models/bounce_classifier.json
+
 serves:
   # Refuerzo del saque con pose (TA-19): models/yolov8m-pose.pt (python scripts/download_models.py --pose)
   # descarta los saques en que el sacador no levanta la muñeca por encima de la cabeza. null = sin pose.

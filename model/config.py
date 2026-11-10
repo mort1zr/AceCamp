@@ -33,6 +33,7 @@ DEFAULTS: dict[str, Any] = {
     "line_calls": {"doubt_margin_m": 0.15, "doubles": False},
     "rallies": {"short_max": 4, "medium_max": 8},
     "serves": {"pose_model": None},
+    "bounces": {"detector": "rules", "classifier": "models/bounce_classifier.json"},
     "match": {"first_server": "auto", "best_of": 3, "games_per_set": 6, "tiebreak_points": 7,
               "match_tiebreak_points": 10, "no_ad": False, "final_set": "tiebreak", "initial_score": None},
     "worker": {"max_duration_seconds": 60, "min_resolution": 720, "min_fps": 25, "max_fps": 60},

@@ -8,6 +8,7 @@ punta (TA-16), que lo ejecuta en la CI con detecciones guardadas en JSON.
 
 from __future__ import annotations
 
+from config import resolve_path
 from events import (
     call_bounces,
     call_counts,
@@ -18,6 +19,7 @@ from events import (
     detect_serves,
     locate_bounces,
 )
+from events.bounce_classifier import BounceClassifier, detect_bounces_trained
 from events.serve_pose import fix_servers
 from mini_court import MiniCourt
 from report.positions import position_rows
@@ -47,8 +49,15 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
     all_hits = sorted(set(hits) | {s["frame"] for s in serves})
 
     # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
-    bounces = detect_bounce_events(ball_detections, player_detections, homography, fps,
-                                   main_camera=main_camera, hits=all_hits)
+    bounce_settings = config.get("bounces", {})
+    if bounce_settings.get("detector", "rules") == "trained":  # TA-22b: clasificador entrenado (opcional)
+        classifier = BounceClassifier.load(resolve_path(bounce_settings.get("classifier",
+                                                                            "models/bounce_classifier.json")))
+        bounces = detect_bounces_trained(ball_detections, player_detections, homography, fps, classifier,
+                                         main_camera=main_camera, hits=all_hits)
+    else:
+        bounces = detect_bounce_events(ball_detections, player_detections, homography, fps,
+                                       main_camera=main_camera, hits=all_hits)
     bounces = locate_bounces(bounces, ball_detections, homography, fps, hits=all_hits,
                              court_keypoints=court_keypoints)
 
