@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { SegmentedControl } from '../ui'
 import { analysisErrorMessage, formatBytes, validateAnalysis } from '../../lib/analysis.js'
+import { validateLocalVideo } from '../../lib/validateLocalVideo.js'
 import { MAX_VIDEO_FPS, MAX_VIDEO_SECONDS, MIN_VIDEO_FPS, MIN_VIDEO_HEIGHT, MIN_VIDEO_WIDTH } from '../../lib/videoRequirements.js'
 
 const initial = { sourceType: 'file', file: null, url: '', playerPosition: '', opponent: '', tournament: '', matchDate: '', result: '' }
@@ -39,7 +40,7 @@ export default function AnalysisForm({ service, players, playersLoading, players
 
   async function submit(event) {
     event.preventDefault()
-    if (sending.current) return
+    if (sending.current || disabled || playerCreationOpen || playersLoading || playersError) return
     const input = { ...values, playerId }
     const validation = validateAnalysis(input, service)
     if (!players.some(player => player.id === playerId)) validation.playerId = 'Selecciona un jugador disponible.'
@@ -52,13 +53,24 @@ export default function AnalysisForm({ service, players, playersLoading, players
     }
     sending.current = true
     setBusy(true)
-    setProgress({ phase: 'uploading', percent: 0 })
-    controller.current = new AbortController()
+    const transfer = new AbortController()
+    controller.current = transfer
     try {
+      if (input.sourceType === 'file') {
+        setProgress({ phase: 'checking', percent: 0 })
+        const error = await validateLocalVideo(input.file, transfer.signal)
+        transfer.signal.throwIfAborted()
+        if (!active.current) return
+        if (error) {
+          setErrors({ file: error })
+          return
+        }
+      }
+      setProgress({ phase: 'uploading', percent: 0 })
       request.current ??= service.createRequestId()
       await service.enqueue(input, {
         requestId: request.current,
-        signal: controller.current.signal,
+        signal: transfer.signal,
         onProgress: next => { if (active.current) setProgress(next) },
       })
       if (!active.current) return
@@ -76,7 +88,7 @@ export default function AnalysisForm({ service, players, playersLoading, players
   }
 
   const update = event => change(event.target.name, event.target.value)
-  const fieldError = field => errors[field] && <p className="players-field-error" id={`${id}-${field}-error`}>{errors[field]}</p>
+  const fieldError = field => errors[field] && <p className="players-field-error" id={`${id}-${field}-error`} role={field === 'file' ? 'alert' : undefined}>{errors[field]}</p>
   const invalid = (field, description) => ({
     'aria-invalid': Boolean(errors[field]),
     'aria-describedby': [description, errors[field] && `${id}-${field}-error`].filter(Boolean).join(' ') || undefined,
@@ -160,7 +172,22 @@ export default function AnalysisForm({ service, players, playersLoading, players
           <button className="players-button-primary" type="submit" disabled={playersLoading || Boolean(playersError)}>{busy ? 'Preparando análisis…' : 'Añadir a la cola'}<span aria-hidden="true"> →</span></button>
         </div>
       </fieldset>
-      {busy && <div className="analysis-progress"><div role="status"><p>{progress.phase === 'saving' ? 'Guardando partido…' : 'Cargando video…'}</p><progress aria-label="Progreso de carga" max={100} value={progress.percent} /><span>{Math.round(progress.percent)} %</span></div><button type="button" className="players-button-secondary" disabled={progress.phase === 'saving'} onClick={() => controller.current?.abort()}>Cancelar carga</button></div>}
+      {busy && (
+        <div className="analysis-progress">
+          <div role="status">
+            {progress.phase === 'checking' ? <p>Verificando resolución y duración…</p> : (
+              <>
+                <p>{progress.phase === 'saving' ? 'Guardando partido…' : 'Cargando video…'}</p>
+                <progress aria-label="Progreso de carga" max={100} value={progress.percent} />
+                <span>{Math.round(progress.percent)} %</span>
+              </>
+            )}
+          </div>
+          <button type="button" className="players-button-secondary" disabled={progress.phase === 'saving'} onClick={() => controller.current?.abort()}>
+            {progress.phase === 'checking' ? 'Cancelar verificación' : 'Cancelar carga'}
+          </button>
+        </div>
+      )}
       {failure && <p role="alert" className="players-save-error">{failure}</p>}
       <p ref={noticeRef} tabIndex={-1} className="players-notice" role="status">{success}</p>
     </form>

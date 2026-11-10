@@ -6,6 +6,7 @@ import { onSnapshot, where } from 'firebase/firestore'
 import { MemoryRouter } from 'react-router'
 import Analizar from './Analizar.jsx'
 import { PlanVistaContexto } from '../context/PlanVistaContext.js'
+import { validateLocalVideo } from '../lib/validateLocalVideo.js'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
 import { createDemoAnalysisService } from '../previews/demoAnalysisService.js'
 
@@ -14,7 +15,12 @@ vi.mock('firebase/firestore', () => ({
   addDoc: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), runTransaction: vi.fn(), serverTimestamp: vi.fn(),
 }))
 
-afterEach(cleanup)
+vi.mock('../lib/validateLocalVideo.js', () => ({ validateLocalVideo: vi.fn(async () => null) }))
+
+afterEach(() => {
+  cleanup()
+  validateLocalVideo.mockClear()
+})
 function setup(options) {
   const playersService = createDemoPlayersService(options)
   const service = createDemoAnalysisService({ playersService, transferDelay: 0 })
@@ -133,7 +139,32 @@ describe('Analizar video v1', () => {
     expect(within(table).getByRole('cell', { name: 'En cola' })).toBeTruthy()
     expect(within(table).getByRole('cell', { name: 'Valeria Torres' })).toBeTruthy()
     expect(props.send).toHaveBeenCalledTimes(1)
+    expect(validateLocalVideo).toHaveBeenCalledTimes(1)
     expect(screen.getByText('Partido añadido a la cola de demostración. No se subió ni procesó ningún video.')).toBeTruthy()
+  })
+
+  it('rechaza un archivo de baja resolución antes de encolar y permite reemplazarlo', async () => {
+    const message = 'El video debe tener al menos 720p (1280×720). Grábalo o expórtalo en 720p o 1080p.'
+    validateLocalVideo.mockResolvedValueOnce(message)
+    const props = setup()
+    const user = userEvent.setup()
+    render(<Analizar {...props} />)
+    await fillMatch(user)
+    const fileInput = screen.getByLabelText('Selecciona el video del partido')
+    const submit = screen.getByRole('button', { name: /Añadir a la cola/ })
+    await user.upload(fileInput, new File(['demo'], 'baja-resolucion.mp4', { type: 'video/mp4' }))
+    await user.click(submit)
+    expect((await screen.findByRole('alert')).textContent).toBe(message)
+    expect(fileInput.getAttribute('aria-invalid')).toBe('true')
+    expect(props.send).not.toHaveBeenCalled()
+    expect(screen.queryByRole('table')).toBeNull()
+    expect(screen.getByLabelText('Rival *').value).toBe('Rival de ejemplo')
+
+    const replacement = new File(['demo'], '720p.mp4', { type: 'video/mp4' })
+    await user.upload(fileInput, replacement)
+    await user.click(submit)
+    await screen.findByRole('table')
+    expect(props.send).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ file: replacement }), expect.any(Object))
   })
 
   it('acepta un enlace de ejemplo sin descargar ni procesar videos', async () => {
@@ -147,6 +178,7 @@ describe('Analizar video v1', () => {
     await user.click(screen.getByRole('button', { name: /Añadir a la cola/ }))
     expect(await screen.findByRole('table')).toBeTruthy()
     expect(props.send.mock.calls[0][0].sourceType).toBe('link')
+    expect(validateLocalVideo).not.toHaveBeenCalled()
   })
 
   it('conserva el mismo ID tras fallo y bloquea doble envío', async () => {
