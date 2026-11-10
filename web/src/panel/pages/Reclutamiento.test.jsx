@@ -73,7 +73,7 @@ describe('Bandeja de reclutamiento', () => {
 
     const table = within(screen.getByRole('table', { name: 'Bandeja de postulaciones' }))
     expect(table.getAllByRole('row')).toHaveLength(4)
-    const search = screen.getByRole('searchbox', { name: 'Buscar por nombre o ciudad' })
+    const search = screen.getByRole('searchbox', { name: 'Buscar por nombre, ciudad o referencia' })
     await user.type(search, '  lucia ')
     expect(table.getByRole('cell', { name: 'Lucía Pérez' })).toBeTruthy()
     expect(table.queryByRole('cell', { name: 'Andrés Díaz' })).toBeNull()
@@ -84,6 +84,17 @@ describe('Bandeja de reclutamiento', () => {
     expect(table.queryByRole('cell', { name: 'Lucía Pérez' })).toBeNull()
     await user.selectOptions(screen.getByLabelText('Estado de postulación'), 'contactada')
     expect(screen.getByText('No hay coincidencias')).toBeTruthy()
+  })
+
+  it('muestra la referencia de cada postulación y permite buscarla (PCIT-186)', async () => {
+    const user = userEvent.setup()
+    render(page())
+    publish(application('ab12cd34', 'Lucía Pérez', 'Lima', 'nueva'), application('zz99yy88', 'Paula Flores', 'Cusco', 'nueva'))
+    const table = within(screen.getByRole('table', { name: 'Bandeja de postulaciones' }))
+    expect(table.getByRole('cell', { name: 'AC-AB12CD' })).toBeTruthy()
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar por nombre, ciudad o referencia' }), 'ac-ab12')
+    expect(table.getByRole('cell', { name: 'Lucía Pérez' })).toBeTruthy()
+    expect(table.queryByRole('cell', { name: 'Paula Flores' })).toBeNull()
   })
 
   it('reintenta tras un error y descarta los datos de la sesión anterior', async () => {

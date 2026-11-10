@@ -9,7 +9,7 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: () => 'server-time',
 }))
 
-const { submitPublicApplication, validateApplicationContact } = await import('./publicApplications.js')
+const { applicationReference, submitPublicApplication, validateApplicationContact } = await import('./publicApplications.js')
 
 const valid = {
   fullName: 'Valentina Demo', birthDate: '2000-02-15', city: 'Lima', email: 'vale@example.test',
@@ -49,5 +49,14 @@ describe('submitPublicApplication', () => {
     addDoc.mockResolvedValueOnce({ id: 'app-1' })
     await submitPublicApplication({}, { orgId: 'org-demo', formId: 'f1' }, valid)
     expect(addDoc).toHaveBeenCalledWith('applications', expect.objectContaining({ city: 'Lima', email: 'vale@example.test', graduationYear: 2027 }))
+  })
+})
+
+describe('applicationReference (PCIT-186)', () => {
+  it('arma un número corto y estable a partir del ID', () => {
+    expect(applicationReference('k3J9xQ7pLm2Ab4Cd5Ef6')).toBe('AC-K3J9XQ')
+    expect(applicationReference('k3J9xQ7pLm2Ab4Cd5Ef6')).toBe(applicationReference('k3J9xQ7pLm2Ab4Cd5Ef6'))
+    expect(applicationReference('')).toBe('')
+    expect(applicationReference(undefined)).toBe('')
   })
 })

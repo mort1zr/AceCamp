@@ -6,6 +6,15 @@ export function applicationForms(db, orgId) {
   return collection(db, COLLECTIONS.orgs, orgId, COLLECTIONS.applicationForms)
 }
 
+/**
+ * Número de referencia corto de una postulación (PCIT-186), sacado de su ID:
+ * el postulante lo ve al enviar y la bandeja de Reclutamiento lo muestra igual.
+ */
+export function applicationReference(applicationId) {
+  const base = String(applicationId ?? '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase()
+  return base ? `AC-${base}` : ''
+}
+
 export function publicApplicationPath(orgId, formId) {
   return `/postular/${encodeURIComponent(orgId)}/${encodeURIComponent(formId)}`
 }

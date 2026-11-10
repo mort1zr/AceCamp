@@ -52,6 +52,8 @@ describe('Formulario público de postulación', () => {
     await user.click(consent)
     await user.click(screen.getByRole('button', { name: 'Enviar postulación' }))
     expect(await screen.findByText(/Recibimos tu postulación/)).toBeTruthy()
+    // PCIT-186: el número de referencia sale del ID de la postulación guardada.
+    expect(screen.getByText('AC-APPLIC')).toBeTruthy()
     expect(addDoc).toHaveBeenCalledExactlyOnceWith('applications', expect.objectContaining({
       orgId: 'org-demo', formId: 'AcecamFormDemoABC123', status: 'nueva', guardian: null,
       consent: expect.objectContaining({ accepted: true, method: 'self', recordedBy: 'public-form' }),

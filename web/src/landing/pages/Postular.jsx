@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router'
 import { db } from '../../panel/lib/firebase.js'
 import { formatBytes, validateVideoFile } from '../../panel/lib/analysis.js'
 import { requiresPlayerGuardian } from '../../panel/lib/players.js'
-import { publicFormExists, submitPublicApplication } from '../../panel/lib/publicApplications.js'
+import { applicationReference, publicFormExists, submitPublicApplication } from '../../panel/lib/publicApplications.js'
 import { validateLocalVideo } from '../../panel/lib/validateLocalVideo.js'
 import { MAX_VIDEO_FPS, MAX_VIDEO_SECONDS, MIN_VIDEO_FPS, MIN_VIDEO_HEIGHT, MIN_VIDEO_WIDTH } from '../../panel/lib/videoRequirements.js'
 import { MAX_VIDEO_BYTES } from '../../panel/lib/videoUpload.js'
@@ -83,6 +83,8 @@ function Formulario({ orgId, formId }) {
   const [guardian, setGuardian] = useState(false)
   const [sending, setSending] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  // PCIT-186: número de referencia que ve el postulante y también la bandeja.
+  const [reference, setReference] = useState('')
   const [error, setError] = useState('')
   const [errors, setErrors] = useState({})
   const [attachment, setAttachment] = useState(null)
@@ -123,6 +125,7 @@ function Formulario({ orgId, formId }) {
     try {
       if (file) await checkAttachment(file, controller.signal)
       const application = await submitPublicApplication(db, { orgId, formId }, input)
+      setReference(applicationReference(application.id))
       if (file) {
         setAttachment({ applicationId: application.id, file })
         await attachVideo({ orgId, formId, applicationId: application.id, file, signal: controller.signal })
@@ -163,7 +166,16 @@ function Formulario({ orgId, formId }) {
 
   if (available == null) return <p role="status">Comprobando el enlace de postulación…</p>
   if (!available) return <p role="alert">Este enlace de postulación no está disponible. Pide un enlace activo a la organización.</p>
-  if (submitted) return <p role="status">Recibimos tu postulación. La organización podrá revisarla y contactarte.</p>
+  if (submitted) return (
+    <div role="status">
+      <p>Recibimos tu postulación. La organización podrá revisarla y contactarte.</p>
+      {reference && (
+        <p className="mt-2">
+          Tu número de referencia es <strong>{reference}</strong>. Guárdalo por si escribes a la organización.
+        </p>
+      )}
+    </div>
+  )
   if (attachment) return (
     <form onSubmit={retryVideo} aria-label="Adjuntar video a la postulación" aria-busy={sending}>
       <p className="mb-3" role="status">{sending ? 'Postulación guardada. Verificando y adjuntando el video…' :

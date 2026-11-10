@@ -8,6 +8,7 @@ import EnlacesPostulacion from '../components/recruitment/EnlacesPostulacion.jsx
 import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { nextApplicationStates, updateApplicationStatus } from '../lib/applicationStatus.js'
+import { applicationReference } from '../lib/publicApplications.js'
 import { APPLICATION_STATUS, COLLECTIONS } from '../lib/schema.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
@@ -20,6 +21,8 @@ const columns = [
       {application.hasVideo && <span className="block text-xs text-muted">Video adjunto</span>}
     </>
   ) },
+  // PCIT-186: el mismo número que ve el postulante al enviar.
+  { key: 'id', label: 'Referencia', render: (id) => applicationReference(id) },
   { key: 'city', label: 'Ciudad' },
   { key: 'graduationYear', label: 'Año de graduación' },
   { key: 'status', label: 'Estado', render: (status) => <StatusBadge status={status} /> },
@@ -111,7 +114,7 @@ function Bandeja({ db, orgId, uid, role }) {
   const profile = roster.rows.find(({ id }) => id === profileId)
   const filtered = rows.filter((row) =>
     (!status || row.status === status) &&
-    [row.fullName, row.city].some((value) => normalize(value).includes(term)),
+    [row.fullName, row.city, applicationReference(row.id)].some((value) => normalize(value).includes(term)),
   )
   async function saveStatus(application, nextStatus) {
     setNotice('')
@@ -156,7 +159,7 @@ function Bandeja({ db, orgId, uid, role }) {
       {rows.length > 0 && (
         <div className="players-filters">
           <div className="players-field">
-            <label htmlFor="application-search">Buscar por nombre o ciudad</label>
+            <label htmlFor="application-search">Buscar por nombre, ciudad o referencia</label>
             <input id="application-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           <div className="players-field">
