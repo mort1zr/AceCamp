@@ -15,17 +15,43 @@ export async function publicFormExists(db, orgId, formId) {
   return (await getDocFromServer(doc(applicationForms(db, orgId), formId))).exists()
 }
 
-export function submitPublicApplication(db, { orgId, formId }, input) {
-  // Las reglas calculan la edad con la misma fecha UTC.
-  const player = normalizePlayer(input, new Date().toISOString().slice(0, 10))
-  const city = input.city.trim()
-  const email = input.email.trim()
-  const message = input.message.trim()
-  if (city.length < 2 || city.length > 100 || email.length > 254 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || player.graduationYear == null ||
-      !/^\d{4}$/.test(input.graduationYear) || message.length > 1000) {
-    throw new Error('applications/invalid-contact')
+const text = (value) => (typeof value === 'string' ? value.trim() : '')
+
+/**
+ * Errores de los datos de contacto, campo por campo (PCIT-183).
+ * Mismos límites que las reglas de `applications` en firestore.rules.
+ */
+export function validateApplicationContact(input) {
+  const errors = {}
+  const city = text(input.city)
+  const email = text(input.email)
+  const year = text(String(input.graduationYear ?? ''))
+  if (city.length < 2 || city.length > 100) errors.city = 'Escribe tu ciudad (entre 2 y 100 caracteres).'
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Escribe un correo válido.'
+  if (!/^\d{4}$/.test(year) || Number(year) < 1900 || Number(year) > 2100) {
+    errors.graduationYear = 'Escribe el año con 4 cifras, por ejemplo 2027.'
   }
+  if (text(input.message).length > 1000) errors.message = 'El mensaje puede tener hasta 1000 caracteres.'
+  return errors
+}
+
+export function submitPublicApplication(db, { orgId, formId }, input) {
+  // Se juntan los errores del jugador y los de contacto para mostrarlos todos a la vez.
+  const errors = validateApplicationContact(input)
+  let player
+  try {
+    // Las reglas calculan la edad con la misma fecha UTC.
+    player = normalizePlayer(input, new Date().toISOString().slice(0, 10))
+  } catch (failure) {
+    if (!failure.fields) throw failure
+    Object.assign(errors, failure.fields, errors)
+  }
+  if (Object.keys(errors).length) {
+    throw Object.assign(new Error('applications/invalid-contact'), { code: 'applications/validation', fields: errors })
+  }
+  const city = text(input.city)
+  const email = text(input.email)
+  const message = text(input.message)
   const now = serverTimestamp()
   return addDoc(collection(db, COLLECTIONS.applications), {
     orgId,

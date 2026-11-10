@@ -71,6 +71,24 @@ describe('Formulario público de postulación', () => {
     expect(addDoc).not.toHaveBeenCalled()
   })
 
+  it('muestra el error debajo de cada campo de contacto inválido (PCIT-183)', async () => {
+    const user = userEvent.setup()
+    getDocFromServer.mockResolvedValueOnce({ exists: () => true })
+    renderForm()
+    await user.type(await screen.findByLabelText('Nombre completo'), 'Valentina Demo')
+    fireEvent.change(screen.getByLabelText('Fecha de nacimiento'), { target: { value: '2000-02-15' } })
+    await user.type(screen.getByLabelText('Ciudad'), 'L')
+    await user.type(screen.getByLabelText('Correo de contacto'), 'vale@example.test')
+    await user.type(screen.getByLabelText('Año de graduación'), '2027')
+    await user.click(screen.getByRole('checkbox'))
+    fireEvent.submit(screen.getByRole('form', { name: 'Formulario de postulación' }))
+    expect(await screen.findByText('Escribe tu ciudad (entre 2 y 100 caracteres).')).toBeTruthy()
+    expect(screen.getByLabelText('Ciudad').getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByLabelText('Correo de contacto').getAttribute('aria-invalid')).toBe('false')
+    expect(screen.getByRole('alert').textContent).toContain('Revisa los campos marcados')
+    expect(addDoc).not.toHaveBeenCalled()
+  })
+
   it('oculta los campos cuando el enlace fue desactivado', async () => {
     getDocFromServer.mockRejectedValueOnce({ code: 'permission-denied' })
     renderForm()

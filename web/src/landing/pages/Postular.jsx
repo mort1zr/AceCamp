@@ -112,7 +112,7 @@ function Formulario({ orgId, formId }) {
       setErrors(failure.fields ?? {})
       setError(failure.code === 'applications/video' ? failure.message :
         failure.fields || failure.message === 'applications/invalid-contact'
-        ? 'Revisa tus datos de contacto y confirma la autorización.'
+        ? 'Revisa los campos marcados y confirma la autorización.'
         : file && failure instanceof TypeError ? 'Comprueba tu conexión e inténtalo de nuevo.'
           : 'No pudimos enviar la postulación. Comprueba tu conexión y que el enlace siga activo.')
     } finally {
@@ -179,7 +179,9 @@ function Formulario({ orgId, formId }) {
         )}
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-semibold" htmlFor="message">Mensaje (opcional)</label>
-          <textarea className={inputClass} id="message" name="message" maxLength={1000} rows={4} />
+          <textarea className={inputClass} id="message" name="message" maxLength={1000} rows={4}
+            aria-invalid={Boolean(errors.message)} aria-describedby={errors.message ? 'message-error' : undefined} />
+          {errors.message && <p id="message-error" className="mt-1 text-sm">{errors.message}</p>}
         </div>
         {videoEnabled && <VideoField />}
         <div className="sm:col-span-2">
