@@ -121,8 +121,14 @@ Los valores están en **Firebase Console → Configuración del proyecto → Tus
 |---|---|
 | PR desde una rama del repositorio | Pasa la CI de la web, y luego una URL de vista previa (`acecam-e93a2--pr…web.app`) que dura 7 días, comentada en la PR |
 | PR desde un fork | Solo CI. Los forks no reciben secretos |
-| Merge a `main` | Pasa la CI de la web, y luego publica producción en `https://acecam-e93a2.web.app` y las reglas e índices |
+| Merge a `main` | Pasa la CI de la web, y luego publica producción en `https://acecam-e93a2.web.app` y las reglas e índices de Firestore. Las reglas de Storage, solo con `DEPLOY_STORAGE_RULES` (ver abajo) |
 | Falta el secreto | La CI corre y el deploy se omite con un aviso |
+
+**Reglas de Storage y plan Blaze.** El proyecto está en plan Spark, sin Cloud Storage, y publicar
+`storage.rules` falla con *Permissions denied enabling firebasestorage.googleapis.com*. Por eso el
+deploy publica solo las reglas de Firestore y deja un aviso. Cuando el proyecto pase a Blaze y
+Storage esté creado, crea en **GitHub → Settings → Secrets and variables → Actions → Variables**
+la variable `DEPLOY_STORAGE_RULES` con valor `true` para publicar también `storage.rules`.
 
 ### 3.4 Content-Security-Policy
 

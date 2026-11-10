@@ -270,7 +270,7 @@ def test_the_limit_is_written_for_people(seconds, text):
     assert text in processor.message_too_long(seconds)
 
 
-def write_video(path, seconds, fps=10, size=(64, 48)):
+def write_video(path, seconds, fps=30, size=(64, 48)):
     import cv2
     import numpy as np
 
@@ -306,19 +306,26 @@ def test_the_analyzer_rejects_long_videos_before_running_the_model(tmp_path, mon
 
 def test_a_low_resolution_video_ends_in_error_with_the_requirement(tmp_path):
     def low_resolution(path):
-        raise processor.VideoResolutionError(640, 360, 720)
+        raise processor.VideoResolutionError(640, 360, 720, 1280)
 
     store = MemoryStore({"m1": queued_match()})
 
     assert run_once(store, MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"}), low_resolution, tmp_path,
                     version="v") == ("m1", "error")
     assert store.matches["m1"]["errorMessage"] == (
-        "El video debe tener al menos 720p (1280x720). Grábalo o expórtalo en 720p o 1080p y vuelve a subirlo.")
+        "El video debe tener al menos 720p (1280×720). Grábalo o expórtalo en 720p o 1080p.")
 
 
-@pytest.mark.parametrize(("size", "accepted"), [((640, 360), False), ((1280, 720), True), ((720, 1280), True),
-                                                 ((1920, 1080), True)],
-                         ids=["360p", "720p", "720p-vertical", "1080p"])
+@pytest.mark.parametrize(("size", "accepted"), [
+    ((640, 360), False),
+    ((1280, 718), False),
+    ((1278, 720), False),
+    ((720, 1278), False),
+    ((720, 720), False),
+    ((1280, 720), True),
+    ((720, 1280), True),
+    ((1920, 1080), True),
+])
 def test_the_analyzer_checks_the_resolution_before_running_the_model(tmp_path, monkeypatch, size, accepted):
     import main
     from worker.__main__ import make_analyzer
@@ -335,3 +342,46 @@ def test_the_analyzer_checks_the_resolution_before_running_the_model(tmp_path, m
         with pytest.raises(processor.VideoResolutionError):
             analyze(video)
         assert ran == []
+
+
+@pytest.mark.parametrize(("fps", "status"), [(24, "error"), (25, "listo"), (30, "listo"),
+                                            (60, "listo"), (61, "error")])
+def test_worker_checks_fps_before_running_the_model(tmp_path, monkeypatch, fps, status):
+    import main
+    from worker.__main__ import make_analyzer
+
+    config = tmp_path / "config.yaml"
+    config.write_text("worker:\n  min_resolution: 0\n")
+    ran = []
+    monkeypatch.setattr(main, "run_pipeline", lambda config, render: ran.append(1) or {"model_statistics": model_stats()})
+    video = write_video(tmp_path / "clip.avi", seconds=0.2, fps=fps)
+    path = "orgs/org1/matches/m1/video.avi"
+    store = MemoryStore({"m1": queued_match(videoPath=path)})
+    storage = MemoryStorage({path: video.read_bytes()})
+
+    result = run_once(store, storage, make_analyzer(config, render_video=False), tmp_path / "work", version="v")
+
+    assert result == ("m1", status)
+    if status == "error":
+        assert ran == []
+        assert store.matches["m1"]["errorMessage"] == (
+            "El video debe tener entre 25 y 60 FPS. Grábalo o expórtalo dentro de ese rango.")
+    else:
+        assert ran == [1]
+        assert store.matches["m1"]["errorMessage"] is None
+    assert list((tmp_path / "work").iterdir()) == []
+
+
+def test_worker_rejects_unreported_fps_without_using_the_fallback(tmp_path, monkeypatch):
+    import main
+    import utils
+    from worker.__main__ import make_analyzer
+
+    monkeypatch.setattr(utils, "get_video_info", lambda path: utils.VideoInfo(24, 1280, 720, 2400, fps_reported=False))
+    monkeypatch.setattr(main, "run_pipeline", lambda *args, **kwargs: pytest.fail("El modelo no debe ejecutarse"))
+    store = MemoryStore({"m1": queued_match()})
+    storage = MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"})
+
+    assert run_once(store, storage, make_analyzer(render_video=False), tmp_path, version="v") == ("m1", "error")
+    assert store.matches["m1"]["errorMessage"] == (
+        "No se pudieron verificar los FPS del video. Expórtalo entre 25 y 60 FPS.")

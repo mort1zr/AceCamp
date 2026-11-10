@@ -12,7 +12,7 @@ import {
   isIsoDate,
   isMatchStatus,
 } from '../src/panel/lib/schema.js'
-import { PLANES } from '../src/panel/lib/planes.js'
+import { PLANES, pruebaVencida } from '../src/panel/lib/planes.js'
 import { buildSeedData } from './seedData.mjs'
 
 const data = buildSeedData()
@@ -94,14 +94,22 @@ describe('datos de ejemplo de Firestore', () => {
     }
   })
 
-  it('planes válidos: contratados con periodo y fecha, y una organización sin plan (PCIT-158)', () => {
+  it('planes válidos: contratados con periodo y fecha (PCIT-158)', () => {
     for (const { doc } of data.orgs) {
       expect(Object.keys(PLANES)).toContain(doc.plan)
       if (doc.plan === 'free') continue
       expect(['mensual', 'anual']).toContain(doc.billingCycle)
       expect(doc.planSince).toBeInstanceOf(Date)
     }
-    expect(data.orgs.some(org => org.doc.plan === 'free')).toBe(true)
+  })
+
+  it('una organización con plan activo y otra con la prueba vencida (PCIT-173)', () => {
+    const club = data.orgs.find(org => org.doc.plan === 'prueba')
+    expect(club?.id).toBe('org-club')
+    // Vencida desde el 4 de noviembre de 2026 (30 días después de planSince).
+    expect(pruebaVencida(club.doc, new Date('2026-11-05T00:00:00Z'))).toBe(true)
+    expect(pruebaVencida(club.doc)).toBe(true)
+    expect(data.orgs.some(org => org.doc.plan === 'ultra' && !pruebaVencida(org.doc))).toBe(true)
   })
 
   it('invitaciones pendientes con el correo como ID, de un dueño y a alguien sin cuenta (PCIT-40)', () => {

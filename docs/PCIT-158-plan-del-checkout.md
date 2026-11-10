@@ -9,7 +9,7 @@ elegido y el panel se desbloquea. No hay cobro real y no se guarda nada de la ta
 
 | Elegido en el checkout | Se guarda en `orgs/{orgId}.plan` | Análisis por mes |
 | --- | --- | --- |
-| Básico, primera vez | `prueba` (1 mes) | 15 |
+| Básico, primera vez | `prueba` (30 días) | 15 |
 | Básico, después de haber contratado antes | `basico` | 30 |
 | Pro | `pro` | 150 |
 | Ultra | `ultra` | Sin tope |
@@ -19,9 +19,29 @@ servidor). Con esos dos datos, Configuración → Plan muestra el periodo y la p
 renovación; en la prueba muestra cuándo termina (`proximaRenovacion` en
 `web/src/panel/lib/planes.js`).
 
+## Subtareas
+
+| Subtarea | Qué hace |
+| --- | --- |
+| PCIT-170 | La prueba vence a los 30 días en la web (`planVigente`, `pruebaVencida`, `finDePrueba` en `planes.js`) |
+| PCIT-171 | Las reglas aplican el vencimiento (`trialExpired` en `withinPlan`) |
+| PCIT-172 | El checkout ofrece la prueba gratis solo si la organización puede usarla (`usePruebaDisponible`) |
+| PCIT-173 | Datos de ejemplo con una prueba vencida y esta documentación |
+
+## Vencimiento de la prueba
+
+- La prueba de Básico dura **30 días** desde `planSince` (`DIAS_PRUEBA`). Después, la
+  organización cuenta como **Sin plan**: el panel queda bloqueado, el límite es 0 y
+  Configuración → Plan dice "Tu mes de prueba terminó el …".
+- No se reescribe el documento: el plan guardado sigue siendo `prueba` y la web y las
+  reglas calculan que venció. Así no hace falta un proceso que lo cambie a `free`.
+- Una prueba sin `planSince` (cargada a mano) no vence.
+- Para seguir, el dueño contrata otro plan. Como ya tiene `planSince`, Básico entra como
+  Básico normal y el checkout no le vuelve a ofrecer la prueba gratis (PCIT-172).
+
 ## Cómo funciona
 
-- `App.jsx` pasa `contratar` a `<Checkout />`, que llama a `contratarPlan()`
+- `web/src/panel/rutas.jsx` pasa `contratar` a `<Checkout />`, que llama a `contratarPlan()`
   (`web/src/panel/lib/contratarPlan.js`). Una transacción lee la organización para
   decidir si Básico es prueba y escribe solo `plan`, `billingCycle` y `planSince`.
 - Si no se puede guardar, el checkout avisa y deja reintentar.
@@ -39,14 +59,17 @@ renovación; en la prueba muestra cuándo termina (`proximaRenovacion` en
 
 ## Pruebas
 
-- Unitarias: `contratarPlan.test.js`, `Checkout.test.jsx`, `planes.test.js`
-  (renovación mensual, anual y fin de la prueba) y Configuración → Plan.
+- Unitarias: `contratarPlan.test.js`, `Checkout.test.jsx` (prueba ofrecida o no),
+  `usePruebaDisponible.test.js`, `planes.test.js` (renovación, vencimiento y que los 30
+  días coincidan con las reglas) y Configuración → Plan.
 - Reglas (`npm run test:rules`): dueño contrata Pro y Ultra, prueba una sola vez,
-  planes, periodos, fechas y campos inválidos, y que nadie más que el dueño contrate.
+  planes, periodos, fechas y campos inválidos, que nadie más que el dueño contrate, y
+  prueba vigente, vencida y sin fecha.
+- `npm run seed`: Club Ejemplo (`coach2@acecam.test`) tiene la prueba vencida.
 
 ## Pendiente (PCIT-67 y cobro real)
 
 - El pago es simulado: cualquier dueño puede activarse Ultra desde la web. Con un
   cobro real, el plan debe escribirlo el servidor tras confirmar el pago.
-- El fin de la prueba se muestra, pero todavía nada pasa la organización a `free`
-  cuando vence.
+- Las reglas de Firestore llegan a producción solo cuando se fusione la PR #21, que
+  saca Storage del paso de reglas del despliegue.

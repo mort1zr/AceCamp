@@ -31,7 +31,8 @@ procesado sigue siendo de escritura exclusiva del worker. Ver
 | `matches` | Admin: su organización; coach: propios | En `'en cola'`, sin estadísticas, con un jugador accesible por rol y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola`, dentro del alcance por rol | Dentro del alcance por rol, salvo si está `procesando` |
 | `matches/{matchId}/coachNotes/{uid}` | Nota propia por ID, en un partido Listo accesible | Nota propia con texto y fecha de servidor | Solo su propia nota | Solo su propia nota |
 | `invites/{correo}` | Dueño o admin: las de su organización. Invitado: solo la suya | Dueño o admin, `pendiente`, para su organización (PCIT-40) | Solo la persona invitada la pasa a `aceptada`, junto con su ficha en `users` | Dueño o admin, mientras esté `pendiente` |
-| `applications` | De su organización | Por ahora solo con sesión (el formulario público llega en PCIT-54) | Estado y notas | De su organización |
+| `applications` | De su organización | Equipo de la organización o visitante con enlace de postulación activo | Estado y notas | De su organización |
+| `orgs/{orgId}/applicationForms` | Consulta directa de un enlace activo. Solo dueño o admin puede listar | Dueño o admin | — | Dueño o admin |
 
 El worker usa el Admin SDK, que no pasa por las reglas: es el único que escribe
 `procesando`, `listo`, `error` y `statistics`. Las consultas de la web **siempre**
@@ -95,7 +96,7 @@ Se crea en el registro, junto con el usuario (PCIT-21).
 | `program` | string \| null | no | Ej. "Tenis varones" |
 | `plan` | string | sí | `'free'` (sin plan) al registrarse. `'prueba'`, `'basico'`, `'pro'` o `'ultra'` fijan los análisis por mes (PCIT-41, `docs/PCIT-41-limite-de-analisis.md`) |
 | `billingCycle` | string | no | `'mensual'` o `'anual'`, el periodo elegido en el checkout (PCIT-158) |
-| `planSince` | Timestamp | no | Inicio o renovación del plan, hora del servidor. Sin este campo, Básico entra como `'prueba'` (una sola vez) |
+| `planSince` | Timestamp | no | Inicio o renovación del plan, hora del servidor. Sin este campo, Básico entra como `'prueba'` (una sola vez). La prueba vence 30 días después de `planSince` y la organización vuelve a contar como sin plan (PCIT-170, PCIT-171) |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
 
@@ -142,6 +143,7 @@ El resto los completa la gestión completa (PCIT-42).
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
 | `deletedAt` | Timestamp | no | Fecha de retirada de la plantilla (PCIT-42) |
+| `sourceApplicationId` | string | no | Postulación de origen cuando se crea la ficha desde Reclutamiento |
 
 PCIT-42 añade la acción **Eliminar de la plantilla**: guarda `deletedAt` y
 `updatedAt`, oculta el jugador en Jugadores, Dashboard y nuevos análisis, y
@@ -289,6 +291,7 @@ de ser jugador del equipo.
 | Campo | Tipo | Obligatorio | Notas |
 | --- | --- | --- | --- |
 | `orgId` | string | sí | Organización dueña del formulario |
+| `formId` | string | en formulario público | ID del enlace de postulación activo al enviar |
 | `status` | estado | sí | Al crearse: `'nueva'` |
 | `fullName` | string | sí | |
 | `birthDate` | string `YYYY-MM-DD` | sí | |
@@ -302,16 +305,24 @@ de ser jugador del equipo.
 | `backhand` | `'dos manos'` \| `'una mano'` \| null | no | |
 | `guardian` | `{ name, phone, email }` \| null | sí si es menor de 18 | |
 | `videoLinks` | string[] | no | Links de YouTube, máximo 5 |
-| `videoPaths` | string[] | no | Archivos subidos a Storage |
+| `videoPaths` | string[] | no | Rutas privadas confirmadas por el servidor. La demo guarda un archivo opcional en `orgs/{orgId}/applications/{appId}/video.mp4` o `.mov`. |
+| `videoUpload` | object | no | Reserva temporal de ruta y huella del archivo para reintentar sin sobrescribirlo. La escribe el servidor y la retira al confirmar `videoPaths`. |
 | `message` | string | no | Hasta 1000 caracteres |
-| `consent` | object | sí | Mismo formato que en `players`, con `method` `'self'` o `'guardian'` y `recordedBy: 'public-form'` |
-| `playerId` | string \| null | no | Se llena al usar "Crear jugador" (PCIT-56) |
+| `consent` | object | sí | Mismo formato que en `players`. El formulario usa `applications-v1` para datos y `applications-video-v1` al autorizar también un video. `method` es `'self'` o `'guardian'` y `recordedBy` es `'public-form'`. |
+| `playerId` | string \| null | no | Ficha activa de la misma organización, creada o vinculada desde Reclutamiento (PCIT-56) |
 | `internalNotes` | string | no | Notas del equipo; nunca visibles para el postulante |
 | `reviewedBy` | string \| null | no | `uid` |
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
 
 **Estados:** `nueva` → `en revisión` → `analizada` → `contactada` o `descartada`.
+También se puede descartar una postulación contactada. Las reglas rechazan
+saltos y retrocesos. La bandeja escribe el estado con una transacción y registra
+quién lo cambió y cuándo en `reviewedBy` y `updatedAt`.
+
+El alta desde la bandeja guarda la ficha y `playerId` en la misma transacción.
+Firestore exige que la referencia apunte a un jugador activo que el usuario
+puede gestionar. Si la postulación ya tiene jugador, se conserva ese vínculo.
 
 ---
 
@@ -331,7 +342,7 @@ cd web && npm run seed
 | Usuario | Contraseña | Organización |
 | --- | --- | --- |
 | `coach@acecam.test` | `acecam123` | Universidad Demo |
-| `coach2@acecam.test` | `acecam123` | Club Ejemplo |
+| `coach2@acecam.test` | `acecam123` | Club Ejemplo (prueba de Básico vencida: panel bloqueado) |
 
 El script **se niega a correr contra el proyecto real**: solo funciona con los
 emuladores y el proyecto `demo-acecam`. Para ver los datos sin emuladores:

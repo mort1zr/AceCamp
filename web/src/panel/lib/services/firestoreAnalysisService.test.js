@@ -109,6 +109,13 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     expect(runTransaction).not.toHaveBeenCalled()
   })
 
+  it('con la prueba de Básico vencida no se analiza (PCIT-170)', async () => {
+    const hace = dias => new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+    getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'prueba', planSince: hace(31) }) : absent))
+    await expect(make().enqueue(input, { requestId: 'r-vencida' })).rejects.toMatchObject({ code: 'analysis/limit', limit: 0 })
+    expect(upload).not.toHaveBeenCalled()
+  })
+
   it('sin plan no se analiza; Ultra no tiene tope', async () => {
     getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'free' }) : absent))
     await expect(make().enqueue(input, { requestId: 'r-free' })).rejects.toMatchObject({ code: 'analysis/limit', limit: 0 })

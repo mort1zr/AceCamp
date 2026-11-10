@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore'
 
 import { anularInvitacion, invitarMiembro } from '../invitaciones.js'
-import { PLANES, proximaRenovacion } from '../planes.js'
+import { finDePrueba, PLANES, planVigente, proximaRenovacion, pruebaVencida } from '../planes.js'
 import { INVITE_STATUS } from '../schema.js'
 import { usagePeriod, usageRef } from '../usage.js'
 
@@ -56,7 +56,9 @@ export function createFirestoreConfiguracionService({
       }
       const emitir = () => {
         if (!estado.usuario || !estado.organizacion) return
-        const plan = PLANES[estado.organizacion.plan] ?? PLANES.free
+        // Con la prueba vencida, la organización cuenta como Sin plan (PCIT-170).
+        const plan = PLANES[planVigente(estado.organizacion, ahora())]
+        const vencida = pruebaVencida(estado.organizacion, ahora())
         // Contador de la organización en el mes (PCIT-41), igual para admin y coach.
         const usados = estado.uso.analyses ?? 0
         const esOrganizacion = plan.id === 'ultra'
@@ -105,9 +107,11 @@ export function createFirestoreConfiguracionService({
             used: usados,
             limit: plan.limite,
             // Periodo y renovación guardados por el checkout (PCIT-158).
-            cycle: estado.organizacion.billingCycle ?? null,
-            renewsAt:
-              proximaRenovacion(
+            cycle: vencida ? null : estado.organizacion.billingCycle ?? null,
+            trialEndedAt: vencida ? finDePrueba(estado.organizacion.planSince).toISOString() : null,
+            renewsAt: vencida
+              ? null
+              : proximaRenovacion(
                 {
                   plan: estado.organizacion.plan,
                   planSince: estado.organizacion.planSince?.toDate?.() ?? estado.organizacion.planSince,

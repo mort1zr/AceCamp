@@ -13,7 +13,11 @@ export function readVideoMetadata(output) {
   const brand = String(data?.format?.tags?.major_brand ?? '').trim()
   const supportedBrand = /^(isom|iso[2-9]|avc1|mp41|mp42|M4V|MSNV|dash|qt)$/.test(brand)
   if (!formats.includes('mov') || !formats.includes('mp4') || !supportedBrand || !video || !Number.isFinite(duration) || duration <= 0) throw new VideoImportError('format', 'Usa un MP4 o MOV con una pista de video válida.')
-  return { durationSeconds: duration, width: video.width, height: video.height, extension: brand === 'qt' ? 'mov' : 'mp4', contentType: brand === 'qt' ? 'video/quicktime' : 'video/mp4' }
+  const rate = /^(\d+)\/(\d+)$/.exec(video.avg_frame_rate ?? '')
+  const fps = rate ? Number(rate[1]) / Number(rate[2]) : 0
+  return { durationSeconds: duration, width: video.width, height: video.height,
+    fps: Number.isFinite(fps) && fps > 0 ? fps : null,
+    extension: brand === 'qt' ? 'mov' : 'mp4', contentType: brand === 'qt' ? 'video/quicktime' : 'video/mp4' }
 }
 
 /** No shell, network protocols or executable path chosen by the caller. */
@@ -26,7 +30,7 @@ export function createLocalVideoProbe({ executable, timeoutMs = 15_000, execute 
       const { stdout } = await execute(executable, [
         '-v', 'error', '-protocol_whitelist', 'file', '-format_whitelist', 'mov',
         '-enable_drefs', '0', '-use_absolute_path', '0',
-        '-show_entries', 'format=format_name,duration:format_tags=major_brand:stream=codec_type,width,height:stream_disposition=attached_pic',
+        '-show_entries', 'format=format_name,duration:format_tags=major_brand:stream=codec_type,width,height,avg_frame_rate:stream_disposition=attached_pic',
         '-of', 'json', localPath,
       ], { signal, timeout: timeoutMs, maxBuffer: 64 * 1024, windowsHide: true })
       return readVideoMetadata(stdout)

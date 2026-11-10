@@ -4,7 +4,8 @@ rules_version = '2';
 // Esquema: docs/firestore-schema.md (PCIT-22). Pruebas: web/tests/rules (npm run test:rules).
 //
 // Principios:
-// - Solo usuarios con sesión leen o escriben. Todo lo no listado aquí se niega.
+// - El acceso exige sesión salvo la recepción de postulaciones por enlace activo.
+//   Todo lo no listado aquí se niega.
 // - Cada documento de players, matches y applications lleva orgId, y solo lo ve
 //   o modifica alguien cuya ficha en users tenga ese mismo orgId.
 // - orgId, createdBy y el consentimiento salen de la sesión y no se pueden cambiar.
@@ -59,13 +60,23 @@ service cloud.firestore {
       return /databases/$(database)/documents/matches/$(matchId);
     }
 
+    // La prueba de Básico dura 30 días desde planSince (DIAS_PRUEBA en planes.js, PCIT-171).
+    // Vencida, la organización no tiene análisis, como "Sin plan". Sin planSince sigue vigente.
+    function trialExpired(org) {
+      return org.get('plan', 'free') == 'prueba'
+        && org.get('planSince', null) is timestamp
+        && request.time >= org.planSince + duration.value(30, 'd');
+    }
+
     // Análisis por mes según orgs/{orgId}.plan. Mismos valores que PLANES en
     // web/src/panel/lib/planes.js: cambiar ambos a la vez (lo comprueba planes.test.js).
     // 'free' (sin plan) y cualquier valor desconocido no permiten análisis; 'ultra' no tiene tope.
     function withinPlan(orgId, analyses) {
-      let plan = get(/databases/$(database)/documents/orgs/$(orgId)).data.get('plan', 'free');
-      return plan == 'ultra'
-        || analyses <= {'prueba': 15, 'basico': 30, 'pro': 150}.get(plan, 0);
+      let org = get(/databases/$(database)/documents/orgs/$(orgId)).data;
+      let plan = org.get('plan', 'free');
+      return !trialExpired(org)
+        && (plan == 'ultra'
+          || analyses <= {'prueba': 15, 'basico': 30, 'pro': 150}.get(plan, 0));
     }
 
     // El partido nuevo suma exactamente uno al contador del mes, en la misma escritura.
@@ -307,6 +318,13 @@ service cloud.firestore {
         && validGuardian(data);
     }
 
+    function validPlayerApplicationSource(data, playerId) {
+      let application = /databases/$(database)/documents/applications/$(data.sourceApplicationId);
+      return exists(application) && get(application).data.orgId == data.orgId
+        && get(application).data.get('playerId', null) == null
+        && getAfter(application).data.playerId == playerId;
+    }
+
     match /players/{playerId} {
       // get de un documento inexistente se permite: no revela nada y lo usa el alta de partidos.
       allow get: if signedIn() && (resource == null || canManage(resource.data));
@@ -317,11 +335,13 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'orgId', 'fullName', 'birthDate', 'academy', 'category', 'dominantHand', 'backhand',
              'utr', 'nationalRanking', 'nationality', 'graduationYear', 'coachName', 'guardian',
-             'consent', 'createdBy', 'createdAt'])
+             'consent', 'createdBy', 'createdAt', 'sourceApplicationId'])
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
         && validConsent(request.resource.data.consent, request.auth.uid)
-        && validPlayer(request.resource.data);
+        && validPlayer(request.resource.data)
+        && (!('sourceApplicationId' in request.resource.data) ||
+          validPlayerApplicationSource(request.resource.data, playerId));
 
       allow update: if canManage(resource.data)
         && resource.data.get('deletedAt', null) == null
@@ -422,13 +442,88 @@ service cloud.firestore {
     }
 
     // ---------- applications/{applicationId} ----------
-    // El formulario público (PCIT-54, sprint 3) tendrá su propia regla de alta.
+    // PCIT-54. Un enlace solo es válido si existe bajo su propia organización.
+    match /orgs/{orgId}/applicationForms/{formId} {
+      allow get: if resource != null || canInvite(orgId);
+      allow list, delete: if canInvite(orgId);
+      allow create: if canInvite(orgId)
+        && formId.matches('^[A-Za-z0-9]{20}$')
+        && request.resource.data.keys().hasOnly(['createdAt'])
+        && request.resource.data.createdAt == request.time;
+    }
+
+    function publicApplicationEmail(value) {
+      return isText(value, 5, 254) && value.matches('^[^@\\s]+@[^@\\s]+[.][^@\\s]+$');
+    }
+
+    function publicApplicationGuardian(guardian) {
+      return guardian is map && guardian.keys().hasOnly(['name', 'phone', 'email'])
+        && isText(guardian.name, 2, 120) && guardian.name.trim().size() >= 2
+        && isText(guardian.phone, 7, 32) && guardian.phone.matches('^[+]?([ ().-]*[0-9]){7,}[ ().-]*$')
+        && publicApplicationEmail(guardian.email);
+    }
+
+    function validPublicApplicationConsent(data) {
+      let parts = data.birthDate.split('-');
+      let year = int(parts[0]);
+      let month = int(parts[1]);
+      let day = int(parts[2]);
+      let birth = timestamp.date(year, month, day);
+      let today = request.time.date();
+      let age = today.year() - year -
+        (today.month() < month || (today.month() == month && today.day() < day) ? 1 : 0);
+      let consent = data.consent;
+      return year >= 1900 && birth.year() == year && birth.month() == month && birth.day() == day && birth <= today
+        && validConsent(consent, 'public-form')
+        && consent.keys().hasOnly(['accepted', 'version', 'method', 'recordedBy', 'recordedAt'])
+        && consent.version in ['applications-v1', 'applications-video-v1'] && consent.recordedAt == request.time
+        && (age < 18
+          ? consent.method == 'guardian' && publicApplicationGuardian(data.guardian)
+          : consent.method == 'self' && data.guardian == null);
+    }
+
+    function validPublicApplication(data) {
+      return data.keys().hasOnly(['orgId', 'formId', 'status', 'fullName', 'birthDate', 'city',
+          'email', 'graduationYear', 'academy', 'guardian', 'message', 'consent', 'createdAt'])
+        && isText(data.orgId, 1, 128) && data.orgId.matches('^[A-Za-z0-9_-]+$')
+        && data.formId is string && data.formId.matches('^[A-Za-z0-9]{20}$')
+        && data.status == 'nueva' && data.createdAt == request.time
+        && isText(data.fullName, 2, 120) && data.fullName.trim().size() >= 2
+        && isText(data.city, 2, 100) && data.city.trim().size() >= 2
+        && publicApplicationEmail(data.email)
+        && data.graduationYear is int && data.graduationYear >= 1900 && data.graduationYear <= 2100
+        && optionalText(data, 'academy', 120) && optionalText(data, 'message', 1000)
+        && isIsoDate(data.birthDate) && validPublicApplicationConsent(data)
+        && exists(/databases/$(database)/documents/orgs/$(data.orgId)/applicationForms/$(data.formId));
+    }
+
+    function validApplicationTransition(from, to) {
+      return from == to
+        || (from == 'nueva' && to == 'en revisión')
+        || (from == 'en revisión' && to == 'analizada')
+        || (from == 'analizada' && to in ['contactada', 'descartada'])
+        || (from == 'contactada' && to == 'descartada');
+    }
+
+    function canLinkApplicationPlayer() {
+      let next = request.resource.data;
+      let player = /databases/$(database)/documents/players/$(next.playerId);
+      return resource.data.get('playerId', null) == null
+        && isText(next.playerId, 1, 1500) && next.playerId.matches('^[^/]+$')
+        && next.updatedAt == request.time && onlyChanges(['playerId', 'updatedAt'])
+        && getAfter(player).data.orgId == resource.data.orgId
+        && getAfter(player).data.get('deletedAt', null) == null
+        && canManage(getAfter(player).data);
+    }
 
     match /applications/{applicationId} {
       allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
       allow list: if inOrg(resource.data.orgId);
 
       allow create: if inOrg(request.resource.data.orgId)
+        && !('formId' in request.resource.data)
+        && !request.resource.data.keys().hasAny(['videoPaths', 'videoUpload'])
+        && request.resource.data.get('playerId', null) == null
         && request.resource.data.status == 'nueva'
         && request.resource.data.createdAt == request.time
         && isText(request.resource.data.fullName, 2, 120)
@@ -436,9 +531,15 @@ service cloud.firestore {
         && request.resource.data.consent is map
         && request.resource.data.consent.accepted == true;
 
+      allow create: if validPublicApplication(request.resource.data);
+
       allow update: if inOrg(resource.data.orgId)
-        && unchanged(['orgId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email'])
-        && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada'];
+        && unchanged(['orgId', 'formId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email',
+             'playerId', 'videoPaths', 'videoUpload'])
+        && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada']
+        && validApplicationTransition(resource.data.status, request.resource.data.status);
+
+      allow update: if inOrg(resource.data.orgId) && canLinkApplicationPlayer();
 
       allow delete: if inOrg(resource.data.orgId);
     }

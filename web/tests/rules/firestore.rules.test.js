@@ -11,6 +11,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -28,6 +29,7 @@ import { createFirestoreMatchNotesService } from '../../src/panel/lib/services/f
 import { createFirestoreDashboardService } from '../../src/panel/lib/services/firestoreDashboardService.js'
 import { buildPlayerComparisonHistory } from '../../src/panel/lib/comparisonHistory.js'
 import { usagePeriod } from '../../src/panel/lib/usage.js'
+import { publicFormExists, submitPublicApplication } from '../../src/panel/lib/publicApplications.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -458,6 +460,22 @@ describe('uso mensual de análisis (PCIT-41)', () => {
       if (analyses != null) await setDoc(usageDoc(db), { analyses, lastMatchId: 'previo', updatedAt: new Date() })
     })
 
+    it('la prueba de Básico vence a los 30 días; sin fecha sigue vigente (PCIT-171)', async () => {
+      const hace = dias => new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+      const prueba = planSince => env.withSecurityRulesDisabled(context =>
+        updateDoc(doc(context.firestore(), 'orgs', ORG), { plan: 'prueba', billingCycle: 'mensual', planSince }))
+      await prueba(hace(29))
+      await assertSucceeds(createMatch(coachDb(), 'm-vigente'))
+      await prueba(hace(31))
+      await assertFails(createMatch(coachDb(), 'm-vencida'))
+      // Después de vencida, contratar Básico normal vuelve a permitir análisis.
+      await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'orgs', ORG), { plan: 'basico' }))
+      await assertSucceeds(createMatch(coachDb(), 'm-basico'))
+      // Una prueba cargada a mano, sin planSince, no vence.
+      await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'orgs', ORG), { plan: 'prueba', planSince: deleteField() }))
+      await assertSucceeds(createMatch(coachDb(), 'm-sin-fecha'))
+    })
+
     it('permite llegar justo al límite y niega el siguiente análisis', async () => {
       await preparar('prueba', 14)
       await assertSucceeds(createMatch(coachDb(), 'm-15'))
@@ -505,5 +523,103 @@ describe('applications', () => {
   it('rechaza estados inventados y postulaciones ajenas', async () => {
     await assertFails(updateDoc(doc(coachDb(), 'applications', 'a-demo'), { status: 'aprobada' }))
     await assertFails(updateDoc(doc(coachDb(), 'applications', 'a-club'), { status: 'en revisión' }))
+  })
+
+  it('impide saltar estados o reabrir una postulación descartada', async () => {
+    const ref = doc(coachDb(), 'applications', 'a-demo')
+    await assertFails(updateDoc(ref, { status: 'contactada' }))
+    await assertSucceeds(updateDoc(ref, { status: 'en revisión' }))
+    await assertSucceeds(updateDoc(ref, { status: 'analizada' }))
+    await assertSucceeds(updateDoc(ref, { status: 'descartada' }))
+    await assertFails(updateDoc(ref, { status: 'en revisión' }))
+  })
+
+  it('crea y enlaza un solo jugador cuando dos sesiones procesan la misma postulación', async () => {
+    const team = coachDb()
+    const makeService = () => createFirestorePlayersService({ db: coachDb(), orgId: ORG, actorId: COACH })
+    const input = { fullName: 'Andrés Villanueva', birthDate: '2000-02-15', consentAccepted: true }
+    const attempts = await Promise.all([
+      makeService().assignApplication('a-demo', { input }),
+      makeService().assignApplication('a-demo', { input }),
+    ])
+    expect(attempts[0].id).toBe(attempts[1].id)
+    expect(attempts.map(({ alreadyLinked }) => alreadyLinked).sort()).toEqual([false, true])
+    const linked = (await getDoc(doc(team, 'applications', 'a-demo'))).data()
+    expect(linked.playerId).toBe(attempts[0].id)
+    expect((await getDoc(doc(team, 'players', linked.playerId))).data()).toMatchObject({
+      fullName: input.fullName, sourceApplicationId: 'a-demo', createdBy: COACH,
+    })
+    const players = await getDocs(query(collection(team, 'players'), where('orgId', '==', ORG), where('createdBy', '==', COACH)))
+    expect(players.docs.filter((player) => player.data().sourceApplicationId === 'a-demo')).toHaveLength(1)
+  })
+
+  it('vincula una ficha existente y las reglas rechazan vínculos ajenos y reemplazos', async () => {
+    const team = coachDb()
+    const application = doc(team, 'applications', 'a-demo')
+    await assertFails(updateDoc(application, { playerId: 'p-club', updatedAt: serverTimestamp() }))
+    await assertFails(updateDoc(application, { playerId: 'ausente', updatedAt: serverTimestamp() }))
+    await assertFails(setDoc(doc(team, 'players', 'orphan'), newPlayer({ sourceApplicationId: 'a-demo' })))
+    const service = createFirestorePlayersService({ db: team, orgId: ORG, actorId: COACH })
+    await expect(service.assignApplication('a-demo', { playerId: 'p-demo' })).resolves.toEqual({ id: 'p-demo', alreadyLinked: false })
+    await expect(service.assignApplication('a-demo', { input: {} })).resolves.toEqual({ id: 'p-demo', alreadyLinked: true })
+    await assertFails(updateDoc(application, { playerId: null, updatedAt: serverTimestamp() }))
+    expect((await getDoc(application)).data().playerId).toBe('p-demo')
+  })
+
+  const formId = 'AcecamFormDemoABC123'
+  const form = (db, orgId = ORG) => doc(db, 'orgs', orgId, 'applicationForms', formId)
+  const newPublicApplication = (overrides = {}) => ({
+    orgId: ORG, formId, status: 'nueva', fullName: 'Valentina Demo', city: 'Lima',
+    birthDate: '2000-02-15', email: 'valentina@example.test', graduationYear: 2027,
+    guardian: null, createdAt: serverTimestamp(),
+    consent: { accepted: true, version: 'applications-v1', method: 'self', recordedBy: 'public-form', recordedAt: serverTimestamp() },
+    ...overrides,
+  })
+
+  it('recibe una postulación real del servicio público y solo la organización puede leerla', async () => {
+    const team = coachDb()
+    const visitor = anonDb()
+    await assertSucceeds(setDoc(form(team), { createdAt: serverTimestamp() }))
+    await expect(publicFormExists(visitor, ORG, formId)).resolves.toBe(true)
+    const submitted = await assertSucceeds(submitPublicApplication(visitor, { orgId: ORG, formId }, {
+      fullName: 'Valentina Demo', birthDate: '2000-02-15', city: 'Lima', email: 'valentina@example.test',
+      graduationYear: '2027', academy: '', message: '', consentAccepted: true,
+    }))
+    const saved = await assertSucceeds(getDoc(doc(team, 'applications', submitted.id)))
+    expect(saved.data()).toMatchObject({ orgId: ORG, status: 'nueva', consent: { method: 'self', accepted: true } })
+    await assertFails(getDoc(submitted))
+    await assertFails(updateDoc(submitted, { status: 'en revisión' }))
+    await assertFails(getDocs(collection(visitor, 'orgs', ORG, 'applicationForms')))
+    const other = env.authenticatedContext(OTHER_COACH).firestore()
+    await assertFails(getDoc(doc(other, 'applications', submitted.id)))
+    await assertFails(deleteDoc(form(other)))
+    await assertSucceeds(deleteDoc(form(team)))
+    await assertFails(setDoc(doc(visitor, 'applications', 'revoked'), newPublicApplication()))
+  })
+
+  it('rechaza altas públicas ajenas, sin consentimiento o con datos manipulados', async () => {
+    const visitor = anonDb()
+    await assertFails(setDoc(form(visitor), { createdAt: serverTimestamp() }))
+    await assertSucceeds(setDoc(form(coachDb()), { createdAt: serverTimestamp() }))
+    const candidates = [
+      { orgId: OTHER_ORG },
+      { consent: { ...newPublicApplication().consent, accepted: false } },
+      { status: 'analizada' },
+      { birthDate: '2030-12-01' },
+      { birthDate: '2000-02-30' },
+      { birthDate: '2020-05-08' },
+      { email: 'correo-invalido' },
+      { playerId: 'p-demo' },
+      { message: 'a'.repeat(1001) },
+    ]
+    for (const [index, overrides] of candidates.entries()) {
+      await assertFails(setDoc(doc(visitor, 'applications', `invalid-${index}`), newPublicApplication(overrides)))
+    }
+    const validGuardian = newPublicApplication({
+      birthDate: '2020-05-08',
+      guardian: { name: 'Apoderado Demo', email: 'adulto@example.test', phone: '+51 999 111 222' },
+      consent: { ...newPublicApplication().consent, method: 'guardian' },
+    })
+    await assertSucceeds(setDoc(doc(visitor, 'applications', 'minor'), validGuardian))
   })
 })

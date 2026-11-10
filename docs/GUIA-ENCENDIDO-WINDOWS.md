@@ -145,11 +145,11 @@ que solo estaban en memoria, aunque el código siga en GitHub.
 8. En **Partidos → Ver reporte**, revisa los indicadores y reproduce el video
    procesado. En el Dashboard selecciona el mismo jugador y el periodo correcto.
 
-El worker comprueba hasta 60 segundos y al menos 720 píxeles en el lado corto.
-El requisito acordado de 25–60 FPS está documentado en PCIT-147 para su validación
-completa; esta guía no afirma que ya se rechace todo FPS fuera del rango. Para
-el ensayo usa 1080p/30 FPS. La subida local admite MP4/MOV hasta 500 MiB, pero
-para empezar conviene un clip pequeño. Un archivo aceptado no garantiza buenas
+El worker comprueba hasta 60 segundos, al menos 1280 píxeles en el lado largo y
+720 en el corto, y entre 25 y 60 FPS inclusive. Si rechaza el video, la cola de
+**Analizar video** muestra el motivo. Para el ensayo usa 1080p/30 FPS. La subida
+local admite MP4/MOV hasta 500 MiB. Para empezar conviene un clip pequeño.
+Un archivo aceptado no garantiza buenas
 detecciones si tiene primeros planos, cortes o no se ve toda la cancha.
 
 El video anotado se genera y guarda antes de Listo. Un golpe sin velocidad

@@ -14,6 +14,7 @@ class VideoInfo:
     width: int
     height: int
     frame_count: int
+    fps_reported: bool = True
 
     @property
     def duration_seconds(self) -> float:
@@ -32,10 +33,11 @@ def get_video_info(video_path) -> VideoInfo:
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     finally:
         cap.release()
-    if not fps or math.isnan(fps) or fps <= 0:
+    fps_reported = math.isfinite(fps) and fps > 0
+    if not fps_reported:
         warnings.warn(f"{video_path} no informa de sus fps; se usan {FALLBACK_FPS}.", stacklevel=2)
         fps = FALLBACK_FPS
-    return VideoInfo(fps=float(fps), width=width, height=height, frame_count=frame_count)
+    return VideoInfo(fps=float(fps), width=width, height=height, frame_count=frame_count, fps_reported=fps_reported)
 
 
 def iter_frames(video_path):

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
 import { usePlanVista } from '../context/PlanVistaContext.js'
+import { MATCH_STATUS } from '../lib/schema.js'
 import { quotaLow, quotaReached, remainingAnalyses } from '../lib/usage.js'
 import AnalysisForm from '../components/analysis/AnalysisForm.jsx'
 import PlayerForm from '../components/players/PlayerForm.jsx'
@@ -115,16 +116,38 @@ function AnalysisWorkspace({ service, playersService }) {
   const quedanPocos = service.mode === 'live' && quotaLow(uso.usados, uso.limite)
   const [playerId, setPlayerId] = useState('')
   const [showNewPlayer, setShowNewPlayer] = useState(false)
+  const playerName = (id) =>
+    players.rows.find((player) => player.id === id)?.fullName ?? 'Jugador no disponible'
   const columns = [
     {
       key: 'playerId',
       label: 'Jugador',
-      render: (id) =>
-        players.rows.find((player) => player.id === id)?.fullName ?? 'Jugador no disponible',
+      render: playerName,
     },
     { key: 'opponent', label: 'Rival' },
     { key: 'matchDate', label: 'Fecha' },
-    { key: 'status', label: 'Estado', render: (status) => <StatusBadge status={status} /> },
+    {
+      key: 'status',
+      label: 'Estado',
+      render: (status, match) => (
+        <>
+          <StatusBadge status={status} />
+          {status === MATCH_STATUS.error && typeof match.errorMessage === 'string' && match.errorMessage.trim() && (
+            <p className="analysis-muted">{match.errorMessage}</p>
+          )}
+          {status === MATCH_STATUS.processing && (
+            <div className="analysis-processing">
+              <div
+                className="analysis-processing-bar"
+                role="progressbar"
+                aria-label={`Análisis de ${playerName(match.playerId)} contra ${match.opponent} (${match.matchDate})`}
+              />
+              <span>El modelo está analizando el video. El tiempo depende de su duración.</span>
+            </div>
+          )}
+        </>
+      ),
+    },
   ]
   return (
     <section className="players-page analysis-page" aria-labelledby="analysis-title">
