@@ -59,6 +59,21 @@ line_calls:
   # Comparar los botes del peloteo con la pista de dobles (true) o la de individuales (false).
   doubles: false
 
+match:
+  # Cómo empieza el partido (TA-29). Se puede sobrescribir con --match-config match.yaml.
+  # Sacador del primer punto del vídeo: 1 (fondo lejano), 2 (cercano) o auto (el que detecta el modelo).
+  first_server: auto
+  best_of: 3
+  games_per_set: 6
+  tiebreak_points: 7
+  match_tiebreak_points: 10
+  no_ad: false
+  # Último set: tiebreak (a 7), advantage (sin tie-break) o match_tiebreak (super tie-break a 10).
+  final_set: tiebreak
+  # Marcador al empezar el vídeo, si empieza a mitad de partido. Ejemplo:
+  #   initial_score: {sets: [[6, 4]], games: [2, 1], points: ["30", "15"], server: 1}
+  initial_score: null
+
 worker:
   # Duración máxima del vídeo que acepta el worker, en segundos. Los más largos pasan a
   # 'error' antes de cargarlos (PCIT-147). Se puede subir cuando haya procesamiento por tramos.

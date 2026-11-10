@@ -19,6 +19,7 @@ from events import (
     locate_bounces,
 )
 from mini_court import MiniCourt
+from scoreboard import load_corrections, review_list, score_points
 from stats import add_serve_and_rally_stats, build_model_statistics, measure_shots, renumber_far_near
 
 
@@ -50,6 +51,9 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
     bounces = call_bounces(bounces, points, doubles=line_calls["doubles"], margin=line_calls["doubt_margin_m"])
     # Quién gana cada punto, con su confianza (TA-28).
     points = decide_winners(points, bounces, all_hits, fps, ball_detections, player_detections)
+    # Marcador punto a punto con el motor de TA-27, la configuración del partido y las correcciones
+    # del entrenador (TA-29).
+    points, match = score_points(points, config["match"], load_corrections(config["paths"].get("corrections")))
 
     # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
     # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
@@ -65,9 +69,12 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
                                    "doubtful": counts["dudoso"]}
     model_statistics["points"] = {
         "count": len(points),
-        "won": {str(player): sum(p["winner"] == player for p in points) for player in (1, 2)},
+        "won": {str(player): sum(p["winner"] == player and p["counted"] for p in points) for player in (1, 2)},
         "lowConfidence": sum(p["confidence_level"] == "baja" for p in points),
+        "corrected": sum(p["corrected"] for p in points),
+        "toReview": review_list(points),
     }
+    model_statistics["score"] = {"text": match.score_text(), **match.score()}
     return {
         "model_statistics": model_statistics,
         "shots": shots,
@@ -78,4 +85,5 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
         "bounces": bounces,
         "serves": serves,
         "points": points,
+        "match": match,
     }

@@ -190,7 +190,27 @@
     "1": 1,
     "2": 0
    },
-   "lowConfidence": 1
+   "lowConfidence": 1,
+   "corrected": 0,
+   "toReview": [
+    1
+   ]
+  },
+  "score": {
+   "text": "0-0 15-0",
+   "sets": [],
+   "tiebreaks": [],
+   "games": [
+    0,
+    0
+   ],
+   "points": [
+    "15",
+    "0"
+   ],
+   "in_tiebreak": false,
+   "server": 2,
+   "winner": null
   }
  }
 }
