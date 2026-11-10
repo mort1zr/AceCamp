@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { SegmentedControl } from '../ui'
 import { analysisErrorMessage, formatBytes, validateAnalysis } from '../../lib/analysis.js'
+import { MAX_VIDEO_FPS, MAX_VIDEO_SECONDS, MIN_VIDEO_FPS, MIN_VIDEO_HEIGHT, MIN_VIDEO_WIDTH } from '../../lib/videoRequirements.js'
 
 const initial = { sourceType: 'file', file: null, url: '', playerPosition: '', opponent: '', tournament: '', matchDate: '', result: '' }
 
@@ -76,7 +77,10 @@ export default function AnalysisForm({ service, players, playersLoading, players
 
   const update = event => change(event.target.name, event.target.value)
   const fieldError = field => errors[field] && <p className="players-field-error" id={`${id}-${field}-error`}>{errors[field]}</p>
-  const invalid = field => ({ 'aria-invalid': Boolean(errors[field]), 'aria-describedby': errors[field] ? `${id}-${field}-error` : undefined })
+  const invalid = (field, description) => ({
+    'aria-invalid': Boolean(errors[field]),
+    'aria-describedby': [description, errors[field] && `${id}-${field}-error`].filter(Boolean).join(' ') || undefined,
+  })
 
   const pickPosition = value => change('playerPosition', value)
   const dropFile = event => {
@@ -96,9 +100,13 @@ export default function AnalysisForm({ service, players, playersLoading, players
             <div className="analysis-upload" onDragOver={event => event.preventDefault()} onDrop={dropFile}>
               <span className="analysis-upload-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15V4" /><path d="M7 9l5-5 5 5" /><path d="M4 15v4a1 1 0 001 1h14a1 1 0 001-1v-4" /></svg></span>
               <label htmlFor={`${id}-file`}>Selecciona el video del partido</label>
-              <p>Arrastra el archivo aquí o elígelo desde tu equipo. MP4 o MOV{limit}</p>
+              <p>Arrastra el archivo aquí o elígelo desde tu equipo{limit}.</p>
+              <p id={`${id}-file-requirements`}>
+                MP4 o MOV de hasta {MAX_VIDEO_SECONDS / 60} minuto, con un mínimo de 720p ({MIN_VIDEO_WIDTH}×{MIN_VIDEO_HEIGHT}) y de {MIN_VIDEO_FPS} a {MAX_VIDEO_FPS} FPS.
+                {' '}Recomendamos 1080p a 30 FPS. Graba con cámara fija detrás de la línea de fondo, con toda la cancha visible y sin cortes.
+              </p>
               <label htmlFor={`${id}-file`} className="analysis-file-button">Elegir archivo</label>
-              <input ref={fileInput} id={`${id}-file`} name="file" type="file" className="analysis-file-input" accept=".mp4,.mov,video/mp4,video/quicktime" onChange={event => change('file', event.target.files?.[0] ?? null)} {...invalid('file')} />
+              <input ref={fileInput} id={`${id}-file`} name="file" type="file" className="analysis-file-input" accept=".mp4,.mov,video/mp4,video/quicktime" onChange={event => change('file', event.target.files?.[0] ?? null)} {...invalid('file', `${id}-file-requirements`)} />
               {values.file && <p className="analysis-selected-file">{values.file.name} · {formatBytes(values.file.size)}</p>}
               {fieldError('file')}
             </div>
