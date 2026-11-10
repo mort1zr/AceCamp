@@ -21,7 +21,7 @@ multiplicada por la de la cantada del bote que decide, si lo hay. Un bote dudoso
 distancia a la línea es menor que su incertidumbre, baja la confianza.
 
 Coherencia: entre dos golpes la pelota bota como mucho una vez (o dos en el mismo lado, si es
-el final, y separados al menos MIN_DOUBLE_BOUNCE_SECONDS: tras botar, la pelota sube y tarda
+el final, y separados al menos MIN_DOUBLE_BOUNCE_SECONDS (0,6 s): tras botar, la pelota sube y tarda
 en volver a caer; dos "botes" más seguidos suelen ser un bote y un golpe que no se detectó). Si tras el último golpe hay botes en los dos lados de la red, se perdió un golpe: el
 bote que decide es el primero del último lado. Cuando los golpes y los botes del punto no
 cuadran así, la confianza se multiplica por INCONSISTENT_FACTOR: es probable que falte un golpe
@@ -47,7 +47,7 @@ BASE_CONFIDENCE = {
 }
 HIGH_CONFIDENCE, MEDIUM_CONFIDENCE = 0.75, 0.5
 INCONSISTENT_FACTOR = 0.7
-MIN_DOUBLE_BOUNCE_SECONDS = 0.4
+MIN_DOUBLE_BOUNCE_SECONDS = 0.6  # tras un bote, la pelota tarda ~0,8-1,2 s en volver a caer
 
 
 def confidence_level(confidence):
