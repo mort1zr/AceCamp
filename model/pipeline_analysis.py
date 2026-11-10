@@ -88,6 +88,7 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
         "serves": serves,
         "points": points,
         "match": match,
+        "rally_cuts": (rallies.get("short_max", 4), rallies.get("medium_max", 8)),
         # Posiciones de los jugadores durante los puntos, con punto, juego y set (TA-32).
         "positions": position_rows(player_court_positions, points, fps, main_camera),
     }

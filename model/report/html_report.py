@@ -55,6 +55,34 @@ def _point_rows(report):
     return "\n".join(rows)
 
 
+RALLY_NAMES = {"short": "Cortos", "medium": "Medios", "long": "Largos"}
+
+
+def _rally_section(report):
+    """Tabla de peloteos (TA-36) que cambia con el mismo selector de periodo que el mapa de calor."""
+    rallies = report.get("rallies")
+    if not rallies:
+        return ""
+    cuts = rallies["cuts"]
+    limits = {"short": f"0-{cuts['shortMax']}", "medium": f"{cuts['shortMax'] + 1}-{cuts['mediumMax']}",
+              "long": f"{cuts['mediumMax'] + 1} o más"}
+    tables = []
+    for scope, summary in rallies.items():
+        if scope == "cuts":
+            continue
+        rows = "".join(
+            f"<tr><td>{RALLY_NAMES[c]} ({limits[c]} golpes)</td><td>{summary[c]['count']}</td>"
+            f"<td>{summary[c]['pct']} %</td><td>{summary[c]['won']['1']}</td><td>{summary[c]['won']['2']}</td></tr>"
+            for c in ("short", "medium", "long"))
+        tables.append(f'<table class="rallies" data-scope="{scope}"><tr><th>Peloteos</th><th>Cuántos</th>'
+                      f"<th>%</th><th>Ganó J1</th><th>Ganó J2</th></tr>{rows}</table>")
+    return ("<h2>Peloteos</h2>" + "".join(tables) + """
+<script>
+document.addEventListener('periodo', e => document.querySelectorAll('table.rallies')
+  .forEach(t => { t.style.display = t.dataset.scope === e.detail ? '' : 'none'; }));
+</script>""")
+
+
 def build_html(report, heatmap_files, extra_sections=""):
     """HTML del informe. heatmap_files: {nombre del PNG: ruta} de report.heatmap.write_heatmaps."""
     scopes = _maps_by_scope(heatmap_files)
@@ -96,6 +124,7 @@ Corrígelos en corrections.json y vuelve a generar el informe.</p>
 </div>
 <p class="note">Escala de color común a todos los mapas: el mismo color es el mismo tiempo.</p>
 <div class="maps" id="maps"></div>
+{_rally_section(report)}
 {extra_sections}
 <h2>Puntos</h2>
 <table><tr><th>#</th><th>Set</th><th>Juego</th><th>Tiempo</th><th>Saca</th><th>Golpes</th><th>Gana</th>

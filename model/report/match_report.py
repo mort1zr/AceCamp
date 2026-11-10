@@ -22,14 +22,17 @@ import csv
 import json
 from pathlib import Path
 
+from stats import rally_category, rally_length
+
 from .positions import POSITION_COLUMNS
 
 REPORT_VERSION = "acecam.match-report.v1"
 POINT_COLUMNS = (
     "number", "set", "game", "start_s", "end_s", "server", "expected_server", "serves", "faults",
     "shots", "bounces", "end_reason", "winner", "model_winner", "corrected", "win_reason", "confidence",
-    "confidence_level", "score_after",
+    "confidence_level", "score_after", "rally_length", "rally_category",
 )
+RALLY_CATEGORIES = ("short", "medium", "long")
 
 
 BOUNCE_COLUMNS = ("frame", "time_s", "point", "x_m", "y_m", "call", "area", "line_distance_cm", "uncertainty_cm",
@@ -54,7 +57,7 @@ def _seconds(frame, fps):
     return round(frame / fps, 2)
 
 
-def point_row(point, bounces, fps):
+def point_row(point, bounces, fps, rally_cuts=(4, 8)):
     """Fila de un punto para el informe y points.csv."""
     attempts = point.get("serve_attempts", [])
     in_point = [b for b in bounces if point["start"] <= b["frame"] <= point["end"]]
@@ -78,6 +81,8 @@ def point_row(point, bounces, fps):
         "confidence": point.get("confidence"),
         "confidence_level": point.get("confidence_level"),
         "score_after": point.get("score_text"),
+        "rally_length": rally_length(point),
+        "rally_category": rally_category(rally_length(point), *rally_cuts),
     }
 
 
@@ -136,19 +141,46 @@ def serve_states(points, num_frames):
     return states
 
 
+def _rally_summary(rows):
+    """Peloteos de unas filas de puntos: total, % y quién ganó en cada categoría (TA-36)."""
+    summary = {"count": len(rows)}
+    for category in RALLY_CATEGORIES:
+        in_category = [r for r in rows if r["rally_category"] == category]
+        summary[category] = {
+            "count": len(in_category),
+            "pct": round(100 * len(in_category) / len(rows), 1) if rows else 0.0,
+            "won": {str(p): sum(r["winner"] == p and r.get("counted", True) for r in in_category) for p in (1, 2)},
+        }
+    return summary
+
+
+def rally_breakdown(rows, rally_cuts=(4, 8)):
+    """Peloteos por partido y por set (TA-36): {"cuts", "partido": {...}, "set1": {...}, ...}.
+
+    Se calcula con las mismas filas que points.csv, así que las cifras coinciden con el CSV.
+    Los puntos anulados en corrections.json (sin ganador) cuentan como peloteo pero no como ganado.
+    """
+    breakdown = {"cuts": {"shortMax": rally_cuts[0], "mediumMax": rally_cuts[1]}, "partido": _rally_summary(rows)}
+    for set_number in sorted({r["set"] for r in rows}):
+        breakdown[f"set{set_number}"] = _rally_summary([r for r in rows if r["set"] == set_number])
+    return breakdown
+
+
 def build_report(analysis, fps, video=None):
     """Informe completo del partido a partir de pipeline_analysis.analyze_detections()."""
     points, bounces = analysis["points"], analysis["bounces"]
     statistics = analysis["model_statistics"]
+    rows = [point_row(p, bounces, fps, analysis.get("rally_cuts", (4, 8))) for p in points]
     return {
         "schemaVersion": REPORT_VERSION,
         "video": {"name": video, "fps": fps, "durationSeconds": statistics.get("durationSeconds")},
         "score": statistics.get("score"),
         "players": {str(p): player_summary(statistics, points, p) for p in (1, 2)},
         "mostServes": _most_serves(statistics),
-        "points": [point_row(p, bounces, fps) for p in points],
+        "points": rows,
         "bounces": bounce_rows(bounces, points, fps),
         "toReview": statistics.get("points", {}).get("toReview", []),
+        "rallies": rally_breakdown(rows, analysis.get("rally_cuts", (4, 8))),
     }
 
 
