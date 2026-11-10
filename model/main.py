@@ -8,24 +8,9 @@ from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
-from events import (
-    call_bounces,
-    call_counts,
-    decide_winners,
-    detect_bounce_events,
-    detect_hits,
-    detect_points,
-    detect_serves,
-    locate_bounces,
-)
 from mini_court import MiniCourt
-from stats import (
-    add_serve_and_rally_stats,
-    build_frame_states,
-    build_model_statistics,
-    measure_shots,
-    renumber_far_near,
-)
+from pipeline_analysis import analyze_detections
+from stats import build_frame_states
 from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
 from utils import VideoWriter, get_video_info, iter_frames
 from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
@@ -192,53 +177,14 @@ def run_pipeline(config, render=True):
     # La selección interpola las cajas en los huecos; fuera de la cámara principal no hay jugadores.
     player_detections = [d if main else {} for d, main in zip(player_detections, main_camera)]
 
-    # Posiciones en metros sobre la pista
-    player_court_positions, ball_court_positions = MiniCourt.court_positions(player_detections,
-                                                                             ball_detections,
-                                                                             homography)
-
-    # Golpes (TA-22a) y saques (TA-18). Los saques se detectan por el lanzamiento y cuentan como
-    # golpes para los botes: si no, el raquetazo del saque parece un bote.
-    hits = detect_hits(ball_detections, player_detections, homography, video_info.fps)
-    serves = detect_serves(ball_detections, player_detections, homography, video_info.fps,
-                           main_camera=main_camera, hits=hits)
-    all_hits = sorted(set(hits) | {s["frame"] for s in serves})
-
-    # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
-    bounces = detect_bounce_events(ball_detections, player_detections, homography, video_info.fps,
-                                   main_camera=main_camera, hits=all_hits)
-    bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=all_hits,
-                             court_keypoints=court_keypoints)
-
-    # División en puntos (TA-17) y cantada de cada bote: dentro, fuera o dudoso (TA-24). El bote
-    # de un saque se compara con su cuadro de saque y el resto con la pista.
-    line_calls = config["line_calls"]
-    points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
-                           main_camera=main_camera, serves=serves, doubt_margin=line_calls["doubt_margin_m"])
-    bounces = call_bounces(bounces, points, doubles=line_calls["doubles"], margin=line_calls["doubt_margin_m"])
-    # Quién gana cada punto, con su confianza (TA-28).
-    points = decide_winners(points, bounces, all_hits, video_info.fps, ball_detections, player_detections)
-
-    # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
-    # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
-    # muy seguidos, con velocidades imposibles.
-    shots = measure_shots(all_hits, ball_detections, player_detections, player_court_positions,
-                          video_info.fps, main_camera=main_camera, hitters={s["frame"]: s["player"] for s in serves})
-
-    stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
-    model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
-    add_serve_and_rally_stats(model_statistics, points)
-    counts = call_counts(bounces)
-    model_statistics["bounces"] = {"count": len(bounces), "in": counts["dentro"], "out": counts["fuera"],
-                                   "doubtful": counts["dudoso"]}
-    model_statistics["points"] = {
-        "count": len(points),
-        "won": {str(player): sum(p["winner"] == player for p in points) for player in (1, 2)},
-        "lowConfidence": sum(p["confidence_level"] == "baja" for p in points),
-    }
+    analysis = analyze_detections(ball_detections, player_detections, court_keypoints, homography, main_camera,
+                                  video_info.fps, config)
+    shots, bounces, serves, points = analysis["shots"], analysis["bounces"], analysis["serves"], analysis["points"]
+    player_court_positions = analysis["player_court_positions"]
+    ball_court_positions = analysis["ball_court_positions"]
     result = {
-        "model_statistics": model_statistics,
-        "shots": stats_shots,
+        "model_statistics": analysis["model_statistics"],
+        "shots": analysis["stats_shots"],
         "output_video": None,
         # Datos intermedios: los usa el pre-etiquetado del set de validación (python -m eval.prelabel).
         "video_info": video_info,

@@ -1,0 +1,196 @@
+{
+ "hits": [
+  13,
+  34,
+  59,
+  82,
+  93,
+  125,
+  156,
+  188,
+  204,
+  221,
+  299,
+  349,
+  365,
+  400,
+  424,
+  476,
+  542,
+  559
+ ],
+ "serves": [
+  {
+   "frame": 13,
+   "player": 2,
+   "side": "izquierda"
+  }
+ ],
+ "bounces": [
+  {
+   "frame": 65,
+   "x_m": 5.17,
+   "y_m": 20.86,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 115,
+   "x_m": 6.95,
+   "y_m": 18.81,
+   "call": "dentro",
+   "inferred": true
+  },
+  {
+   "frame": 144,
+   "x_m": 7.84,
+   "y_m": 2.58,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 179,
+   "x_m": 4.96,
+   "y_m": 19.52,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 210,
+   "x_m": 7.92,
+   "y_m": 2.64,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 287,
+   "x_m": 7.77,
+   "y_m": 2.8,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 321,
+   "x_m": 8.75,
+   "y_m": 19.85,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 356,
+   "x_m": 4.24,
+   "y_m": 1.59,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 385,
+   "x_m": 1.75,
+   "y_m": 18.99,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 469,
+   "x_m": 8.66,
+   "y_m": 21.84,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 524,
+   "x_m": 4.64,
+   "y_m": 14.4,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 577,
+   "x_m": 1.44,
+   "y_m": 17.82,
+   "call": "dudoso",
+   "inferred": false
+  }
+ ],
+ "points": [
+  {
+   "start": 1,
+   "end": 597,
+   "server": 2,
+   "shots": 18,
+   "end_reason": "sin pelota",
+   "winner": 1,
+   "win_reason": "no devuelta",
+   "confidence_level": "baja"
+  }
+ ],
+ "statistics": {
+  "schemaVersion": "acecam.model-stats.v1",
+  "durationSeconds": 23.9,
+  "players": {
+   "1": {
+    "shots": {
+     "count": 5,
+     "sumSpeedKmh": 378.4,
+     "maxSpeedKmh": 94.0
+    },
+    "movement": {
+     "distanceMeters": 50.0,
+     "avgSpeedKmh": 7.6,
+     "maxSpeedKmh": 14.6
+    },
+    "serve": {
+     "count": 0,
+     "fromRight": 0,
+     "fromLeft": 0,
+     "sumSpeedKmh": 0.0,
+     "sampleCount": 0
+    }
+   },
+   "2": {
+    "shots": {
+     "count": 6,
+     "sumSpeedKmh": 627.4,
+     "maxSpeedKmh": 170.7
+    },
+    "movement": {
+     "distanceMeters": 53.4,
+     "avgSpeedKmh": 8.2,
+     "maxSpeedKmh": 22.4
+    },
+    "serve": {
+     "count": 1,
+     "fromRight": 0,
+     "fromLeft": 1,
+     "sumSpeedKmh": 0.0,
+     "sampleCount": 0,
+     "firstServeAttempts": 1,
+     "firstServeIn": 1,
+     "doubleFaults": 0
+    }
+   }
+  },
+  "rallies": {
+   "count": 1,
+   "sumShots": 18,
+   "longestShots": 18,
+   "short": 0,
+   "medium": 0,
+   "long": 1
+  },
+  "bounces": {
+   "count": 12,
+   "in": 11,
+   "out": 0,
+   "doubtful": 1
+  },
+  "points": {
+   "count": 1,
+   "won": {
+    "1": 1,
+    "2": 0
+   },
+   "lowConfidence": 1
+  }
+ }
+}
