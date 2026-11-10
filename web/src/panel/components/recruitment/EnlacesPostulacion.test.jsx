@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { addDoc, deleteDoc, getDoc, onSnapshot } from 'firebase/firestore'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -25,8 +25,10 @@ it('el dueño puede crear, compartir y desactivar enlaces', async () => {
   getDoc.mockResolvedValueOnce({ data: () => ({ ownerId: 'owner' }) })
   render(<EnlacesPostulacion db={{}} orgId="org-demo" uid="owner" role="coach" />)
   const create = await screen.findByRole('button', { name: 'Crear enlace' })
+  await waitFor(() => expect(onSnapshot).toHaveBeenCalledWith(
+    'orgs/org-demo/applicationForms', expect.any(Function), expect.any(Function),
+  ))
   const [collection, receive] = onSnapshot.mock.lastCall
-  expect(collection).toBe('orgs/org-demo/applicationForms')
   act(() => receive({ docs: [] }))
   await user.click(create)
   expect(addDoc).toHaveBeenCalledExactlyOnceWith(collection, { createdAt: 'server-time' })
