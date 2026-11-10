@@ -534,6 +534,38 @@ describe('applications', () => {
     await assertFails(updateDoc(ref, { status: 'en revisión' }))
   })
 
+  it('crea y enlaza un solo jugador cuando dos sesiones procesan la misma postulación', async () => {
+    const team = coachDb()
+    const makeService = () => createFirestorePlayersService({ db: coachDb(), orgId: ORG, actorId: COACH })
+    const input = { fullName: 'Andrés Villanueva', birthDate: '2000-02-15', consentAccepted: true }
+    const attempts = await Promise.all([
+      makeService().assignApplication('a-demo', { input }),
+      makeService().assignApplication('a-demo', { input }),
+    ])
+    expect(attempts[0].id).toBe(attempts[1].id)
+    expect(attempts.map(({ alreadyLinked }) => alreadyLinked).sort()).toEqual([false, true])
+    const linked = (await getDoc(doc(team, 'applications', 'a-demo'))).data()
+    expect(linked.playerId).toBe(attempts[0].id)
+    expect((await getDoc(doc(team, 'players', linked.playerId))).data()).toMatchObject({
+      fullName: input.fullName, sourceApplicationId: 'a-demo', createdBy: COACH,
+    })
+    const players = await getDocs(query(collection(team, 'players'), where('orgId', '==', ORG), where('createdBy', '==', COACH)))
+    expect(players.docs.filter((player) => player.data().sourceApplicationId === 'a-demo')).toHaveLength(1)
+  })
+
+  it('vincula una ficha existente y las reglas rechazan vínculos ajenos y reemplazos', async () => {
+    const team = coachDb()
+    const application = doc(team, 'applications', 'a-demo')
+    await assertFails(updateDoc(application, { playerId: 'p-club', updatedAt: serverTimestamp() }))
+    await assertFails(updateDoc(application, { playerId: 'ausente', updatedAt: serverTimestamp() }))
+    await assertFails(setDoc(doc(team, 'players', 'orphan'), newPlayer({ sourceApplicationId: 'a-demo' })))
+    const service = createFirestorePlayersService({ db: team, orgId: ORG, actorId: COACH })
+    await expect(service.assignApplication('a-demo', { playerId: 'p-demo' })).resolves.toEqual({ id: 'p-demo', alreadyLinked: false })
+    await expect(service.assignApplication('a-demo', { input: {} })).resolves.toEqual({ id: 'p-demo', alreadyLinked: true })
+    await assertFails(updateDoc(application, { playerId: null, updatedAt: serverTimestamp() }))
+    expect((await getDoc(application)).data().playerId).toBe('p-demo')
+  })
+
   const formId = 'AcecamFormDemoABC123'
   const form = (db, orgId = ORG) => doc(db, 'orgs', orgId, 'applicationForms', formId)
   const newPublicApplication = (overrides = {}) => ({

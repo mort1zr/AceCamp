@@ -1,15 +1,31 @@
-import { addDoc, collection, deleteField, doc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
+import { addDoc, collection, deleteField, doc, getDocFromServer, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
 import { normalizePlayer, PLAYER_CONSENT_VERSION, PLAYER_EDITABLE_FIELDS } from '../players.js'
+import { COLLECTIONS } from '../schema.js'
 
 /** db and identity come from Axel's authenticated app, never from form fields. */
 export function createFirestorePlayersService({ db, orgId, actorId, role = 'coach', onlyOwned = false, includeDeleted = false }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string' || !actorId.trim()) {
     throw new Error('Players service requires a database, organization and authenticated user.')
   }
-  const players = collection(db, 'players')
+  const players = collection(db, COLLECTIONS.players)
   const isAdmin = role === 'admin'
   if (!['coach', 'admin'].includes(role)) throw new Error('Invalid player role.')
   const canViewProfile = player => player.orgId === orgId && (isAdmin || (role === 'coach' && player.createdBy === actorId))
+  function newPlayer(fields) {
+    return {
+      ...fields,
+      orgId,
+      createdBy: actorId,
+      createdAt: serverTimestamp(),
+      consent: {
+        accepted: true,
+        version: PLAYER_CONSENT_VERSION,
+        recordedBy: actorId,
+        recordedAt: serverTimestamp(),
+        method: 'coach-attestation',
+      },
+    }
+  }
 
   return {
     scopeKey: `firestore:${db.app?.options?.projectId ?? ''}:${orgId}:${actorId}`,
@@ -44,20 +60,38 @@ export function createFirestorePlayersService({ db, orgId, actorId, role = 'coac
     },
     async create(input) {
       const fields = normalizePlayer(input)
-      const reference = await addDoc(players, {
-        ...fields,
-        orgId,
-        createdBy: actorId,
-        createdAt: serverTimestamp(),
-        consent: {
-          accepted: true,
-          version: PLAYER_CONSENT_VERSION,
-          recordedBy: actorId,
-          recordedAt: serverTimestamp(),
-          method: 'coach-attestation',
-        },
-      })
+      const reference = await addDoc(players, newPlayer(fields))
       return { ...fields, id: reference.id }
+    },
+    async assignApplication(applicationId, { playerId, input }) {
+      const application = doc(db, COLLECTIONS.applications, applicationId)
+      const player = playerId ? doc(players, playerId) : doc(players)
+      try {
+        return await runTransaction(db, async transaction => {
+          const current = (await transaction.get(application)).data()
+          if (current?.orgId !== orgId) throw Object.assign(new Error('Application unavailable'), { code: 'permission-denied' })
+          if (current.playerId) return { id: current.playerId, alreadyLinked: true }
+
+          if (playerId) {
+            const existing = (await transaction.get(player)).data()
+            if (!existing || existing.deletedAt != null || !canViewProfile(existing)) {
+              throw Object.assign(new Error('Player unavailable'), { code: 'players/not-found' })
+            }
+          } else {
+            const fields = normalizePlayer(input)
+            transaction.set(player, { ...newPlayer(fields), sourceApplicationId: applicationId })
+          }
+          transaction.update(application, { playerId: player.id, updatedAt: serverTimestamp() })
+          return { id: player.id, alreadyLinked: false }
+        })
+      } catch (error) {
+        // Las reglas pueden rechazar la escritura del segundo intento antes del reintento automático.
+        if (error.code === 'permission-denied') {
+          const latest = (await getDocFromServer(application)).data()
+          if (latest?.orgId === orgId && latest.playerId) return { id: latest.playerId, alreadyLinked: true }
+        }
+        throw error
+      }
     },
     async update(player, input) {
       const fields = normalizePlayer({ ...input, consentAccepted: true })

@@ -19,7 +19,7 @@ const guardianFields = [
   { name: 'guardianEmail', label: 'Correo del apoderado', type: 'email', maxLength: 254 },
 ]
 
-export default function PlayerForm({ service, onCancel, onCreated, initialPlayer }) {
+export default function PlayerForm({ service, onCancel, onCreated, initialPlayer, initialValues = initialPlayer }) {
   const id = useId()
   const nameRef = useRef(null)
   const active = useRef(false)
@@ -27,9 +27,9 @@ export default function PlayerForm({ service, onCancel, onCreated, initialPlayer
   const original = useRef(initialPlayer)
   const editing = Boolean(initialPlayer)
   const [values, setValues] = useState(() => ({
-    fullName: initialPlayer?.fullName ?? '', birthDate: initialPlayer?.birthDate ?? '', academy: initialPlayer?.academy ?? '',
-    guardianName: initialPlayer?.guardian?.name ?? '', guardianPhone: initialPlayer?.guardian?.phone ?? '', guardianEmail: initialPlayer?.guardian?.email ?? '', consentAccepted: editing,
-    ...Object.fromEntries(sportFields.map(field => [field.name, initialPlayer?.[field.name] ?? ''])),
+    fullName: initialValues?.fullName ?? '', birthDate: initialValues?.birthDate ?? '', academy: initialValues?.academy ?? '',
+    guardianName: initialValues?.guardian?.name ?? '', guardianPhone: initialValues?.guardian?.phone ?? '', guardianEmail: initialValues?.guardian?.email ?? '', consentAccepted: editing,
+    ...Object.fromEntries(sportFields.map(field => [field.name, initialValues?.[field.name] ?? ''])),
   }))
   const [errors, setErrors] = useState({})
   const [saveError, setSaveError] = useState(null)

@@ -318,6 +318,13 @@ service cloud.firestore {
         && validGuardian(data);
     }
 
+    function validPlayerApplicationSource(data, playerId) {
+      let application = /databases/$(database)/documents/applications/$(data.sourceApplicationId);
+      return exists(application) && get(application).data.orgId == data.orgId
+        && get(application).data.get('playerId', null) == null
+        && getAfter(application).data.playerId == playerId;
+    }
+
     match /players/{playerId} {
       // get de un documento inexistente se permite: no revela nada y lo usa el alta de partidos.
       allow get: if signedIn() && (resource == null || canManage(resource.data));
@@ -328,11 +335,13 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
              'orgId', 'fullName', 'birthDate', 'academy', 'category', 'dominantHand', 'backhand',
              'utr', 'nationalRanking', 'nationality', 'graduationYear', 'coachName', 'guardian',
-             'consent', 'createdBy', 'createdAt'])
+             'consent', 'createdBy', 'createdAt', 'sourceApplicationId'])
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
         && validConsent(request.resource.data.consent, request.auth.uid)
-        && validPlayer(request.resource.data);
+        && validPlayer(request.resource.data)
+        && (!('sourceApplicationId' in request.resource.data) ||
+          validPlayerApplicationSource(request.resource.data, playerId));
 
       allow update: if canManage(resource.data)
         && resource.data.get('deletedAt', null) == null
@@ -496,12 +505,24 @@ service cloud.firestore {
         || (from == 'contactada' && to == 'descartada');
     }
 
+    function canLinkApplicationPlayer() {
+      let next = request.resource.data;
+      let player = /databases/$(database)/documents/players/$(next.playerId);
+      return resource.data.get('playerId', null) == null
+        && isText(next.playerId, 1, 1500) && next.playerId.matches('^[^/]+$')
+        && next.updatedAt == request.time && onlyChanges(['playerId', 'updatedAt'])
+        && getAfter(player).data.orgId == resource.data.orgId
+        && getAfter(player).data.get('deletedAt', null) == null
+        && canManage(getAfter(player).data);
+    }
+
     match /applications/{applicationId} {
       allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
       allow list: if inOrg(resource.data.orgId);
 
       allow create: if inOrg(request.resource.data.orgId)
         && !('formId' in request.resource.data)
+        && request.resource.data.get('playerId', null) == null
         && request.resource.data.status == 'nueva'
         && request.resource.data.createdAt == request.time
         && isText(request.resource.data.fullName, 2, 120)
@@ -512,9 +533,11 @@ service cloud.firestore {
       allow create: if validPublicApplication(request.resource.data);
 
       allow update: if inOrg(resource.data.orgId)
-        && unchanged(['orgId', 'formId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email'])
+        && unchanged(['orgId', 'formId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email', 'playerId'])
         && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada']
         && validApplicationTransition(resource.data.status, request.resource.data.status);
+
+      allow update: if inOrg(resource.data.orgId) && canLinkApplicationPlayer();
 
       allow delete: if inOrg(resource.data.orgId);
     }

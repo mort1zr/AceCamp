@@ -5,6 +5,8 @@ import { collection, onSnapshot, query, runTransaction, where } from 'firebase/f
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlanVistaContexto } from '../context/PlanVistaContext.js'
+import { usePlayers } from '../hooks/usePlayers.js'
+import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import Reclutamiento from './Reclutamiento.jsx'
 
 vi.mock('firebase/firestore', () => ({
@@ -18,6 +20,13 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 vi.mock('../components/recruitment/EnlacesPostulacion.jsx', () => ({ default: () => null }))
+vi.mock('../hooks/usePlayers.js', () => ({ usePlayers: vi.fn(() => ({ rows: [], loading: false })) }))
+vi.mock('../lib/services/firestorePlayersService.js', () => ({
+  createFirestorePlayersService: vi.fn(() => ({ assignApplication: vi.fn() })),
+}))
+vi.mock('../components/players/PlayerProfile.jsx', () => ({
+  default: ({ player }) => <h2>Ficha de {player.fullName}</h2>,
+}))
 
 const db = { app: { options: { projectId: 'prueba' } } }
 const session = { uid: 'entrenador', orgId: 'equipo-a', role: 'coach' }
@@ -32,8 +41,8 @@ function page(currentSession = session, plan = 'pro') {
   )
 }
 
-function application(id, fullName, city, status, orgId = session.orgId) {
-  return { id, data: () => ({ orgId, fullName, city, status, graduationYear: 2027 }) }
+function application(id, fullName, city, status, orgId = session.orgId, fields = {}) {
+  return { id, data: () => ({ orgId, fullName, city, status, graduationYear: 2027, birthDate: '2000-02-15', ...fields }) }
 }
 
 function publish(...docs) {
@@ -44,6 +53,7 @@ function publish(...docs) {
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+  usePlayers.mockImplementation(() => ({ rows: [], loading: false }))
 })
 
 describe('Bandeja de reclutamiento', () => {
@@ -140,5 +150,43 @@ describe('Bandeja de reclutamiento', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar estado de Lucía Pérez' }))
     expect((await screen.findByRole('alert')).textContent).toContain('cambió en otra sesión')
     expect(transaction.update).not.toHaveBeenCalled()
+  })
+
+  it('reutiliza la ficha de alta con los datos de la postulación y exige autorización', async () => {
+    const user = userEvent.setup()
+    const assignApplication = vi.fn(async () => ({ id: 'jugadora-1', alreadyLinked: false }))
+    createFirestorePlayersService.mockReturnValueOnce({ assignApplication })
+    render(page())
+    publish(application('1', 'Lucía Pérez', 'Lima', 'nueva'))
+    await user.click(screen.getByRole('button', { name: 'Crear o vincular jugador para Lucía Pérez' }))
+    await user.click(screen.getByRole('button', { name: 'Crear jugador nuevo' }))
+    expect(screen.getByLabelText('Nombre completo *').value).toBe('Lucía Pérez')
+    expect(screen.getByLabelText('Fecha de nacimiento *').value).toBe('2000-02-15')
+    await user.click(screen.getByRole('button', { name: 'Guardar jugador' }))
+    expect(assignApplication).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Guardar jugador' }))
+    expect(await screen.findByText('Jugador vinculado a la postulación.')).toBeTruthy()
+    expect(assignApplication).toHaveBeenCalledExactlyOnceWith('1', {
+      input: expect.objectContaining({ fullName: 'Lucía Pérez', consentAccepted: true }),
+    })
+  })
+
+  it('ofrece vincular la ficha existente cuando coinciden el nombre y la fecha', async () => {
+    const user = userEvent.setup()
+    const player = { id: 'jugadora-1', fullName: 'Lucia Perez', birthDate: '2000-02-15' }
+    usePlayers.mockReturnValue({ rows: [player], loading: false })
+    const assignApplication = vi.fn(async () => ({ id: player.id, alreadyLinked: false }))
+    createFirestorePlayersService.mockReturnValueOnce({ assignApplication })
+    render(page())
+    publish(application('1', 'Lucía Pérez', 'Lima', 'en revisión'))
+    await user.click(screen.getByRole('button', { name: 'Crear o vincular jugador para Lucía Pérez' }))
+    expect(screen.queryByRole('button', { name: 'Crear jugador nuevo' })).toBeNull()
+    await user.selectOptions(screen.getByLabelText('Jugador existente'), player.id)
+    await user.click(screen.getByRole('button', { name: 'Vincular jugador' }))
+    expect(assignApplication).toHaveBeenCalledExactlyOnceWith('1', { playerId: player.id })
+    publish(application('1', 'Lucía Pérez', 'Lima', 'en revisión', session.orgId, { playerId: player.id }))
+    await user.click(screen.getByRole('button', { name: 'Ver ficha de Lucía Pérez' }))
+    expect(screen.getByRole('heading', { name: 'Ficha de Lucia Perez' })).toBeTruthy()
   })
 })

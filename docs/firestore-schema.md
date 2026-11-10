@@ -143,6 +143,7 @@ El resto los completa la gestión completa (PCIT-42).
 | `createdAt` | Timestamp | sí | |
 | `updatedAt` | Timestamp | no | |
 | `deletedAt` | Timestamp | no | Fecha de retirada de la plantilla (PCIT-42) |
+| `sourceApplicationId` | string | no | Postulación de origen cuando se crea la ficha desde Reclutamiento |
 
 PCIT-42 añade la acción **Eliminar de la plantilla**: guarda `deletedAt` y
 `updatedAt`, oculta el jugador en Jugadores, Dashboard y nuevos análisis, y
@@ -307,7 +308,7 @@ de ser jugador del equipo.
 | `videoPaths` | string[] | no | Archivos subidos a Storage |
 | `message` | string | no | Hasta 1000 caracteres |
 | `consent` | object | sí | Mismo formato que en `players`, con `version: 'applications-v1'`, `method` `'self'` o `'guardian'` y `recordedBy: 'public-form'` en el formulario público |
-| `playerId` | string \| null | no | Se llena al usar "Crear jugador" (PCIT-56) |
+| `playerId` | string \| null | no | Ficha activa de la misma organización, creada o vinculada desde Reclutamiento (PCIT-56) |
 | `internalNotes` | string | no | Notas del equipo; nunca visibles para el postulante |
 | `reviewedBy` | string \| null | no | `uid` |
 | `createdAt` | Timestamp | sí | |
@@ -317,6 +318,10 @@ de ser jugador del equipo.
 También se puede descartar una postulación contactada. Las reglas rechazan
 saltos y retrocesos. La bandeja escribe el estado con una transacción y registra
 quién lo cambió y cuándo en `reviewedBy` y `updatedAt`.
+
+El alta desde la bandeja guarda la ficha y `playerId` en la misma transacción.
+Firestore exige que la referencia apunte a un jugador activo que el usuario
+puede gestionar. Si la postulación ya tiene jugador, se conserva ese vínculo.
 
 ---
 

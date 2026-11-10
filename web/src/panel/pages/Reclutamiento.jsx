@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
+import PlayerProfile from '../components/players/PlayerProfile.jsx'
+import AsignarJugador from '../components/recruitment/AsignarJugador.jsx'
 import EnlacesPostulacion from '../components/recruitment/EnlacesPostulacion.jsx'
 import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
+import { usePlayers } from '../hooks/usePlayers.js'
 import { nextApplicationStates, updateApplicationStatus } from '../lib/applicationStatus.js'
 import { APPLICATION_STATUS, COLLECTIONS } from '../lib/schema.js'
+import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
 
 const states = Object.values(APPLICATION_STATUS)
@@ -57,12 +61,16 @@ function CambiarEstado({ application, onSave }) {
   )
 }
 
-function Bandeja({ db, orgId, uid }) {
+function Bandeja({ db, orgId, uid, role }) {
   const [result, setResult] = useState(null)
   const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [notice, setNotice] = useState('')
+  const [assignmentId, setAssignmentId] = useState('')
+  const [profileId, setProfileId] = useState('')
+  const playerService = useMemo(() => createFirestorePlayersService({ db, orgId, actorId: uid, role }), [db, orgId, uid, role])
+  const roster = usePlayers(playerService)
 
   useEffect(() => {
     let active = true
@@ -72,8 +80,10 @@ function Bandeja({ db, orgId, uid }) {
         if (!active) return
         const rows = snapshot.docs
           .map((doc) => {
-            const { orgId, fullName, city, graduationYear, status, createdAt } = doc.data()
-            return { id: doc.id, orgId, fullName, city, graduationYear, status, createdAt }
+            const { orgId, fullName, city, graduationYear, status, createdAt, playerId,
+              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking } = doc.data()
+            return { id: doc.id, orgId, fullName, city, graduationYear, status, createdAt, playerId,
+              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking }
           })
           .filter((row) => row.orgId === orgId)
           .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))
@@ -91,6 +101,8 @@ function Bandeja({ db, orgId, uid }) {
 
   const term = normalize(search.trim())
   const rows = result?.rows ?? []
+  const assignment = rows.find(({ id }) => id === assignmentId)
+  const profile = roster.rows.find(({ id }) => id === profileId)
   const filtered = rows.filter((row) =>
     (!status || row.status === status) &&
     [row.fullName, row.city].some((value) => normalize(value).includes(term)),
@@ -101,11 +113,38 @@ function Bandeja({ db, orgId, uid }) {
     setNotice(`Se guardó el estado de ${application.fullName}: ${nextStatus}.`)
   }
 
-  const editableColumns = [...columns, {
-    key: 'action',
-    label: 'Cambiar estado',
-    render: (_, application) => <CambiarEstado application={application} onSave={saveStatus} />,
-  }]
+  const editableColumns = [...columns,
+    {
+      key: 'action',
+      label: 'Cambiar estado',
+      render: (_, application) => <CambiarEstado application={application} onSave={saveStatus} />,
+    },
+    {
+      key: 'playerId',
+      label: 'Jugador',
+      render: (playerId, application) => {
+        if (!playerId) return (
+          <button type="button" className="players-button-secondary"
+            aria-label={`Crear o vincular jugador para ${application.fullName}`}
+            disabled={Boolean(assignment)} onClick={() => setAssignmentId(application.id)}>
+            Crear o vincular
+          </button>
+        )
+        return roster.rows.some(({ id }) => id === playerId) ? (
+          <button type="button" className="players-button-secondary" aria-label={`Ver ficha de ${application.fullName}`}
+            onClick={() => setProfileId(playerId)}>Ver ficha</button>
+        ) : 'Jugador vinculado'
+      },
+    },
+  ]
+
+  function assigned({ alreadyLinked }) {
+    setNotice(alreadyLinked ? 'Esta postulación ya tiene un jugador vinculado.' : 'Jugador vinculado a la postulación.')
+    setAssignmentId('')
+  }
+
+  if (profile) return <PlayerProfile key={profile.id} player={profile} service={playerService} onBack={() => setProfileId('')} />
+
   return (
     <>
       {rows.length > 0 && (
@@ -126,6 +165,15 @@ function Bandeja({ db, orgId, uid }) {
         </div>
       )}
       <p className="players-notice" role="status">{notice}</p>
+      {assignment && (assignment.playerId ? (
+        <div className="players-form-panel">
+          <p role="status">Esta postulación ya tiene un jugador vinculado.</p>
+          <button type="button" className="players-button-secondary" onClick={() => setAssignmentId('')}>Volver a la bandeja</button>
+        </div>
+      ) : (
+        <AsignarJugador key={assignment.id} application={assignment} roster={roster} service={playerService}
+          onAssigned={assigned} onCancel={() => setAssignmentId('')} />
+      ))}
       <DataTable
         caption="Bandeja de postulaciones"
         columns={editableColumns}
@@ -166,7 +214,7 @@ export default function Reclutamiento({ db, session }) {
       ) : db && uid && orgId && ['coach', 'admin'].includes(role) ? (
         <div className="space-y-4" key={JSON.stringify([db.app?.options?.projectId, uid, orgId, role])}>
           <EnlacesPostulacion db={db} orgId={orgId} uid={uid} role={role} />
-          <Bandeja db={db} orgId={orgId} uid={uid} />
+          <Bandeja db={db} orgId={orgId} uid={uid} role={role} />
         </div>
       ) : (
         <p role="status">La bandeja se habilitará cuando tu sesión de equipo esté disponible.</p>
