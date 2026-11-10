@@ -14,7 +14,12 @@ import './jugadores.css'
 
 const states = Object.values(APPLICATION_STATUS)
 const columns = [
-  { key: 'fullName', label: 'Postulante' },
+  { key: 'fullName', label: 'Postulante', render: (name, application) => (
+    <>
+      {name}
+      {application.hasVideo && <span className="block text-xs text-muted">Video adjunto</span>}
+    </>
+  ) },
   { key: 'city', label: 'Ciudad' },
   { key: 'graduationYear', label: 'Año de graduación' },
   { key: 'status', label: 'Estado', render: (status) => <StatusBadge status={status} /> },
@@ -81,9 +86,10 @@ function Bandeja({ db, orgId, uid, role }) {
         const rows = snapshot.docs
           .map((doc) => {
             const { orgId, fullName, city, graduationYear, status, createdAt, playerId,
-              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking } = doc.data()
+              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking, videoPaths } = doc.data()
             return { id: doc.id, orgId, fullName, city, graduationYear, status, createdAt, playerId,
-              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking }
+              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking,
+              hasVideo: Array.isArray(videoPaths) && videoPaths.length > 0 }
           })
           .filter((row) => row.orgId === orgId)
           .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))

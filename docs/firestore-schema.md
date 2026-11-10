@@ -305,9 +305,10 @@ de ser jugador del equipo.
 | `backhand` | `'dos manos'` \| `'una mano'` \| null | no | |
 | `guardian` | `{ name, phone, email }` \| null | sí si es menor de 18 | |
 | `videoLinks` | string[] | no | Links de YouTube, máximo 5 |
-| `videoPaths` | string[] | no | Archivos subidos a Storage |
+| `videoPaths` | string[] | no | Rutas privadas confirmadas por el servidor. La demo guarda un archivo opcional en `orgs/{orgId}/applications/{appId}/video.mp4` o `.mov`. |
+| `videoUpload` | object | no | Reserva temporal de ruta y huella del archivo para reintentar sin sobrescribirlo. La escribe el servidor y la retira al confirmar `videoPaths`. |
 | `message` | string | no | Hasta 1000 caracteres |
-| `consent` | object | sí | Mismo formato que en `players`, con `version: 'applications-v1'`, `method` `'self'` o `'guardian'` y `recordedBy: 'public-form'` en el formulario público |
+| `consent` | object | sí | Mismo formato que en `players`. El formulario usa `applications-v1` para datos y `applications-video-v1` al autorizar también un video. `method` es `'self'` o `'guardian'` y `recordedBy` es `'public-form'`. |
 | `playerId` | string \| null | no | Ficha activa de la misma organización, creada o vinculada desde Reclutamiento (PCIT-56) |
 | `internalNotes` | string | no | Notas del equipo; nunca visibles para el postulante |
 | `reviewedBy` | string \| null | no | `uid` |

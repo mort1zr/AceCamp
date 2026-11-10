@@ -6,8 +6,14 @@ const report = (override = {}) => JSON.stringify({ format: { format_name: 'mov,m
 
 describe('Verificación de contenedor y pista de video', () => {
   it('acepta MP4/MOV con duración y dimensiones reales, y rechaza audio o imágenes adjuntas', () => {
-    expect(readVideoMetadata(report())).toEqual({ durationSeconds: 25.5, width: 1920, height: 1080, extension: 'mp4', contentType: 'video/mp4' })
+    expect(readVideoMetadata(report())).toEqual({ durationSeconds: 25.5, width: 1920, height: 1080, fps: null, extension: 'mp4', contentType: 'video/mp4' })
     for (const output of [report({ streams: [{ codec_type: 'audio' }] }), report({ streams: [{ codec_type: 'video', width: 100, height: 100, disposition: { attached_pic: 1 } }] }), report({ format: { format_name: 'matroska', duration: '10' } }), report({ format: { format_name: 'mov,mp4', duration: 'NaN' } }), '<html>not video</html>']) expect(() => readVideoMetadata(output)).toThrow()
+  })
+
+  it('lee la frecuencia de la pista como fracción y no inventa FPS', () => {
+    const stream = { codec_type: 'video', width: 1280, height: 720 }
+    expect(readVideoMetadata(report({ streams: [{ ...stream, avg_frame_rate: '30000/1001' }] })).fps).toBeCloseTo(29.97)
+    expect(readVideoMetadata(report({ streams: [{ ...stream, avg_frame_rate: '0/0' }] })).fps).toBeNull()
   })
 
   it('distingue MOV, MP4 y marcas de otros formatos de la misma familia', () => {

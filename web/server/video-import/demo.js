@@ -5,6 +5,7 @@ import { getAuth } from 'firebase-admin/auth'
 import { getFirestore } from 'firebase-admin/firestore'
 import { getStorage } from 'firebase-admin/storage'
 import { EMULATOR_PORTS, EMULATOR_PROJECT_ID } from '../../src/panel/lib/firebaseConfig.js'
+import { createApplicationVideoMiddleware, createApplicationVideoStore } from './applicationVideo.js'
 import { createDemoImportStore } from './demoStore.js'
 import { createPublicVideoDownloader } from './download.js'
 import { VideoImportError } from './errors.js'
@@ -64,22 +65,27 @@ export function demoVideoImport(env) {
       const origin = `http://${host}:${port}`
       const directDownload = createPublicVideoDownloader({ allowedHosts: ['raw.githubusercontent.com'] })
       const probe = createLocalVideoProbe({ executable: ffprobe })
+      const bucket = getStorage(app).bucket()
+      async function authorize({ bearerToken }) {
+        const { uid } = await auth.verifyIdToken(bearerToken)
+        const profile = (await db.collection('users').doc(uid).get()).data()
+        if (!profile || !['coach', 'admin'].includes(profile.role)) return null
+        return { orgId: profile.orgId, actorId: uid }
+      }
+      server.middlewares.use(createApplicationVideoMiddleware({
+        origin, probe, authorize, store: createApplicationVideoStore({ db, bucket }),
+      }))
       const importVideo = createVideoImporter({
         maxBytes: 24 * 1024 * 1024,
         maxConcurrent: 1,
-        store: createDemoImportStore({ db, bucket: getStorage(app).bucket() }),
+        store: createDemoImportStore({ db, bucket }),
         download: createVideoSourceDownloader({ directDownload, resolveYouTube: createYtDlpResolver({ executable: ytDlp }) }),
         async probe(input) {
           const data = await probe(input)
           if (data.durationSeconds > 30) throw new VideoImportError('duration', 'La demo admite videos de hasta 30 segundos.')
           return data
         },
-        async authorize({ bearerToken }) {
-          const { uid } = await auth.verifyIdToken(bearerToken)
-          const profile = (await db.collection('users').doc(uid).get()).data()
-          if (!profile || !['coach', 'admin'].includes(profile.role)) return null
-          return { orgId: profile.orgId, actorId: uid }
-        },
+        authorize,
       })
       const handle = createVideoImportHttpHandler({ importVideo, origin })
 

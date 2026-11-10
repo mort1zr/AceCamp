@@ -107,6 +107,15 @@ describe('Bandeja de reclutamiento', () => {
     expect(screen.getByText('Aún no llegan postulaciones')).toBeTruthy()
   })
 
+  it('identifica en la bandeja un video confirmado sin mostrar su ruta', () => {
+    render(page())
+    const path = 'orgs/equipo-a/applications/1/video.mp4'
+    publish(application('1', 'Lucía Pérez', 'Lima', 'nueva', session.orgId, { videoPaths: [path] }))
+    const row = screen.getByRole('row', { name: /Lucía Pérez/ })
+    expect(within(row).getByText('Video adjunto')).toBeTruthy()
+    expect(row.textContent).not.toContain(path)
+  })
+
   it('espera el plan y no consulta postulaciones con Básico', () => {
     const { rerender } = render(page(session, null))
     expect(onSnapshot).not.toHaveBeenCalled()

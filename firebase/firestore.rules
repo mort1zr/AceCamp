@@ -476,7 +476,7 @@ service cloud.firestore {
       return year >= 1900 && birth.year() == year && birth.month() == month && birth.day() == day && birth <= today
         && validConsent(consent, 'public-form')
         && consent.keys().hasOnly(['accepted', 'version', 'method', 'recordedBy', 'recordedAt'])
-        && consent.version == 'applications-v1' && consent.recordedAt == request.time
+        && consent.version in ['applications-v1', 'applications-video-v1'] && consent.recordedAt == request.time
         && (age < 18
           ? consent.method == 'guardian' && publicApplicationGuardian(data.guardian)
           : consent.method == 'self' && data.guardian == null);
@@ -522,6 +522,7 @@ service cloud.firestore {
 
       allow create: if inOrg(request.resource.data.orgId)
         && !('formId' in request.resource.data)
+        && !request.resource.data.keys().hasAny(['videoPaths', 'videoUpload'])
         && request.resource.data.get('playerId', null) == null
         && request.resource.data.status == 'nueva'
         && request.resource.data.createdAt == request.time
@@ -533,7 +534,8 @@ service cloud.firestore {
       allow create: if validPublicApplication(request.resource.data);
 
       allow update: if inOrg(resource.data.orgId)
-        && unchanged(['orgId', 'formId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email', 'playerId'])
+        && unchanged(['orgId', 'formId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email',
+             'playerId', 'videoPaths', 'videoUpload'])
         && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada']
         && validApplicationTransition(resource.data.status, request.resource.data.status);
 

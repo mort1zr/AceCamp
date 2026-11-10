@@ -1,6 +1,6 @@
 import { addDoc, collection, doc, getDocFromServer, serverTimestamp } from 'firebase/firestore'
 import { normalizePlayer } from './players.js'
-import { APPLICATION_CONSENT_VERSION, APPLICATION_STATUS, COLLECTIONS } from './schema.js'
+import { APPLICATION_CONSENT_VERSION, APPLICATION_STATUS, APPLICATION_VIDEO_CONSENT_VERSION, COLLECTIONS } from './schema.js'
 
 export function applicationForms(db, orgId) {
   return collection(db, COLLECTIONS.orgs, orgId, COLLECTIONS.applicationForms)
@@ -41,7 +41,7 @@ export function submitPublicApplication(db, { orgId, formId }, input) {
     message,
     consent: {
       accepted: true,
-      version: APPLICATION_CONSENT_VERSION,
+      version: input.attachVideo ? APPLICATION_VIDEO_CONSENT_VERSION : APPLICATION_CONSENT_VERSION,
       method: player.guardian ? 'guardian' : 'self',
       recordedBy: 'public-form',
       recordedAt: now,
