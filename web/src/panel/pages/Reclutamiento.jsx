@@ -1,5 +1,118 @@
-import PageStub from '../../compartido/components/PageStub.jsx'
+import { useEffect, useState } from 'react'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { Link } from 'react-router'
+import { DataTable, StatusBadge } from '../components/ui'
+import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
+import { APPLICATION_STATUS, COLLECTIONS } from '../lib/schema.js'
+import './jugadores.css'
 
-export default function Reclutamiento() {
-  return <PageStub title="Reclutamiento" note="La bandeja de postulaciones y sus estados van en FE-06." />
+const states = Object.values(APPLICATION_STATUS)
+const columns = [
+  { key: 'fullName', label: 'Postulante' },
+  { key: 'city', label: 'Ciudad' },
+  { key: 'graduationYear', label: 'Año de graduación' },
+  { key: 'status', label: 'Estado', render: (status) => <StatusBadge status={status} /> },
+]
+const normalize = (text) => String(text ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
+function Bandeja({ db, orgId }) {
+  const [result, setResult] = useState(null)
+  const [attempt, setAttempt] = useState(0)
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+
+  useEffect(() => {
+    let active = true
+    const unsubscribe = onSnapshot(
+      query(collection(db, COLLECTIONS.applications), where('orgId', '==', orgId)),
+      (snapshot) => {
+        if (!active) return
+        const rows = snapshot.docs
+          .map((doc) => {
+            const { orgId, fullName, city, graduationYear, status, createdAt } = doc.data()
+            return { id: doc.id, orgId, fullName, city, graduationYear, status, createdAt }
+          })
+          .filter((row) => row.orgId === orgId)
+          .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))
+        setResult({ rows })
+      },
+      () => {
+        if (active) setResult({ error: 'No se pudieron cargar las postulaciones de tu organización.' })
+      },
+    )
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [db, orgId, attempt])
+
+  const term = normalize(search.trim())
+  const rows = result?.rows ?? []
+  const filtered = rows.filter((row) =>
+    (!status || row.status === status) &&
+    [row.fullName, row.city].some((value) => normalize(value).includes(term)),
+  )
+  return (
+    <>
+      {rows.length > 0 && (
+        <div className="players-filters">
+          <div className="players-field">
+            <label htmlFor="application-search">Buscar por nombre o ciudad</label>
+            <input id="application-search" type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="players-field">
+            <label htmlFor="application-status">Estado de postulación</label>
+            <select id="application-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">Todos los estados</option>
+              {states.map((state) => (
+                <option key={state} value={state}>{state[0].toUpperCase() + state.slice(1)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      <DataTable
+        caption="Bandeja de postulaciones"
+        columns={columns}
+        rows={filtered}
+        loading={!result}
+        error={result?.error}
+        onRetry={() => {
+          setResult(null)
+          setAttempt((value) => value + 1)
+        }}
+        emptyTitle={rows.length > 0 ? 'No hay coincidencias' : 'Aún no llegan postulaciones'}
+        emptyDescription={rows.length > 0 ? 'Prueba otro nombre, ciudad o estado.' : 'Aquí aparecerán las postulaciones de tu organización.'}
+      />
+    </>
+  )
+}
+
+export default function Reclutamiento({ db, session }) {
+  const { plan } = usePlanVista()
+  const { uid, orgId, role } = session ?? {}
+  const allowed = incluyeSeccion(plan, 'reclutamiento')
+  return (
+    <section className="players-page" aria-labelledby="recruitment-title">
+      <header className="players-page-heading">
+        <div>
+          <p className="players-eyebrow">Postulaciones de tu organización</p>
+          <h1 id="recruitment-title">Reclutamiento<span className="players-title-dot">.</span></h1>
+          <p>Consulta las postulaciones y su estado.</p>
+        </div>
+      </header>
+      {plan == null ? (
+        <p role="status">La bandeja estará disponible cuando se confirme el plan de tu organización.</p>
+      ) : !allowed ? (
+        <aside className="players-demo-notice">
+          <strong>Reclutamiento está disponible desde el plan Pro.</strong>
+          <Link to="/configuracion?seccion=plan">Ver mi plan</Link>
+        </aside>
+      ) : db && uid && orgId && ['coach', 'admin'].includes(role) ? (
+        <Bandeja key={JSON.stringify([db.app?.options?.projectId, uid, orgId, role])} db={db} orgId={orgId} />
+      ) : (
+        <p role="status">La bandeja se habilitará cuando tu sesión de equipo esté disponible.</p>
+      )}
+    </section>
+  )
 }
