@@ -94,6 +94,11 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
             target = np.array([rng.uniform(1.5, 9.5), rng.uniform(1.0, NET_Y - 2.0)])
         else:
             target = np.array([rng.uniform(1.5, 9.5), rng.uniform(NET_Y + 2.0, COURT_LENGTH - 1.0)])
+        if shot_index < num_shots - 1 and not (serve and shot_index == 0):
+            # Una pelota que se devuelve cae al alcance del receptor (hasta ~3 m a cada lado): en un
+            # partido real nadie golpea una pelota a la que no llega. El último golpe no se limita.
+            reach = players[receiver][0]
+            target[0] = float(np.clip(target[0], max(1.5, reach - 3.0), min(9.5, reach + 3.0)))
         if last_out and shot_index == num_shots - 1:
             miss = rng.uniform(0.4, 2.0)
             kind = rng.integers(3)
@@ -145,6 +150,7 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
             last_shot = shot_index == num_shots - 1
             if bounced and t - first_bounce_t > 0.2 and (reached or falling_low) and not last_shot:
                 players[receiver][1] = pos[1] + (-0.5 if receiver == 1 else 0.5)
+                players[receiver][0] = pos[0] - 0.6  # la golpea a un brazo de distancia
                 break
             if last_shot and bounced and t - first_bounce_t > 0.5:
                 break  # el último golpe es un ganador: se sigue 0,5 s tras su bote
@@ -154,8 +160,13 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
     return rally
 
 
-def render_detections(rally, camera, noise_px=1.5, miss_rate=0.03, seed=0):
-    """Cajas de pelota y jugadores por fotograma, como las devuelve el pipeline."""
+def render_detections(rally, camera, noise_px=1.5, miss_rate=0.03, seed=0, occlusion_rate=0.0):
+    """Cajas de pelota y jugadores por fotograma, como las devuelve el pipeline.
+
+    Una pelota fuera del encuadre no se detecta. occlusion_rate: probabilidad de perder la pelota
+    en cada fotograma en que está delante de un jugador (en vídeo real el detector la pierde a
+    menudo cuando se solapa con el jugador, justo en el golpe).
+    """
     rng = np.random.default_rng(seed + 100)
     ball, players = [], []
     for ball_3d, players_m in zip(rally.ball_3d, rally.players_m):
@@ -170,6 +181,13 @@ def render_detections(rally, camera, noise_px=1.5, miss_rate=0.03, seed=0):
             ball.append({})
             continue
         cx, cy = camera.project(ball_3d)[0] + rng.normal(0, noise_px, 2)
+        if not (0 <= cx < camera.width and 0 <= cy < camera.height):
+            ball.append({})
+            continue
+        if occlusion_rate and any(x1 <= cx <= x2 and y1 <= cy <= y2 for x1, y1, x2, y2 in frame_players.values()) \
+                and rng.random() < occlusion_rate:
+            ball.append({})
+            continue
         ball.append({1: [cx - 6, cy - 6, cx + 6, cy + 6]})
     return ball, players
 

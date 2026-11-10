@@ -3,6 +3,7 @@
   10,
   56,
   94,
+  129,
   182
  ],
  "serves": [],
@@ -48,11 +49,11 @@
    "start": 1,
    "end": 213,
    "server": 2,
-   "shots": 4,
+   "shots": 5,
    "end_reason": "sin pelota",
    "winner": 2,
    "win_reason": "no devuelta",
-   "confidence_level": "baja"
+   "confidence_level": "media"
   }
  ],
  "statistics": {
@@ -80,9 +81,9 @@
    },
    "2": {
     "shots": {
-     "count": 1,
-     "sumSpeedKmh": 63.8,
-     "maxSpeedKmh": 63.8
+     "count": 2,
+     "sumSpeedKmh": 153.8,
+     "maxSpeedKmh": 89.9
     },
     "movement": {
      "distanceMeters": 15.0,
@@ -100,10 +101,10 @@
   },
   "rallies": {
    "count": 1,
-   "sumShots": 4,
-   "longestShots": 4,
-   "short": 1,
-   "medium": 0,
+   "sumShots": 5,
+   "longestShots": 5,
+   "short": 0,
+   "medium": 1,
    "long": 0
   },
   "bounces": {
@@ -118,11 +119,9 @@
     "1": 0,
     "2": 1
    },
-   "lowConfidence": 1,
+   "lowConfidence": 0,
    "corrected": 0,
-   "toReview": [
-    1
-   ]
+   "toReview": []
   },
   "score": {
    "text": "0-0 0-15",

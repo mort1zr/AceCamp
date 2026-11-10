@@ -39,33 +39,44 @@ CAMERA = BroadcastCamera()
 FPS = 30
 
 
-def simulated_matches(seeds):
+def camera_for(height):
+    """Cámara de retransmisión a 1080p o 720p (misma vista; la focal escala con la resolución)."""
+    scale = height / 1080
+    return BroadcastCamera(width=int(round(1920 * scale)), height=height, focal=1700.0 * scale)
+
+
+def simulated_matches(seeds, height=1080, fps=FPS, noise_px=1.5, miss_rate=0.03, occlusion_rate=0.0):
+    CAMERA = camera_for(height)
+    FPS = fps
     for seed in seeds:
         rng = np.random.default_rng(seed + 7)
         keypoints = CAMERA.project(np.c_[COURT_KEYPOINTS_M, np.zeros(14)]) + rng.normal(0, 0.5, (14, 2))
         homography = CourtHomography.from_keypoints(keypoints.ravel())
         match = simulate_match(num_points=8, seed=seed, fault_points=(1,), out_points=(2,), net_points=(5,),
-                               double_fault_points=(6,), max_shots=12)
-        ball, players = render_detections(match, CAMERA, seed=seed)
+                               double_fault_points=(6,), max_shots=12, fps=FPS)
+        ball, players = render_detections(match, CAMERA, noise_px=noise_px, miss_rate=miss_rate, seed=seed,
+                                          occlusion_rate=occlusion_rate)
         analysis = analyze_detections(ball, players, [keypoints.ravel()] * len(ball), homography,
                                       [True] * len(ball), FPS, DEFAULTS)
-        yield match, analysis
+        yield match, analysis, FPS
 
 
-def evaluate_simulation(seeds):
+def evaluate_simulation(seeds, **conditions):
     bounce_score = serve_score = None
     position_errors, calls, speed_errors, winners, nets, rallies, boundaries = [], [], [], [], [], [], []
     singles = court_area()
-    for match, analysis in simulated_matches(seeds):
+    for match, analysis, FPS in simulated_matches(seeds, **conditions):
         bounces = [b for b in analysis["bounces"] if "x_m" in b]
-        score, matched = match_events([b["frame"] for b in bounces], [b["frame"] for b in match.bounces], 2)
+        score, matched = match_events([b["frame"] for b in bounces], [b["frame"] for b in match.bounces],
+                                      max(2, round(2 * FPS / 30)))
         bounce_score = score if bounce_score is None else bounce_score + score
         for i, j in matched:
             truth = match.bounces[j]
             position_errors.append(np.hypot(bounces[i]["x_m"] - truth["x_m"], bounces[i]["y_m"] - truth["y_m"]))
             if abs(line_distance(truth["x_m"], truth["y_m"], singles)) > 0.30 and bounces[i]["area"] == "pista":
                 calls.append(bounces[i]["call"] == call(truth["x_m"], truth["y_m"], singles, margin=0.0))
-        score, _ = match_events([s["frame"] for s in analysis["serves"]], [s["frame"] for s in match.serves], 3)
+        score, _ = match_events([s["frame"] for s in analysis["serves"]], [s["frame"] for s in match.serves],
+                                max(3, round(3 * FPS / 30)))
         serve_score = score if serve_score is None else serve_score + score
         for attempt in (a for p in analysis["points"] for a in p["serve_attempts"] if a["speedKmh"]):
             real = min(match.serves, key=lambda s: abs(s["frame"] - attempt["frame"]))

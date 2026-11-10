@@ -10,12 +10,16 @@
   188,
   204,
   221,
+  251,
   299,
+  331,
   349,
   365,
   400,
   424,
   476,
+  505,
+  534,
   542,
   559
  ],
@@ -117,7 +121,7 @@
    "start": 1,
    "end": 597,
    "server": 2,
-   "shots": 18,
+   "shots": 22,
    "end_reason": "sin pelota",
    "winner": 1,
    "win_reason": "no devuelta",
@@ -130,8 +134,8 @@
   "players": {
    "1": {
     "shots": {
-     "count": 5,
-     "sumSpeedKmh": 378.4,
+     "count": 7,
+     "sumSpeedKmh": 548.8,
      "maxSpeedKmh": 94.0
     },
     "movement": {
@@ -149,8 +153,8 @@
    },
    "2": {
     "shots": {
-     "count": 6,
-     "sumSpeedKmh": 627.4,
+     "count": 8,
+     "sumSpeedKmh": 828.2,
      "maxSpeedKmh": 170.7
     },
     "movement": {
@@ -174,8 +178,8 @@
   },
   "rallies": {
    "count": 1,
-   "sumShots": 18,
-   "longestShots": 18,
+   "sumShots": 22,
+   "longestShots": 22,
    "short": 0,
    "medium": 0,
    "long": 1

@@ -62,6 +62,10 @@ HIT_EXCLUSION_SECONDS = 0.15
 OUT_MARGIN_SIDE_M = 4.0
 OUT_MARGIN_BACK_M = 6.0
 
+# Golpes dentro de un hueco sin pelota
+MAX_HIT_GAP_SECONDS = 0.6
+HIT_GAP_FIT_POINTS = 4
+
 # Huecos sin pelota
 MIN_GAP_FRAMES = 2  # huecos más cortos ya los cubre la detección normal
 MAX_GAP_SECONDS = 0.5  # en un hueco más largo no se puede deducir la trayectoria (15 fotogramas)
@@ -127,7 +131,8 @@ def detect_hits(ball_detections, player_detections, homography, fps,
 
     Los jugadores deben venir numerados 1 = fondo lejano y 2 = fondo cercano (TA-12).
     """
-    frames, suppression = _frames(HIT_VELOCITY_SECONDS, fps), _frames(SUPPRESSION_SECONDS, fps)
+    # Al menos 3 fotogramas por lado: a 25 fps, 0,1 s son 2 y la pendiente salía muy ruidosa.
+    frames, suppression = max(3, _frames(HIT_VELOCITY_SECONDS, fps)), _frames(SUPPRESSION_SECONDS, fps)
     centers = _ball_centers(ball_detections)
     homographies = per_frame(homography, len(ball_detections))
     y = centers[:, 1]
@@ -150,11 +155,46 @@ def detect_hits(ball_detections, player_detections, homography, fps,
         near_hit = 2 in near and before > 0 > after  # baja hacia el jugador cercano y vuelve subiendo
         if far_hit or near_hit:
             candidates.append((-abs(after - before), i))
+    candidates += _gap_hits(centers, player_detections, homographies, fps, near_player_fraction, min_speed)
     hits = []
     for _, i in sorted(candidates):
         if all(abs(i - j) >= suppression for j in hits):
             hits.append(i)
     return sorted(hits)
+
+
+def _gap_hits(centers, player_detections, homographies, fps, near_player_fraction, min_speed):
+    """Golpes dentro de un hueco sin pelota: [(-cambio de velocidad, fotograma)].
+
+    En vídeo real el detector pierde a menudo la pelota justo en el golpe: se solapa con el
+    jugador, va muy rápida o sale del encuadre por abajo junto al jugador cercano. Si antes del
+    hueco la pelota iba hacia un jugador y después se aleja de él, y en los bordes del hueco está
+    junto a ese jugador, hubo un golpe dentro. El fotograma es donde se cruzan las dos rectas.
+    """
+    y = centers[:, 1]
+    found = []
+    for start, end in _gaps(y, 1, _frames(MAX_HIT_GAP_SECONDS, fps)):
+        before = [j for j in range(start - 1, max(-1, start - 1 - 2 * HIT_GAP_FIT_POINTS), -1)
+                  if not np.isnan(y[j])][:HIT_GAP_FIT_POINTS]
+        after = [j for j in range(end + 1, min(len(y), end + 1 + 2 * HIT_GAP_FIT_POINTS))
+                 if not np.isnan(y[j])][:HIT_GAP_FIT_POINTS]
+        if len(before) < 3 or len(after) < 3 or homographies[start - 1] is None:
+            continue
+        scale = _pixels_per_meter(homographies[start - 1], centers[start - 1]) * (30.0 / fps)
+        fit_b, fit_a = np.polyfit(before, y[before], 1), np.polyfit(after, y[after], 1)
+        slope_b, slope_a = fit_b[0] / scale, fit_a[0] / scale
+        if min(abs(slope_b), abs(slope_a)) < min_speed:
+            continue
+        near = set(_players_near(centers[start - 1], player_detections[start - 1], near_player_fraction))
+        near |= set(_players_near(centers[end + 1], player_detections[end + 1], near_player_fraction))
+        far_hit = 1 in near and slope_b < 0 < slope_a
+        near_hit = 2 in near and slope_b > 0 > slope_a
+        if not (far_hit or near_hit):
+            continue
+        cross = (fit_a[1] - fit_b[1]) / (fit_b[0] - fit_a[0])  # donde se cortan las dos rectas
+        frame = int(round(min(max(cross, start - 1), end + 1)))
+        found.append((-abs(slope_a - slope_b), frame))
+    return found
 
 
 def bounce_scores(ball_detections, homography, fps, hits=(), fit_frames=None, min_points=MIN_POINTS):

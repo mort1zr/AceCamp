@@ -116,7 +116,9 @@ def test_bounces_of_the_sample_video():
     hits = detect_hits(ball, players, homographies, data["fps"])
     found = detect_bounces(ball, players, homographies, data["fps"], hits=hits)
 
-    assert hits == [10, 56, 94, 182]
+    # El golpe del 129 ocurre con la pelota sin detectar (127-135, junto al jugador del fondo): se
+    # deduce del cambio de dirección antes y después del hueco.
+    assert hits == [10, 56, 94, 129, 182]
     result, _ = match_events(found, data["bounces_labeled"], 2)
     assert result.true_positives >= 4
     assert result.false_positives <= 1
@@ -210,3 +212,28 @@ def test_bounces_of_a_low_resolution_highlight_with_court_marks():
     result, _ = match_events(found, data["bounces_labeled"], 2)
     assert result.recall >= 0.8
     assert result.f1 >= 0.7
+
+
+def test_a_hit_hidden_by_the_player_is_inferred_from_the_gap():
+    """La pelota desaparece 8 fotogramas junto al jugador del fondo y vuelve en sentido contrario."""
+    homography = CAMERA.homography()
+    players = [{1: [900, 150, 960, 260], 2: [900, 800, 1000, 1000]} for _ in range(60)]
+    ball = []
+    for i in range(60):
+        if 22 <= i <= 29:
+            ball.append({})  # tapada por el jugador
+            continue
+        y = 420 - 9 * i if i < 22 else 222 + 9 * (i - 26)  # sube hacia el jugador 1 y vuelve
+        ball.append({1: [925, y - 5, 935, y + 5]})
+    hits = detect_hits(ball, players, homography, 30)
+    assert len(hits) == 1 and 22 <= hits[0] <= 29
+    # Sin jugador cerca no es un golpe.
+    far_away = [{1: [200, 150, 260, 260], 2: [900, 800, 1000, 1000]} for _ in range(60)]
+    assert detect_hits(ball, far_away, homography, 30) == []
+
+
+def test_toss_and_duplicate_hits_around_a_serve_are_dropped():
+    from events.serves import drop_toss_hits
+
+    serves = [{"frame": 100, "toss_start": 80}]
+    assert drop_toss_hits([50, 85, 99, 100, 104, 130], serves, 30) == [50, 100, 130]

@@ -21,6 +21,7 @@ from events import (
 )
 from events.bounce_classifier import BounceClassifier, detect_bounces_trained
 from events.serve_pose import fix_servers
+from events.serves import drop_toss_hits
 from mini_court import MiniCourt
 from report.positions import position_rows
 from scoreboard import load_corrections, review_list, score_points
@@ -46,6 +47,7 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
                            main_camera=main_camera, hits=hits)
     if serve_filter is not None:
         serves = serve_filter(serves)
+    hits = drop_toss_hits(hits, serves, fps)  # el lanzamiento del saque no es un golpe
     all_hits = sorted(set(hits) | {s["frame"] for s in serves})
 
     # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
