@@ -36,7 +36,7 @@ y un **archivo o carpeta de Google Drive**.
 | --- | --- |
 | **Memoria del modelo** | Desde PCIT-146 el vídeo se procesa fotograma a fotograma: la memoria **no depende de la duración**. Antes, un vídeo de más de ~1 min a 1080p agotaba la RAM. |
 | **Velocidad del modelo** | Medida en un PC sin GPU con el detector por defecto, `yolov8m`: **~12 min de proceso por cada minuto de vídeo**. Con `yolov8x` eran ~19 min. Con GPU (T4) se estima ~1–1,5 h por hora de partido (por confirmar en Colab). |
-| **Resolución mínima en el worker** | `worker.min_resolution` en `model/config.yaml` (**720**, lado corto). Por debajo, el partido pasa a `error` antes de analizarlo. |
+| **Resolución mínima en el worker** | `worker.min_resolution` en `model/config.yaml` fija 720 píxeles para el lado corto y 1280 para el largo. Si falta alguno de los mínimos, el partido pasa a `error` antes de analizarlo. |
 | **Límite de duración en el worker** | `worker.max_duration_seconds` en `model/config.yaml` (hoy **60 s**). Si un vídeo lo supera, el partido pasa a `error` con un mensaje para el usuario, antes de analizarlo. |
 | **Límite de tamaño** | **500 MB** en `MAX_VIDEO_BYTES` (`web/src/panel/lib/videoUpload.js`) y en `firebase/storage.rules`. |
 | **Subida de archivos** | Un archivo por partido (PCIT-27). |
@@ -82,10 +82,10 @@ de 500 MB. A 1080p, un móvil graba unos **60–100 MB por minuto**, así que 50
 | Analizar (PCIT-27) y Postulación (PCIT-54) | Leer la duración en el navegador (`<video>` + `loadedmetadata`) y rechazar los que superen `MAX_VIDEO_SECONDS`, con el mensaje de PCIT-147 | Fabian (Analizar) y Axel (Postulación) |
 | `web/server/video-import/` | Tras `ffprobe`, rechazar por duración con el mismo límite (nuevo código `import/too-long`) | Fabian |
 | `model/config.yaml` | `worker.max_duration_seconds` con el mismo valor | Aaron |
-| `web/src/panel/lib/schema.js` | Nueva constante `MIN_VIDEO_RESOLUTION = 720` (lado corto, en píxeles) | Axel |
-| Analizar y Postulación | Leer `videoWidth` y `videoHeight` en el navegador (mismo `loadedmetadata`) y rechazar si `min(ancho, alto) < MIN_VIDEO_RESOLUTION` | Fabian y Axel |
+| `web/src/panel/lib/videoRequirements.js` | Mínimo de 1280 píxeles en el lado largo y 720 en el corto | Axel |
+| Analizar y Postulación | Leer `videoWidth` y `videoHeight` en el navegador (mismo `loadedmetadata`) y rechazar si uno de los lados queda por debajo de su mínimo | Fabian y Axel |
 | `web/server/video-import/` | Tras `ffprobe`, rechazar con el mismo mínimo (nuevo código `import/low-resolution`). En YouTube, pedir un formato de 720p o más: si no se elige, muchos vídeos llegan a 360p | Fabian |
-| `model/config.yaml` | `worker.min_resolution: 720` (**hecho**): el worker rechaza el vídeo antes de analizarlo | Aaron |
+| `model/config.yaml` | `worker.min_resolution: 720`: el worker comprueba el lado corto y calcula 1280 para el largo. Se valida antes de analizar el video. | Aaron |
 
 **Resolución (decidido tras probar highlights reales):**
 
@@ -96,9 +96,10 @@ de 500 MB. A 1080p, un móvil graba unos **60–100 MB por minuto**, así que 50
 | 1920×1080 | El mejor resultado | **Recomendado** |
 
 Fotogramas por segundo: de 25 a 60 (recomendado 30; a 60 fps se procesa el doble de fotogramas).
-Mensaje si no llega al mínimo: *"El video debe tener al menos 720p (1280x720). Grábalo o expórtalo
-en 720p o 1080p y vuelve a subirlo."* (el mismo que da el worker). Se mide el lado corto para que
-un vídeo vertical de 720×1280 también valga.
+
+Mensaje si no llega al mínimo: *"El video debe tener al menos 720p (1280×720).
+Grábalo o expórtalo en 720p o 1080p."* Analizar video y el worker aplican la
+misma regla a archivos horizontales y verticales.
 
 **Valores propuestos (pendientes de acordar):**
 

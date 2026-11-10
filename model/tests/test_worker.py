@@ -306,19 +306,26 @@ def test_the_analyzer_rejects_long_videos_before_running_the_model(tmp_path, mon
 
 def test_a_low_resolution_video_ends_in_error_with_the_requirement(tmp_path):
     def low_resolution(path):
-        raise processor.VideoResolutionError(640, 360, 720)
+        raise processor.VideoResolutionError(640, 360, 720, 1280)
 
     store = MemoryStore({"m1": queued_match()})
 
     assert run_once(store, MemoryStorage({"orgs/org1/matches/m1/video.mp4": b"v"}), low_resolution, tmp_path,
                     version="v") == ("m1", "error")
     assert store.matches["m1"]["errorMessage"] == (
-        "El video debe tener al menos 720p (1280x720). Grábalo o expórtalo en 720p o 1080p y vuelve a subirlo.")
+        "El video debe tener al menos 720p (1280×720). Grábalo o expórtalo en 720p o 1080p.")
 
 
-@pytest.mark.parametrize(("size", "accepted"), [((640, 360), False), ((1280, 720), True), ((720, 1280), True),
-                                                 ((1920, 1080), True)],
-                         ids=["360p", "720p", "720p-vertical", "1080p"])
+@pytest.mark.parametrize(("size", "accepted"), [
+    ((640, 360), False),
+    ((1280, 718), False),
+    ((1278, 720), False),
+    ((720, 1278), False),
+    ((720, 720), False),
+    ((1280, 720), True),
+    ((720, 1280), True),
+    ((1920, 1080), True),
+])
 def test_the_analyzer_checks_the_resolution_before_running_the_model(tmp_path, monkeypatch, size, accepted):
     import main
     from worker.__main__ import make_analyzer

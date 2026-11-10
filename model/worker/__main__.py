@@ -50,6 +50,7 @@ def make_analyzer(config_path=None, device=None, render_video=True):
     base = load_config(config_path)
     max_seconds = base["worker"]["max_duration_seconds"]
     min_short_side = base["worker"].get("min_resolution")
+    min_long_side = round(min_short_side * 16 / 9) if min_short_side else 0
     min_fps = base["worker"]["min_fps"]
     max_fps = base["worker"]["max_fps"]
 
@@ -60,8 +61,9 @@ def make_analyzer(config_path=None, device=None, render_video=True):
             raise VideoFrameRateError(None, min_fps, max_fps)
         if max_seconds and info.duration_seconds > max_seconds:
             raise VideoTooLongError(info.duration_seconds, max_seconds)
-        if min_short_side and min(info.width, info.height) < min_short_side:
-            raise VideoResolutionError(info.width, info.height, min_short_side)
+        if min_short_side and (min(info.width, info.height) < min_short_side
+                               or max(info.width, info.height) < min_long_side):
+            raise VideoResolutionError(info.width, info.height, min_short_side, min_long_side)
         if not min_fps <= info.fps <= max_fps:
             raise VideoFrameRateError(info.fps, min_fps, max_fps)
         config = {**base, "paths": {**base["paths"], "input": str(video_path),
