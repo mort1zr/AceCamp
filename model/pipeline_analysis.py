@@ -63,7 +63,8 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
 
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, fps, len(ball_detections))
-    add_serve_and_rally_stats(model_statistics, points)
+    rallies = config.get("rallies", {})
+    add_serve_and_rally_stats(model_statistics, points, rallies.get("short_max", 4), rallies.get("medium_max", 8))
     counts = call_counts(bounces)
     model_statistics["bounces"] = {"count": len(bounces), "in": counts["dentro"], "out": counts["fuera"],
                                    "doubtful": counts["dudoso"]}

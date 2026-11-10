@@ -61,6 +61,12 @@ line_calls:
   # Comparar los botes del peloteo con la pista de dobles (true) o la de individuales (false).
   doubles: false
 
+rallies:
+  # Peloteos (TA-35, TA-36), contando el saque: corto hasta short_max golpes, medio hasta
+  # medium_max y largo a partir de ahí.
+  short_max: 4
+  medium_max: 8
+
 match:
   # Cómo empieza el partido (TA-29). Se puede sobrescribir con --match-config match.yaml.
   # Sacador del primer punto del vídeo: 1 (fondo lejano), 2 (cercano) o auto (el que detecta el modelo).

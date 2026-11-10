@@ -139,3 +139,44 @@ def test_aces_and_faults():
     without_winners = serve_stats([point(attempt())], player=2)
     assert "aces" not in without_winners  # sin TA-28 no se sabe: se omite, nunca 0
     assert "faults" not in serve_stats([point(attempt(fault=None))], player=2)
+
+
+def test_rally_shot_counts_are_right_within_one_in_90_percent_of_points():
+    """Criterio de TA-35: el número de golpes de cada punto, ±1, en ≥ 90 % de los puntos.
+
+    Verdad: golpes simulados del punto, saque incluido; un primer saque que fue falta no cuenta.
+    """
+    from stats import rally_length
+
+    camera = BroadcastCamera()
+    homography = camera.homography()
+    diffs = []
+    for seed in range(12):
+        match = simulate_match(8, seed=seed, fault_points=(1,), out_points=(2, 5), double_fault_points=(6,),
+                               max_shots=12)
+        ball, players = render_detections(match, camera, seed=seed)
+        hits = detect_hits(ball, players, homography, 30)
+        serves = detect_serves(ball, players, homography, 30, hits=hits)
+        all_hits = sorted(set(hits) | {s["frame"] for s in serves})
+        bounces = locate_bounces(detect_bounce_events(ball, players, homography, 30, hits=all_hits), ball,
+                                 homography, 30, hits=all_hits)
+        points = detect_points(ball, players, hits, bounces, 30, serves=serves)
+        for real in match.points:
+            if real["how"] == "doble falta":
+                truth = 1
+            else:
+                faults = sum(1 for s in match.serves if real["start"] <= s["frame"] <= real["end"] and s["fault"])
+                truth = sum(1 for s in match.shots if real["start"] <= s["frame"] <= real["end"]) - min(faults, 1)
+            best = max(points, key=lambda p: min(p["end"], real["end"]) - max(p["start"], real["start"]))
+            diffs.append(rally_length(best) - truth)
+    assert np.mean(np.abs(diffs) <= 1) >= 0.90
+
+
+def test_rally_categories_use_the_configured_cuts():
+    from stats import rally_category
+
+    assert [rally_category(n) for n in (0, 4, 5, 8, 9)] == ["short", "short", "medium", "medium", "long"]
+    assert [rally_category(n, 2, 5) for n in (2, 3, 5, 6)] == ["short", "medium", "medium", "long"]
+    points = [{"shots": n, "serve_attempts": []} for n in (2, 3, 6)]
+    assert rally_stats(points, 2, 5) == {"count": 3, "sumShots": 11, "longestShots": 6, "short": 1, "medium": 1,
+                                         "long": 1}

@@ -166,24 +166,37 @@ def serve_stats(points, player):
     return stats
 
 
-def rally_stats(points):
+def rally_length(point):
+    """Golpes del peloteo de un punto, saque incluido (un primer saque que fue falta no cuenta)."""
+    return point["shots"] - max(0, len(point.get("serve_attempts", [])) - 1)
+
+
+def rally_category(length, short_max=RALLY_SHORT_MAX, medium_max=RALLY_MEDIUM_MAX):
+    """"short", "medium" o "long" (TA-35). Los cortes se configuran en config.yaml (rallies)."""
+    if length <= short_max:
+        return "short"
+    return "medium" if length <= medium_max else "long"
+
+
+def rally_stats(points, short_max=RALLY_SHORT_MAX, medium_max=RALLY_MEDIUM_MAX):
     """Peloteos del partido: cuántos, golpes totales, el más largo y por longitud (opción A)."""
-    lengths = [p["shots"] - max(0, len(p.get("serve_attempts", [])) - 1) for p in points]
+    lengths = [rally_length(p) for p in points]
+    categories = [rally_category(n, short_max, medium_max) for n in lengths]
     return {
         "count": len(lengths),
         "sumShots": sum(lengths),
         "longestShots": max(lengths) if lengths else 0,
-        "short": sum(n <= RALLY_SHORT_MAX for n in lengths),
-        "medium": sum(RALLY_SHORT_MAX < n <= RALLY_MEDIUM_MAX for n in lengths),
-        "long": sum(n > RALLY_MEDIUM_MAX for n in lengths),
+        "short": categories.count("short"),
+        "medium": categories.count("medium"),
+        "long": categories.count("long"),
     }
 
 
-def add_serve_and_rally_stats(model_statistics, points):
+def add_serve_and_rally_stats(model_statistics, points, short_max=RALLY_SHORT_MAX, medium_max=RALLY_MEDIUM_MAX):
     """Añade serve a cada jugador y rallies al partido (TA-17, TA-18). Devuelve el mismo objeto."""
     for player in (FAR_PLAYER, NEAR_PLAYER):
         model_statistics["players"][str(player)]["serve"] = serve_stats(points, player)
-    model_statistics["rallies"] = rally_stats(points)
+    model_statistics["rallies"] = rally_stats(points, short_max, medium_max)
     return model_statistics
 
 
