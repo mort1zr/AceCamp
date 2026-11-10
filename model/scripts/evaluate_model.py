@@ -110,11 +110,12 @@ def evaluate_simulation(seeds, **conditions):
 
 def evaluate_real():
     rows = {}
-    for name in ("input_video", "h1"):
+    for name in ("input_video", "h4", "h1"):
         data, ball, players, homographies = load_case(name)
         analysis = analyze_detections(ball, players, data["court_keypoints"], homographies, [True] * len(ball),
                                       data["fps"], DEFAULTS)
-        score, _ = match_events([b["frame"] for b in analysis["bounces"]], data["bounces_labeled"], 2)
+        score, _ = match_events([b["frame"] for b in analysis["bounces"]], data["bounces_labeled"],
+                                max(2, round(2 * data["fps"] / 30)))
         rows[name] = (score, len(data["bounces_labeled"]))
     return rows
 

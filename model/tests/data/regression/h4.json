@@ -1,0 +1,170 @@
+{
+ "hits": [
+  21,
+  68,
+  130,
+  172,
+  247,
+  314
+ ],
+ "serves": [
+  {
+   "frame": 21,
+   "player": 2,
+   "side": "derecha"
+  }
+ ],
+ "bounces": [
+  {
+   "frame": 50,
+   "x_m": 4.49,
+   "y_m": 7.17,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 109,
+   "x_m": 4.6,
+   "y_m": 19.44,
+   "call": "dentro",
+   "inferred": true
+  },
+  {
+   "frame": 206,
+   "x_m": 4.23,
+   "y_m": 20.1,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 277,
+   "x_m": 2.64,
+   "y_m": 3.68,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 303,
+   "x_m": 1.09,
+   "y_m": -4.15,
+   "call": "fuera",
+   "inferred": false
+  },
+  {
+   "frame": 356,
+   "x_m": 2.01,
+   "y_m": 21.16,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 397,
+   "x_m": 2.95,
+   "y_m": 29.07,
+   "call": "fuera",
+   "inferred": false
+  }
+ ],
+ "points": [
+  {
+   "start": 8,
+   "end": 403,
+   "server": 2,
+   "shots": 6,
+   "end_reason": "doble bote",
+   "winner": 1,
+   "win_reason": "doble bote",
+   "confidence_level": "media"
+  }
+ ],
+ "statistics": {
+  "schemaVersion": "acecam.model-stats.v1",
+  "durationSeconds": 8.2,
+  "players": {
+   "1": {
+    "shots": {
+     "count": 2,
+     "sumSpeedKmh": 120.0,
+     "maxSpeedKmh": 74.2
+    },
+    "movement": {
+     "distanceMeters": 25.0,
+     "avgSpeedKmh": 11.4,
+     "maxSpeedKmh": 22.7
+    },
+    "serve": {
+     "count": 0,
+     "fromRight": 0,
+     "fromLeft": 0,
+     "sumSpeedKmh": 0.0,
+     "sampleCount": 0
+    }
+   },
+   "2": {
+    "shots": {
+     "count": 2,
+     "sumSpeedKmh": 212.2,
+     "maxSpeedKmh": 115.8
+    },
+    "movement": {
+     "distanceMeters": 21.2,
+     "avgSpeedKmh": 9.7,
+     "maxSpeedKmh": 20.2
+    },
+    "serve": {
+     "count": 1,
+     "fromRight": 1,
+     "fromLeft": 0,
+     "sumSpeedKmh": 109.8,
+     "sampleCount": 1,
+     "maxSpeedKmh": 109.8,
+     "faults": 0,
+     "aces": 0,
+     "firstServeAttempts": 1,
+     "firstServeIn": 1,
+     "doubleFaults": 0
+    }
+   }
+  },
+  "rallies": {
+   "count": 1,
+   "sumShots": 6,
+   "longestShots": 6,
+   "short": 0,
+   "medium": 1,
+   "long": 0
+  },
+  "bounces": {
+   "count": 7,
+   "in": 5,
+   "out": 2,
+   "doubtful": 0
+  },
+  "points": {
+   "count": 1,
+   "won": {
+    "1": 1,
+    "2": 0
+   },
+   "lowConfidence": 0,
+   "corrected": 0,
+   "toReview": []
+  },
+  "score": {
+   "text": "0-0 15-0",
+   "sets": [],
+   "tiebreaks": [],
+   "games": [
+    0,
+    0
+   ],
+   "points": [
+    "15",
+    "0"
+   ],
+   "in_tiebreak": false,
+   "server": 2,
+   "winner": null
+  }
+ }
+}

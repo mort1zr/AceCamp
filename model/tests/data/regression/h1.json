@@ -32,13 +32,6 @@
  ],
  "bounces": [
   {
-   "frame": 65,
-   "x_m": 5.17,
-   "y_m": 20.86,
-   "call": "dentro",
-   "inferred": false
-  },
-  {
    "frame": 115,
    "x_m": 6.95,
    "y_m": 18.81,
@@ -60,13 +53,6 @@
    "inferred": false
   },
   {
-   "frame": 210,
-   "x_m": 7.92,
-   "y_m": 2.64,
-   "call": "dentro",
-   "inferred": false
-  },
-  {
    "frame": 287,
    "x_m": 7.77,
    "y_m": 2.8,
@@ -81,10 +67,10 @@
    "inferred": false
   },
   {
-   "frame": 356,
-   "x_m": 4.24,
-   "y_m": 1.59,
-   "call": "dentro",
+   "frame": 358,
+   "x_m": 4.07,
+   "y_m": 0.14,
+   "call": "dudoso",
    "inferred": false
   },
   {
@@ -185,10 +171,10 @@
    "long": 1
   },
   "bounces": {
-   "count": 12,
-   "in": 11,
+   "count": 10,
+   "in": 8,
    "out": 0,
-   "doubtful": 1
+   "doubtful": 2
   },
   "points": {
    "count": 1,

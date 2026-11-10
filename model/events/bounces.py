@@ -62,6 +62,15 @@ HIT_EXCLUSION_SECONDS = 0.15
 OUT_MARGIN_SIDE_M = 4.0
 OUT_MARGIN_BACK_M = 6.0
 
+# Tras un golpe la pelota tarda en botar: antes de este tiempo, un cambio de dirección es todavía
+# el propio golpe (un bote justo antes del golpe sí es posible: se excluye solo HIT_EXCLUSION_SECONDS).
+MIN_FLIGHT_SECONDS = 0.3
+
+# Bote del último golpe de una jugada (ver detect_bounce_events)
+LAST_BOUNCE_SECONDS = 2.0  # sin otro golpe en este tiempo, el golpe fue el último
+LAST_MIN_KINK_M_PER_FRAME = 0.25
+LAST_MIN_POINTS_AFTER = 2
+
 # Golpes dentro de un hueco sin pelota
 MAX_HIT_GAP_SECONDS = 0.6
 HIT_GAP_FIT_POINTS = 4
@@ -197,7 +206,8 @@ def _gap_hits(centers, player_detections, homographies, fps, near_player_fractio
     return found
 
 
-def bounce_scores(ball_detections, homography, fps, hits=(), fit_frames=None, min_points=MIN_POINTS):
+def bounce_scores(ball_detections, homography, fps, hits=(), fit_frames=None, min_points=MIN_POINTS,
+                  min_points_after=None):
     """Salto de la velocidad vertical en cada fotograma (m por fotograma a 30 fps; NaN si no se puede medir).
 
     Las ventanas de ajuste no cruzan los golpes (hits): así se detecta un bote aunque el
@@ -214,7 +224,7 @@ def bounce_scores(ball_detections, homography, fps, hits=(), fit_frames=None, mi
             continue
         left = _side(y, i, -1, fit_frames, barriers)
         right = _side(y, i, 1, fit_frames, barriers)
-        if len(left) < min_points or len(right) < min_points:
+        if len(left) < min_points or len(right) < (min_points_after or min_points):
             continue
         slope_left = _slope(np.array(left) - i, y[left], 2)
         slope_right = _slope(np.array(right) - i, y[right], 2)
@@ -300,6 +310,7 @@ def detect_bounce_events(ball_detections, player_detections, homography, fps, ma
     """
     fit_frames, suppression = _frames(FIT_SECONDS, fps), _frames(SUPPRESSION_SECONDS, fps)
     exclusion = _frames(HIT_EXCLUSION_SECONDS, fps)
+    flight = _frames(MIN_FLIGHT_SECONDS, fps)
     if hits is None:
         hits = detect_hits(ball_detections, player_detections, homography, fps)
     scores = bounce_scores(ball_detections, homography, fps, hits, fit_frames)
@@ -310,7 +321,7 @@ def detect_bounce_events(ball_detections, player_detections, homography, fps, ma
             continue
         if main_camera is not None and not all(main_camera[max(0, i - fit_frames):i + fit_frames + 1]):
             continue
-        if any(abs(i - h) <= exclusion for h in hits):
+        if any(-exclusion <= i - h <= flight for h in hits):
             continue
         candidates.append((score, i, (float(centers[i][0]), float(centers[i][1])), False))
     for i, score, point in gap_bounces(ball_detections, homography, fps, hits, min_kink):
@@ -332,4 +343,30 @@ def detect_bounce_events(ball_detections, player_detections, homography, fps, ma
         if all(abs(i - event["frame"]) >= suppression for event in chosen):
             chosen.append({"frame": i, "x_px": round(point[0], 1), "y_px": round(point[1], 1),
                            "inferred": inferred})
+
+    # Bote del último golpe de cada jugada. Tras un golpe que nadie devuelve la pelota tiene que
+    # botar, pero ese bote es el más difícil de ver: suele ser un golpe ganador rápido y raso (salto
+    # pequeño) o la pelota sale del encuadre poco después (pocos puntos tras el bote). Si no se
+    # encontró ninguno, se acepta el mayor salto de ese tramo con un umbral y una ventana menores.
+    relaxed = bounce_scores(ball_detections, homography, fps, hits, fit_frames, min_points_after=LAST_MIN_POINTS_AFTER)
+    window = _frames(LAST_BOUNCE_SECONDS, fps)
+    ordered = sorted(hits)
+    for k, hit in enumerate(ordered):
+        limit = min(hit + window, ordered[k + 1] if k + 1 < len(ordered) else len(relaxed))
+        if k + 1 < len(ordered) and ordered[k + 1] - hit <= window:
+            continue  # el rival la devolvió: no es el último golpe
+        if any(hit < event["frame"] < limit for event in chosen):
+            continue
+        best = None
+        for i in range(hit + flight + 1, min(limit, len(relaxed))):
+            if np.isnan(relaxed[i]) or relaxed[i] > -LAST_MIN_KINK_M_PER_FRAME:
+                continue
+            if main_camera is not None and not main_camera[i]:
+                continue
+            point = (float(centers[i][0]), float(centers[i][1]))
+            if plausible(i, point) and (best is None or relaxed[i] < relaxed[best]):
+                best = i
+        if best is not None and all(abs(best - event["frame"]) >= suppression for event in chosen):
+            chosen.append({"frame": best, "x_px": round(float(centers[best][0]), 1),
+                           "y_px": round(float(centers[best][1]), 1), "inferred": False})
     return sorted(chosen, key=lambda event: event["frame"])

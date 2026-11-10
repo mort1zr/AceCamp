@@ -59,27 +59,51 @@ python scripts/evaluate_model.py --seeds 20
 
 Las cifras salen de dos fuentes:
 
-- **Partidos simulados** (`tests/ball_sim.py`), donde se conoce la verdad exacta de cada evento. Cada partido incluye ganadores, faltas, golpes fuera, bolas a la red y dobles faltas. Las detecciones llevan ruido de 1,5 px y un 3 % de pelotas perdidas.
-- **Botes marcados a mano** en vídeos reales: el vídeo de ejemplo y el highlight h1.
+- **Partidos simulados** (`tests/ball_sim.py`), donde se conoce la verdad exacta de cada evento. Cada partido incluye ganadores, faltas, golpes fuera, bolas a la red y dobles faltas. Las detecciones llevan ruido de 1,5 px y un 3 % de pelotas perdidas; la pelota fuera del encuadre no se detecta.
+- **Botes marcados a mano** en vídeos reales: el vídeo de ejemplo (1080p), h4 (720p) y h1 (360p).
 
-Las cifras de simulación son una **cota superior**: los vídeos reales tienen oclusiones, desenfoque y detecciones peores.
+Las cifras de simulación son una **cota superior**: los vídeos reales tienen desenfoque y detecciones peores.
 
 | Módulo | Métrica | Simulación (20 partidos, 160 puntos) | Criterio del ticket |
 | --- | --- | --- | --- |
-| Botes (TA-22a) | F1 ±2 fotogramas | 0,916 (P 0,89, R 0,95) | — |
-| Posición del bote (TA-23) | Error medio / percentil 90 | 24 cm / 50 cm | < 30 cm ✔ |
-| Dentro/fuera (TA-24) | Acierto a > 30 cm de la línea | 99,6 % (739 botes) | ≥ 95 % ✔ |
+| Golpes | F1 ±3 fotogramas | 0,99 | — |
+| Botes (TA-22a) | F1 ±2 fotogramas | 0,970 (P 0,99, R 0,95) | — |
+| Posición del bote (TA-23) | Error medio / percentil 90 | 23 cm / 46 cm | < 30 cm ✔ |
+| Dentro/fuera (TA-24) | Acierto a > 30 cm de la línea | 99,7 % (749 botes) | ≥ 95 % ✔ |
 | Saques (TA-18) | F1 ±3 fotogramas | 0,995 | ≥ 0,90 ✔ |
-| Velocidad del saque (TA-20) | Error medio | 2,6 % (199 de 200 saques < 15 %) | < 15 % ✔ |
-| Puntos (TA-17) | Inicio y fin a < 1 s | 98,1 % | — |
-| Ganador del punto (TA-28) | Acierto | 90,0 % (confianza alta 91 %, media 90 %, baja 90 %) | ≥ 85 % ✔ |
-| Pelota en la red (TA-26) | Bolas a la red detectadas | 75 % (20). En los tests, 92 % (24) | ≥ 80 % ~ |
-| Peloteos (TA-35) | Golpes del punto ±1 | 92,5 % | ≥ 90 % ✔ |
+| Velocidad del saque (TA-20) | Error medio | 2,5 % (199 de 200 saques < 15 %) | < 15 % ✔ |
+| Puntos (TA-17) | Inicio y fin a < 1 s | 100 % | — |
+| Ganador del punto (TA-28) | Acierto | 98,1 % (confianza alta 100 %, media 99 %, baja 86 %) | ≥ 85 % ✔ |
+| Pelota en la red (TA-26) | Bolas a la red detectadas | 85 % (20) | ≥ 80 % ✔ |
+| Peloteos (TA-35) | Golpes del punto ±1 | 100 % | ≥ 90 % ✔ |
 
-| Vídeo real | Botes marcados a mano | F1 de botes (reglas, TA-22a) | F1 de botes (entrenado, TA-22b) |
-| --- | --- | --- | --- |
-| Vídeo de ejemplo (1080p, 30 fps) | 5 | 0,800 | 0,727 |
-| h1 (640×360, 25 fps, pista con marcas) | 9 | 0,762 | 0,762 |
+| Vídeo real | Botes marcados a mano | F1 de botes |
+| --- | --- | --- |
+| Vídeo de ejemplo (1080p, 30 fps) | 5 | 0,800 |
+| h4 (720p, 50 fps) | 6 | 0,769 |
+| h1 (640×360, 25 fps; por debajo del mínimo admitido) | 9 | 0,842 |
+
+### Optimización de la precisión (PCIT-187)
+
+El modelo está optimizado para **720p y 1080p**, de 25 a 60 fps. Se midió en 8 condiciones (resolución, fps, ruido, pelotas perdidas y pelota tapada por el jugador) con 896 puntos simulados que no se usaron para ajustar:
+
+| Métrica | Antes | Después |
+| --- | --- | --- |
+| Golpes (F1) | 0,910 | 0,992 |
+| Botes (F1) | 0,905 | 0,966 |
+| Puntos bien delimitados | 94,4 % | 98,9 % |
+| Ganador del punto | 91,6 % | 97,5 % |
+| Ganador con confianza alta | 90 % | 99 % |
+| Pelota en la red detectada | 56 % | 74 % |
+| Peloteos (golpes ±1) | 89,1 % | 99,2 % |
+
+Qué cambió:
+
+- **Golpes tapados:** el golpe se deduce cuando la pelota desaparece junto a un jugador y vuelve en sentido contrario. En vídeo real el detector pierde la pelota justo en el golpe.
+- **Lanzamiento del saque:** ya no cuenta como golpe.
+- **Tiempo de vuelo:** un cambio de dirección en los 0,3 s siguientes a un golpe no es un bote.
+- **Bote del último golpe:** si tras el último golpe de una jugada no se ve ningún bote, se acepta el mayor salto con un umbral menor.
+- Los umbrales de bote que ya había (0,45 m por fotograma, 4 puntos por lado) se barrieron y estaban en su óptimo: no se tocaron.
 
 Los demás criterios están cubiertos por los tests (`python -m pytest`):
 
@@ -92,16 +116,19 @@ Los demás criterios están cubiertos por los tests (`python -m pytest`):
 ## Limitaciones conocidas
 
 **Detección de la pelota y de los botes**
-- Son el punto débil. En vídeos reales el F1 de botes es de 0,76 a 0,80, por debajo del 0,85 que pedía TA-22b.
-- El detector entrenado (`bounces.detector: trained`) no mejora a las reglas: se entrenó solo con simulación. Para superarlo hacen falta unos 300 botes reales etiquetados.
-- Mientras tanto, el marcador es **semiautomático**: el informe lista los puntos de confianza baja y se corrigen con `corrections.json`.
+- Sigue siendo el punto débil en vídeo real: el F1 de botes es de 0,77 a 0,80 en 720p y 1080p, por debajo del 0,85 que pedía TA-22b. Lo limita el detector de pelota (pelotas perdidas y falsas), no las reglas de botes.
+- El detector entrenado (`bounces.detector: trained`) no mejora a las reglas: se entrenó solo con simulación.
+- El marcador es **semiautomático**: el informe lista los puntos de confianza baja y se corrigen con `corrections.json`.
 
-**Golpes no detectados**
-- Son la causa principal de los errores restantes: peloteos con un golpe de menos y puntos asignados al jugador equivocado.
-- Cuando los golpes y los botes no cuadran, la confianza del punto baja, pero no siempre se nota. La confianza "alta" acierta un 91 %, no el 100 %.
+**Resolución**
+- Mínimo 720p. Por debajo, el worker rechaza el vídeo y `main.py` avisa: la pelota mide 2-3 px y el modelo no está ajustado para eso.
+
+**Errores que quedan en el ganador del punto**
+- El primer bote del golpe ganador no se ve y se toma el segundo (que puede caer fuera).
+- La pelota se va larga y sale del encuadre sin botar a la vista.
 
 **Pelota en la red**
-- Solo se detecta si la pelota bota en el campo de quien golpeó (75-92 %).
+- Solo se detecta si la pelota bota en el campo de quien golpeó (74-85 %).
 - El saque que toca la red (*let*) no se detecta.
 
 **Aces**

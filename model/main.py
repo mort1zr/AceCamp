@@ -129,6 +129,10 @@ def run_pipeline(config, render=True):
     if not input_video_path.exists():
         raise FileNotFoundError(f"No existe el vídeo de entrada: {input_video_path}")
     video_info = get_video_info(input_video_path)
+    min_resolution = config.get("worker", {}).get("min_resolution", 720)
+    if min(video_info.width, video_info.height) < min_resolution:
+        print(f"AVISO: el vídeo es de {video_info.width}x{video_info.height}. El modelo está optimizado para "
+              f"{min_resolution}p y 1080p; con menos resolución los resultados no son fiables.")
     video_hash = file_sha256(input_video_path)
     cache_dir = resolve_path(paths["cache_dir"])
 

@@ -55,7 +55,7 @@ def summary(analysis):
     }, default=str))
 
 
-@pytest.mark.parametrize("name", ["input_video", "h1"])
+@pytest.mark.parametrize("name", ["input_video", "h1", "h4"])
 def test_pipeline_output_matches_the_reference(name):
     data, ball, players, homographies = load_case(name)
     analysis = analyze_detections(ball, players, data["court_keypoints"], homographies, [True] * len(ball),
