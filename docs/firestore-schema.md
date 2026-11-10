@@ -237,6 +237,9 @@ statistics: {
   },
   opponent: { /* mismas claves */ },
   rallies: { count: 1, sumShots: 18, longestShots: 18, short: 0, medium: 0, long: 1 },
+  // Opcionales (PCIT-85/86): marcador que propone el modelo y puntos ganados.
+  score:  { sets: [[6, 4]], games: [2, 1], points: ['30', '15'], winner: null },
+  points: { count: 12, playerWon: 7, opponentWon: 5, lowConfidence: 2, toReview: 2 },
 }
 ```
 
@@ -250,6 +253,10 @@ statistics: {
 | `serve.doubleFaults` | Dobles faltas | Si de algún segundo saque no se supo si entró |
 | `rallies.count`, `rallies.sumShots`, `rallies.longestShots` | Puntos (peloteos) del partido, golpes en total y el más largo | Nunca |
 | `rallies.short`, `rallies.medium`, `rallies.long` | Peloteos de 0-4, 5-8 y 9 o más golpes | Nunca |
+| `score.sets`, `score.games`, `score.points` | Marcador final que propone el modelo, `[player, opponent]`: sets terminados, juegos del set en curso y puntos del juego (`'0'`, `'15'`, `'30'`, `'40'`, `'AD'` o los del tie-break) | Si el modelo no se actualizó (partidos anteriores) |
+| `score.winner` | `'player'`, `'opponent'` o `null` si el partido no terminó en el vídeo | Igual que `score` |
+| `points.count`, `points.playerWon`, `points.opponentWon` | Puntos del vídeo y cuántos ganó cada uno (un punto sin ganador no suma a ninguno) | Igual que `score` |
+| `points.lowConfidence`, `points.toReview` | Puntos con confianza baja y cuántos conviene revisar a mano | Igual que `score` |
 
 - **Un dato que el modelo no pudo saber se omite; nunca es 0** (por ejemplo, el primer
   saque dentro si en un punto no se vio el bote ni hubo resto). Un 0 significa que se midió

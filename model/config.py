@@ -17,6 +17,7 @@ DEFAULTS: dict[str, Any] = {
         "input": "input_videos/input_video.mp4",
         "output": "output_videos/output_video.avi",
         "cache_dir": "cache",
+        "report_dir": "output_videos/informe",
     },
     "models": {
         "players": "models/yolov8m.pt",
@@ -72,6 +73,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stats-json", help="guardar las estadísticas del partido en este archivo JSON")
     parser.add_argument("--no-video", action="store_true", help="no dibujar ni guardar el vídeo anotado (más rápido)")
     parser.add_argument("--match-config", help="match.yaml con el formato, el sacador y el marcador inicial (TA-29)")
+    parser.add_argument("--report-dir", help="carpeta del informe del partido: report.json, points.csv... (TA-30)")
     parser.add_argument("--corrections", help="corrections.json con el ganador correcto de algunos puntos (TA-29)")
     return parser
 
@@ -98,6 +100,8 @@ def config_from_args(argv: list[str] | None = None) -> dict[str, Any]:
     if args.match_config:
         match = yaml.safe_load(Path(args.match_config).read_text(encoding="utf-8")) or {}
         overrides["match"] = match.get("match", match)  # con o sin la clave match:
+    if args.report_dir:
+        overrides["paths"]["report_dir"] = str(Path(args.report_dir).resolve())
     if args.corrections:
         overrides["paths"]["corrections"] = str(Path(args.corrections).resolve())
     return _merge(config, overrides)

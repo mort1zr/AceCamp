@@ -5,6 +5,8 @@ paths:
   input: input_videos/input_video.mp4
   output: output_videos/output_video.avi
   cache_dir: cache
+  # Informe del partido (TA-30): report.json y points.csv. Se escribe en cada ejecución.
+  report_dir: output_videos/informe
 
 models:
   # Detector de jugadores (los descarga scripts/download_models.py). Con el vídeo de ejemplo en CPU,

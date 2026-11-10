@@ -10,6 +10,7 @@ from court import CourtTracker
 from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
 from pipeline_analysis import analyze_detections
+from report import build_report, draw_scoreboard, scoreboard_states, write_report
 from stats import build_frame_states
 from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
 from utils import VideoWriter, get_video_info, iter_frames
@@ -197,12 +198,16 @@ def run_pipeline(config, render=True):
         "serves": serves,
         "points": points,
         "main_camera_segments": main_segments,
+        # Informe del partido (TA-30): lo escribe main() en --report-dir.
+        "report": build_report(analysis, video_info.fps, video=input_video_path.name),
     }
     if not render:
         return result
 
     # Estadísticas de cada fotograma para el overlay (sin "nan": lo que aún no se mide es None)
     frame_states = build_frame_states(shots, num_frames)
+    # Marcador de cada fotograma (TA-30): el mismo que el informe.
+    score_states = scoreboard_states(points, num_frames)
 
     # Segunda pasada: se vuelve a leer el vídeo y cada fotograma se dibuja y se escribe al momento.
     output_video_path = resolve_path(paths["output"])
@@ -255,6 +260,7 @@ def run_pipeline(config, render=True):
                             (int(10 * text_scale), int(110 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale,
                             (0, 255, 255), max(1, int(round(2 * text_scale))))
             frame = stats_box.draw(frame, frame_states[i])
+            frame = draw_scoreboard(frame, score_states[i])
             cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
                         text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))
             out.write(frame)
@@ -281,6 +287,8 @@ def main(argv=None):
         stats_path.parent.mkdir(parents=True, exist_ok=True)
         stats_path.write_text(json.dumps(result["model_statistics"], indent=2, ensure_ascii=False))
         print(f"Estadísticas guardadas en {stats_path}")
+    report_dir = write_report(result["report"], resolve_path(config["paths"]["report_dir"]))
+    print(f"Informe del partido en {report_dir} (report.json, points.csv)")
     return result
 
 

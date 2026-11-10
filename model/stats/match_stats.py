@@ -214,4 +214,23 @@ def to_match_statistics(model_statistics, player_position):
     }
     if "rallies" in model_statistics:
         statistics["rallies"] = model_statistics["rallies"]
+    order = (player - 1, opponent - 1)  # índices de [jugador 1, jugador 2] → [player, opponent]
+    score = model_statistics.get("score")
+    if score:  # marcador del modelo (TA-29/TA-30), visto desde el jugador registrado
+        winner = score.get("winner")
+        statistics["score"] = {
+            "sets": [[s[order[0]], s[order[1]]] for s in score["sets"]],
+            "games": [score["games"][order[0]], score["games"][order[1]]],
+            "points": [score["points"][order[0]], score["points"][order[1]]],
+            "winner": None if winner is None else ("player" if winner == player else "opponent"),
+        }
+    points = model_statistics.get("points")
+    if points:
+        statistics["points"] = {
+            "count": points["count"],
+            "playerWon": points["won"][str(player)],
+            "opponentWon": points["won"][str(opponent)],
+            "lowConfidence": points["lowConfidence"],
+            "toReview": len(points.get("toReview", [])),
+        }
     return statistics
