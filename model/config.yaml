@@ -61,6 +61,12 @@ line_calls:
   # Comparar los botes del peloteo con la pista de dobles (true) o la de individuales (false).
   doubles: false
 
+serves:
+  # Refuerzo del saque con pose (TA-19): models/yolov8m-pose.pt (python scripts/download_models.py --pose)
+  # descarta los saques en que el sacador no levanta la muñeca por encima de la cabeza. null = sin pose.
+  # Compara con y sin pose: python scripts/compare_serve_pose.py --input ... --labels ...
+  pose_model: null
+
 rallies:
   # Peloteos (TA-35, TA-36), contando el saque: corto hasta short_max golpes, medio hasta
   # medium_max y largo a partir de ahí.

@@ -8,6 +8,7 @@ from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
+from events.serve_pose import POSE_WINDOW_FRAMES, PoseServeVerifier, filter_serves_by_pose, read_frames
 from mini_court import MiniCourt
 from pipeline_analysis import analyze_detections
 from report import build_report, draw_scoreboard, scoreboard_states, serve_states, write_report
@@ -97,6 +98,22 @@ def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tra
         result.court_visible.append(court_tracker.court_visible)
         report_progress("Detección", i + 1, num_frames)
     return result
+
+
+def pose_serve_filter(config, video_path, player_detections):
+    """Filtro de saques con pose (TA-19) si serves.pose_model está configurado; si no, None."""
+    model = config.get("serves", {}).get("pose_model")
+    if not model:
+        return None
+    verifier = PoseServeVerifier(str(resolve_path(model)), device=config["detection"]["device"])
+
+    def apply(serves):
+        numbers = [i for s in serves for i in range(s["frame"] - POSE_WINDOW_FRAMES, s["frame"] + POSE_WINDOW_FRAMES + 1)]
+        kept = filter_serves_by_pose(serves, player_detections, verifier, read_frames(video_path, numbers))
+        print(f"Pose (TA-19): {len(kept)}/{len(serves)} saques confirmados")
+        return kept
+
+    return apply
 
 
 def run_pipeline(config, render=True):
@@ -193,7 +210,8 @@ def run_pipeline(config, render=True):
     player_detections = [d if main else {} for d, main in zip(player_detections, main_camera)]
 
     analysis = analyze_detections(ball_detections, player_detections, court_keypoints, homography, main_camera,
-                                  video_info.fps, config)
+                                  video_info.fps, config,
+                                  serve_filter=pose_serve_filter(config, input_video_path, player_detections))
     shots, bounces, serves, points = analysis["shots"], analysis["bounces"], analysis["serves"], analysis["points"]
     player_court_positions = analysis["player_court_positions"]
     ball_court_positions = analysis["ball_court_positions"]

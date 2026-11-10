@@ -5,6 +5,7 @@ Uso (desde la carpeta model/):
     python scripts/download_models.py            # modelos + vídeo de ejemplo
     python scripts/download_models.py --no-video # solo modelos
     python scripts/download_models.py --tracknet # además, los pesos de TrackNet (evaluación, TA-14b)
+    python scripts/download_models.py --pose     # además, el modelo de pose para el saque (TA-19)
     python scripts/download_models.py --verify   # solo comprobar los archivos que ya están en disco
     python scripts/download_models.py --strict   # también falla si un archivo no tiene hash registrado
 
@@ -45,6 +46,11 @@ TRACKNET_FILES = {
     "models/tracknet.pt": "1XEYZ4myUN7QT-NeBYJI0xteLsvs-ZAOl",
 }
 
+# Modelo de pose para reforzar el saque (TA-19, opcional): --pose.
+POSE_FILES = {
+    "models/yolov8m-pose.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8m-pose.pt",
+}
+
 SAMPLE_VIDEO = {
     "input_videos/input_video.mp4": (
         "https://raw.githubusercontent.com/abdullahtarek/tennis_analysis/main/input_videos/input_video.mp4"
@@ -59,6 +65,7 @@ EXPECTED_SHA256: dict[str, str | None] = {
     "models/yolov8x.pt": "3df4ada6b4dad6d657868f2fdf7faecfb34dcfccf3a25c4b82079064718524c8",
     "models/yolov8m.pt": "5d4a90cdc7a21786cc59cd19778e9eafff836df9e2da32524737c7ee6efe4fe5",
     "models/tracknet.pt": None,
+    "models/yolov8m-pose.pt": "dbe539ea268db2534390942cfdf206e521f376f19e5415967a57f6a2ddfa3c90",
     # El mismo hash que registra eval/labels/botes_a_mano.json.
     "input_videos/input_video.mp4": "5f2584a2010864d5d8624c325d7f0571d48bd0756164657ef603dc8a97bab22d",
 }
@@ -111,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-video", action="store_true", help="no descargar el vídeo de ejemplo")
     parser.add_argument("--force", action="store_true", help="descargar aunque el archivo ya exista")
     parser.add_argument("--tracknet", action="store_true", help="descargar también los pesos de TrackNet (TA-14b)")
+    parser.add_argument("--pose", action="store_true", help="descargar también el modelo de pose (TA-19)")
     parser.add_argument("--verify", action="store_true", help="solo comprobar el sha256 de los archivos en disco")
     parser.add_argument("--strict", action="store_true", help="fallar si un archivo no tiene sha256 registrado")
     args = parser.parse_args(argv)
@@ -119,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
     jobs += [(p, "url", u) for p, u in URL_FILES.items()]
     if args.tracknet or args.verify:  # --verify también comprueba TrackNet si está en disco
         jobs += [(p, "drive", i) for p, i in TRACKNET_FILES.items()]
+    if args.pose or args.verify:
+        jobs += [(p, "url", u) for p, u in POSE_FILES.items()]
     if not args.no_video:
         jobs += [(p, "url", u) for p, u in SAMPLE_VIDEO.items()]
 

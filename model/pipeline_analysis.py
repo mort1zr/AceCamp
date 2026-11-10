@@ -18,14 +18,20 @@ from events import (
     detect_serves,
     locate_bounces,
 )
+from events.serve_pose import fix_servers
 from mini_court import MiniCourt
 from report.positions import position_rows
 from scoreboard import load_corrections, review_list, score_points
 from stats import add_serve_and_rally_stats, build_model_statistics, measure_shots, renumber_far_near
 
 
-def analyze_detections(ball_detections, player_detections, court_keypoints, homography, main_camera, fps, config):
-    """Eventos, puntos y estadísticas del partido. Devuelve un diccionario (ver el final)."""
+def analyze_detections(ball_detections, player_detections, court_keypoints, homography, main_camera, fps, config,
+                       serve_filter=None):
+    """Eventos, puntos y estadísticas del partido. Devuelve un diccionario (ver el final).
+
+    serve_filter: función opcional que recibe los saques detectados y devuelve los que se quedan
+    (la usa main.run_pipeline para el refuerzo con pose de TA-19, que necesita el vídeo).
+    """
     # Posiciones en metros sobre la pista
     player_court_positions, ball_court_positions = MiniCourt.court_positions(player_detections,
                                                                              ball_detections,
@@ -36,6 +42,8 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
     hits = detect_hits(ball_detections, player_detections, homography, fps)
     serves = detect_serves(ball_detections, player_detections, homography, fps,
                            main_camera=main_camera, hits=hits)
+    if serve_filter is not None:
+        serves = serve_filter(serves)
     all_hits = sorted(set(hits) | {s["frame"] for s in serves})
 
     # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
@@ -55,6 +63,8 @@ def analyze_detections(ball_detections, player_detections, court_keypoints, homo
     # Marcador punto a punto con el motor de TA-27, la configuración del partido y las correcciones
     # del entrenador (TA-29).
     points, match = score_points(points, config["match"], load_corrections(config["paths"].get("corrections")))
+    # En un juego saca siempre el mismo jugador: corrige los saques mal atribuidos (TA-19).
+    points = fix_servers(points)
 
     # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
     # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
