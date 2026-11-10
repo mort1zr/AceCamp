@@ -31,7 +31,8 @@ procesado sigue siendo de escritura exclusiva del worker. Ver
 | `matches` | Admin: su organización; coach: propios | En `'en cola'`, sin estadísticas, con un jugador accesible por rol y el video en `orgs/{orgId}/matches/{matchId}/video.mp4\|mov` | Datos del partido, o pasar de `error` a `en cola`, dentro del alcance por rol | Dentro del alcance por rol, salvo si está `procesando` |
 | `matches/{matchId}/coachNotes/{uid}` | Nota propia por ID, en un partido Listo accesible | Nota propia con texto y fecha de servidor | Solo su propia nota | Solo su propia nota |
 | `invites/{correo}` | Dueño o admin: las de su organización. Invitado: solo la suya | Dueño o admin, `pendiente`, para su organización (PCIT-40) | Solo la persona invitada la pasa a `aceptada`, junto con su ficha en `users` | Dueño o admin, mientras esté `pendiente` |
-| `applications` | De su organización | Por ahora solo con sesión (el formulario público llega en PCIT-54) | Estado y notas | De su organización |
+| `applications` | De su organización | Equipo de la organización o visitante con enlace de postulación activo | Estado y notas | De su organización |
+| `orgs/{orgId}/applicationForms` | Consulta directa de un enlace activo. Solo dueño o admin puede listar | Dueño o admin | — | Dueño o admin |
 
 El worker usa el Admin SDK, que no pasa por las reglas: es el único que escribe
 `procesando`, `listo`, `error` y `statistics`. Las consultas de la web **siempre**
@@ -289,6 +290,7 @@ de ser jugador del equipo.
 | Campo | Tipo | Obligatorio | Notas |
 | --- | --- | --- | --- |
 | `orgId` | string | sí | Organización dueña del formulario |
+| `formId` | string | en formulario público | ID del enlace de postulación activo al enviar |
 | `status` | estado | sí | Al crearse: `'nueva'` |
 | `fullName` | string | sí | |
 | `birthDate` | string `YYYY-MM-DD` | sí | |
@@ -304,7 +306,7 @@ de ser jugador del equipo.
 | `videoLinks` | string[] | no | Links de YouTube, máximo 5 |
 | `videoPaths` | string[] | no | Archivos subidos a Storage |
 | `message` | string | no | Hasta 1000 caracteres |
-| `consent` | object | sí | Mismo formato que en `players`, con `method` `'self'` o `'guardian'` y `recordedBy: 'public-form'` |
+| `consent` | object | sí | Mismo formato que en `players`, con `version: 'applications-v1'`, `method` `'self'` o `'guardian'` y `recordedBy: 'public-form'` en el formulario público |
 | `playerId` | string \| null | no | Se llena al usar "Crear jugador" (PCIT-56) |
 | `internalNotes` | string | no | Notas del equipo; nunca visibles para el postulante |
 | `reviewedBy` | string \| null | no | `uid` |

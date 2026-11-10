@@ -24,6 +24,7 @@ const Jugadores = conPanel(() => import('./panel/pages/Jugadores.jsx'))
 const Login = lazy(() => import('./panel/pages/Login.jsx'))
 const Partidos = conPanel(() => import('./panel/pages/Partidos.jsx'))
 const Precios = lazy(() => import('./landing/pages/Precios.jsx'))
+const Postular = lazy(() => import('./landing/pages/Postular.jsx'))
 const Privacidad = lazy(() => import('./landing/pages/Privacidad.jsx'))
 const Reclutamiento = conPanel(() => import('./panel/pages/Reclutamiento.jsx'))
 const Registro = lazy(() => import('./panel/pages/Registro.jsx'))
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/precios" element={<Precios />} />
           <Route path="/terminos" element={<Terminos />} />
           <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/postular/:orgId/:formId" element={<Postular />} />
         </Route>
 
         <Route element={<Acceso />}>

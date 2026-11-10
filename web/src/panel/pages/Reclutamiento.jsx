@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
+import EnlacesPostulacion from '../components/recruitment/EnlacesPostulacion.jsx'
 import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
 import { nextApplicationStates, updateApplicationStatus } from '../lib/applicationStatus.js'
 import { APPLICATION_STATUS, COLLECTIONS } from '../lib/schema.js'
@@ -163,7 +164,10 @@ export default function Reclutamiento({ db, session }) {
           <Link to="/configuracion?seccion=plan">Ver mi plan</Link>
         </aside>
       ) : db && uid && orgId && ['coach', 'admin'].includes(role) ? (
-        <Bandeja key={JSON.stringify([db.app?.options?.projectId, uid, orgId, role])} db={db} orgId={orgId} uid={uid} />
+        <div className="space-y-4" key={JSON.stringify([db.app?.options?.projectId, uid, orgId, role])}>
+          <EnlacesPostulacion db={db} orgId={orgId} uid={uid} role={role} />
+          <Bandeja db={db} orgId={orgId} uid={uid} />
+        </div>
       ) : (
         <p role="status">La bandeja se habilitará cuando tu sesión de equipo esté disponible.</p>
       )}

@@ -17,6 +17,8 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: vi.fn(() => 'server-time'),
 }))
 
+vi.mock('../components/recruitment/EnlacesPostulacion.jsx', () => ({ default: () => null }))
+
 const db = { app: { options: { projectId: 'prueba' } } }
 const session = { uid: 'entrenador', orgId: 'equipo-a', role: 'coach' }
 

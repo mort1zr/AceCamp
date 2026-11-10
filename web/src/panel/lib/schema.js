@@ -11,6 +11,7 @@ export const COLLECTIONS = Object.freeze({
   players: 'players',
   matches: 'matches',
   applications: 'applications',
+  applicationForms: 'applicationForms',
   invites: 'invites',
 })
 
@@ -46,6 +47,7 @@ export const COURT_SURFACES = Object.freeze(['arcilla', 'dura', 'césped', 'otra
 
 /** Versión del texto de autorización (Ley N.° 29733) que acepta el entrenador. */
 export const PLAYER_CONSENT_VERSION = 'players-v1'
+export const APPLICATION_CONSENT_VERSION = 'applications-v1'
 export const CONSENT_METHODS = Object.freeze(['coach-attestation', 'self', 'guardian'])
 
 /** Versión del objeto matches.statistics que escribe el worker. */
