@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from court import COURT_KEYPOINTS_M, COURT_LENGTH, DOUBLES_WIDTH, NET_Y, CourtHomography
+from court.court_model import ALLEY_WIDTH
 
 G = 9.81
 RESTITUTION = 0.72  # velocidad vertical que conserva la pelota al botar
@@ -54,8 +55,13 @@ class Rally:
     shots: list = field(default_factory=list)  # [{"frame", "player"}]
 
 
-def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derecha", serve_fault=False):
-    """Peloteo entre el jugador 1 (fondo lejano) y el 2 (fondo cercano). Empieza golpeando el 2."""
+def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derecha", serve_fault=False,
+                   last_out=False):
+    """Peloteo entre el jugador 1 (fondo lejano) y el 2 (fondo cercano). Empieza golpeando el 2.
+
+    last_out: el último golpe bota fuera de la pista de individuales (por un lado o largo), a
+    0,4-2 m de la línea.
+    """
     rng = np.random.default_rng(seed)
     dt_sub = 1.0 / (fps * 20)
     t, frame_t = 0.0, 0.0
@@ -86,6 +92,15 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
             target = np.array([rng.uniform(1.5, 9.5), rng.uniform(1.0, NET_Y - 2.0)])
         else:
             target = np.array([rng.uniform(1.5, 9.5), rng.uniform(NET_Y + 2.0, COURT_LENGTH - 1.0)])
+        if last_out and shot_index == num_shots - 1:
+            miss = rng.uniform(0.4, 2.0)
+            kind = rng.integers(3)
+            if kind == 0:  # ancha por la izquierda
+                target[0] = ALLEY_WIDTH - miss
+            elif kind == 1:  # ancha por la derecha
+                target[0] = DOUBLES_WIDTH - ALLEY_WIDTH + miss
+            else:  # larga
+                target[1] = -miss if receiver == 1 else COURT_LENGTH + miss
         flight = rng.uniform(0.55, 0.9) if not (serve and shot_index == 0) else 0.55
         vel = np.array([(target[0] - pos[0]) / flight, (target[1] - pos[1]) / flight,
                         (0.5 * G * flight ** 2 - pos[2]) / flight])

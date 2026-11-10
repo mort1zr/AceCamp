@@ -8,7 +8,15 @@ from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
-from events import detect_bounce_events, detect_hits, detect_points, detect_serves, locate_bounces
+from events import (
+    call_bounces,
+    call_counts,
+    detect_bounce_events,
+    detect_hits,
+    detect_points,
+    detect_serves,
+    locate_bounces,
+)
 from mini_court import MiniCourt
 from stats import (
     add_serve_and_rally_stats,
@@ -24,6 +32,8 @@ from utils.player_stats_drawer_utils import StatsBox
 from utils.progress import report_progress
 
 MINI_COURT_BOUNCES = 6  # botes que se ven a la vez en la mini-pista
+# Color (BGR) de cada bote en el vídeo según su cantada (TA-24).
+CALL_COLORS = {"dentro": (0, 200, 0), "fuera": (0, 0, 255), "dudoso": (0, 215, 255)}
 
 
 # Con ball_image_size "auto", los vídeos más estrechos que esto se analizan ampliados a
@@ -199,9 +209,12 @@ def run_pipeline(config, render=True):
     bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=all_hits,
                              court_keypoints=court_keypoints)
 
-    # División en puntos (TA-17).
+    # División en puntos (TA-17) y cantada de cada bote: dentro, fuera o dudoso (TA-24). El bote
+    # de un saque se compara con su cuadro de saque y el resto con la pista.
+    line_calls = config["line_calls"]
     points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
-                           main_camera=main_camera, serves=serves)
+                           main_camera=main_camera, serves=serves, doubt_margin=line_calls["doubt_margin_m"])
+    bounces = call_bounces(bounces, points, doubles=line_calls["doubles"], margin=line_calls["doubt_margin_m"])
 
     # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
     # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
@@ -212,6 +225,9 @@ def run_pipeline(config, render=True):
     stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
     model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
     add_serve_and_rally_stats(model_statistics, points)
+    counts = call_counts(bounces)
+    model_statistics["bounces"] = {"count": len(bounces), "in": counts["dentro"], "out": counts["fuera"],
+                                   "doubtful": counts["dudoso"]}
     result = {
         "model_statistics": model_statistics,
         "shots": stats_shots,
@@ -261,9 +277,11 @@ def run_pipeline(config, render=True):
             for bounce in bounces:  # marca cada bote durante medio segundo
                 if 0 <= i - bounce["frame"] < bounce_marker_frames:
                     center = (int(bounce["x_px"]), int(bounce["y_px"]))
-                    cv2.circle(frame, center, int(18 * text_scale), (255, 0, 255), max(1, int(round(3 * text_scale))))
-                    cv2.putText(frame, "BOTE", (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.7 * text_scale, (255, 0, 255), max(1, int(round(2 * text_scale))))
+                    color = CALL_COLORS.get(bounce.get("call"), (255, 0, 255))
+                    label = f"BOTE {bounce['call'].upper()}" if bounce.get("call") else "BOTE"
+                    cv2.circle(frame, center, int(18 * text_scale), color, max(1, int(round(3 * text_scale))))
+                    cv2.putText(frame, label, (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7 * text_scale, color, max(1, int(round(2 * text_scale))))
             for serve in serves:  # marca cada saque durante medio segundo, sobre el sacador
                 if 0 <= i - serve["frame"] < bounce_marker_frames and serve["player"] in player_detections[i]:
                     x1, y1, x2, _ = player_detections[i][serve["player"]]

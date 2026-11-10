@@ -51,6 +51,14 @@ cameras:
   # fotograma) para seguir contando como cámara principal.
   max_shift_fraction: 0.08
 
+line_calls:
+  # Dentro, fuera o dudoso de cada bote (TA-24). Un bote a menos de este margen de una línea
+  # (por dentro o por fuera) es dudoso: la posición no basta para decidir. En un saque, un
+  # dudoso no cuenta como falta.
+  doubt_margin_m: 0.15
+  # Comparar los botes del peloteo con la pista de dobles (true) o la de individuales (false).
+  doubles: false
+
 worker:
   # Duración máxima del vídeo que acepta el worker, en segundos. Los más largos pasan a
   # 'error' antes de cargarlos (PCIT-147). Se puede subir cuando haya procesamiento por tramos.

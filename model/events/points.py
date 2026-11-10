@@ -25,8 +25,9 @@ Con lo que ya detecta el modelo (pelota, golpes, botes y cortes de cámara):
    saques. Sin bote del saque no se juntan (podría ser un ace).
 
 Cada saque del punto (serve_attempts) lleva si fue falta: el saque debe botar en el cuadro
-de saque cruzado del rival (con SERVICE_BOX_MARGIN_M por la incertidumbre del bote). Si no
-se ve su bote pero el rival lo devolvió, entró; si no se ve ni hay resto, no se sabe (None).
+de saque cruzado del rival. Su bote se canta con events.line_calls (TA-24): fuera es falta;
+dentro o dudoso (a menos del margen de duda de una línea), no. Si no se ve su bote pero el
+rival lo devolvió, entró; si no se ve ni hay resto, no se sabe (None).
 Con el bote también se estima su velocidad: distancia del sacador al bote entre el tiempo.
 
 Salida: [{"start", "end", "server", "serve_frames", "serve_attempts", "shots", "end_reason"}].
@@ -39,6 +40,8 @@ import numpy as np
 from court import COURT_LENGTH, DOUBLES_WIDTH, NET_Y
 from court.court_model import ALLEY_WIDTH, SERVICE_LINE_FROM_NET
 from utils import get_center_of_bbox, measure_distance
+
+from .line_calls import DOUBT_MARGIN_M, OUT, call, service_box
 
 PAUSE_SECONDS = 3.0
 MAX_TOSS_SECONDS = 1.5
@@ -86,28 +89,8 @@ MIN_SERVE_SPEED_KMH, MAX_SERVE_SPEED_KMH = 50.0, 260.0
 MIN_SERVE_FLIGHT_SECONDS = 0.25  # el bote del saque no puede llegar antes
 
 
-def serve_box_contains(bounce, server, side, margin=SERVICE_BOX_MARGIN_M):
-    """Si el bote cae en el cuadro de saque cruzado del rival (el que corresponde a ese saque).
-
-    server: 1 (fondo lejano) o 2 (cercano); side: 'derecha' o 'izquierda' del sacador.
-    """
-    x, y = bounce["x_m"], bounce["y_m"]
-    if server == 2:  # saca desde el fondo cercano: el cuadro está en la mitad lejana
-        inside_y = NET_Y - SERVICE_LINE_FROM_NET - margin <= y <= NET_Y + margin
-    else:
-        inside_y = NET_Y - margin <= y <= NET_Y + SERVICE_LINE_FROM_NET + margin
-    # Lado de la imagen desde el que saca (el del fondo mira a la cámara) y cuadro cruzado.
-    server_on_right = (side == "derecha") == (server == 2)
-    center = DOUBLES_WIDTH / 2
-    if server_on_right:
-        inside_x = ALLEY_WIDTH - margin <= x <= center + margin
-    else:
-        inside_x = center - margin <= x <= DOUBLES_WIDTH - ALLEY_WIDTH + margin
-    return inside_x and inside_y
-
-
-def _serve_attempt(serve, next_hit, bounces, fps):
-    """Resultado de un saque: bote, falta (True/False/None) y velocidad estimada."""
+def _serve_attempt(serve, next_hit, bounces, fps, doubt_margin=DOUBT_MARGIN_M):
+    """Resultado de un saque: bote, cantada del bote, falta (True/False/None) y velocidad estimada."""
     min_flight = MIN_SERVE_FLIGHT_SECONDS * fps
 
     def receiver_half(b):
@@ -117,10 +100,12 @@ def _serve_attempt(serve, next_hit, bounces, fps):
              and (next_hit is None or b["frame"] < next_hit)]
     bounce = after[0] if after else None
     attempt = {"frame": serve["frame"], "player": serve["player"], "side": serve["side"],
-               "fault": None, "bounce_frame": None, "speedKmh": None}
+               "fault": None, "call": None, "bounce_frame": None, "speedKmh": None}
     if bounce is not None:
         attempt["bounce_frame"] = bounce["frame"]
-        attempt["fault"] = not serve_box_contains(bounce, serve["player"], serve["side"])
+        attempt["call"] = call(bounce["x_m"], bounce["y_m"], service_box(serve["player"], serve["side"]),
+                               doubt_margin)
+        attempt["fault"] = attempt["call"] == OUT
         if "x_m" in serve and bounce["frame"] > serve["frame"]:
             meters = float(np.hypot(bounce["x_m"] - serve["x_m"], bounce["y_m"] - serve["y_m"]))
             flight = (bounce.get("contact_frame", bounce["frame"]) - serve["frame"]) / fps
@@ -168,10 +153,12 @@ def _end_of_play(start, end, hits, bounces, fps):
     return end, "sin pelota"
 
 
-def detect_points(ball_detections, player_detections, hits, bounces, fps, main_camera=None, serves=()):
+def detect_points(ball_detections, player_detections, hits, bounces, fps, main_camera=None, serves=(),
+                  doubt_margin=DOUBT_MARGIN_M):
     """Puntos del vídeo, en orden.
 
     bounces: los de events.locate_bounces() (con x_m, y_m); serves: los de events.detect_serves().
+    doubt_margin: margen de duda de las líneas para cantar el bote del saque (TA-24).
     """
     n = len(ball_detections)
     main = main_camera if main_camera is not None else [True] * n
@@ -204,7 +191,8 @@ def detect_points(ball_detections, player_detections, hits, bounces, fps, main_c
                          first_hit)
         end, reason = _end_of_play(start, seg_end, seg_hits, bounces, fps)
         next_hit = seg_hits[1] if len(seg_hits) > 1 else None
-        attempts = [_serve_attempt(serve, next_hit, [b for b in bounces if b["frame"] <= end], fps)] if serve else []
+        attempts = ([_serve_attempt(serve, next_hit, [b for b in bounces if b["frame"] <= end], fps, doubt_margin)]
+                    if serve else [])
         if attempts:
             fault = attempts[0]["fault"] is True
         else:  # sin saque detectado: falta si el primer bote cae fuera de los cuadros
