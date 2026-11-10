@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { onSnapshot, where } from 'firebase/firestore'
 import { MemoryRouter } from 'react-router'
@@ -59,6 +59,37 @@ describe('Analizar video v1', () => {
     await user.click(screen.getByRole('button', { name: /Añadir a la cola/ }))
     expect(await screen.findByText('Partido añadido a la cola de demostración. No se subió ni procesó ningún video.')).toBeTruthy()
     expect(props.send.mock.calls[0][0].url).toContain('youtu.be/abcdefghijk')
+  })
+
+  it('muestra progreso indeterminado por partido solo mientras Firestore indica que se procesa', () => {
+    onSnapshot.mockImplementation(() => vi.fn())
+    const db = { app: { options: { projectId: 'prueba' } } }
+    const session = { uid: 'coach-1', orgId: 'equipo-1' }
+    render(<Analizar db={db} session={session} uploadVideo={vi.fn()} maxBytes={1024} />)
+    const [receivePlayers, receiveMatches] = onSnapshot.mock.calls.slice(-2).map(([, receive]) => receive)
+    const base = { orgId: 'equipo-1', createdBy: 'coach-1' }
+    const player = { id: 'player-1', data: () => ({ ...base, fullName: 'Valeria Torres' }) }
+    const match = (id, opponent, status) => ({
+      id,
+      data: () => ({ ...base, opponent, status, playerId: player.id, matchDate: '2026-01-01' }),
+    })
+
+    act(() => {
+      receivePlayers({ docs: [player] })
+      receiveMatches({ docs: [match('a', 'Rival A', 'en cola'), match('b', 'Rival B', 'en cola')] })
+    })
+    expect(screen.queryByRole('progressbar')).toBeNull()
+
+    act(() => receiveMatches({ docs: [match('a', 'Rival A', 'procesando'), match('b', 'Rival B', 'procesando')] }))
+    const first = screen.getByRole('progressbar', { name: 'Análisis de Valeria Torres contra Rival A (2026-01-01)' })
+    expect(first.getAttribute('aria-valuenow')).toBeNull()
+    expect(within(first.closest('tr')).getByText(/El modelo está analizando/)).toBeTruthy()
+    expect(screen.getAllByRole('progressbar')).toHaveLength(2)
+
+    act(() => receiveMatches({ docs: [match('a', 'Rival A', 'listo'), match('b', 'Rival B', 'error')] }))
+    expect(screen.queryByRole('progressbar')).toBeNull()
+    expect(screen.getByRole('cell', { name: 'Listo' })).toBeTruthy()
+    expect(screen.getByRole('cell', { name: 'Error' })).toBeTruthy()
   })
 
   it('conserva el enlace y los datos si YouTube no ofrece un video público', async () => {
