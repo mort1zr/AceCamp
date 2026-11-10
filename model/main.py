@@ -11,6 +11,7 @@ from court_line_detector import CourtLineDetector
 from mini_court import MiniCourt
 from pipeline_analysis import analyze_detections
 from report import build_report, draw_scoreboard, scoreboard_states, serve_states, write_report
+from report.heatmap import write_heatmaps
 from stats import build_frame_states
 from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
 from utils import VideoWriter, get_video_info, iter_frames
@@ -320,6 +321,9 @@ def main(argv=None):
     report_dir = write_report(result["report"], resolve_path(config["paths"]["report_dir"]),
                               positions=result["positions"])
     print(f"Informe del partido en {report_dir} (report.json, points.csv, bounces.csv, positions.csv)")
+    # Mapas de calor de cada jugador (TA-33), con escala de color común.
+    maps = write_heatmaps(result["positions"], result["video_info"].fps, report_dir)
+    print(f"Mapas de calor: {', '.join(sorted(maps))}")
     return result
 
 
