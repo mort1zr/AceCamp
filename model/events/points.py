@@ -14,8 +14,9 @@ Con lo que ya detecta el modelo (pelota, golpes, botes y cortes de cámara):
    da el primer golpe.
 4. Fin: lo primero que ocurra de
    - doble bote: dos botes seguidos en el mismo lado de la red sin golpe entre medias;
-   - bote claramente fuera: más de OUT_MARGIN_M por fuera de las líneas de dobles
-     (salvo el bote del saque: una falta no acaba el punto, viene el segundo saque);
+   - bote claramente fuera: el primer bote tras un golpe cae a más de OUT_MARGIN_M por fuera
+     de las líneas de dobles (salvo el bote del saque: una falta no acaba el punto, viene el
+     segundo saque);
    - la pelota deja de verse (fin del tramo).
    Un doble bote o un bote fuera seguidos de otro golpe antes de NEXT_HIT_SECONDS no
    acaban el punto: el bote era falso (o mal situado) y el punto seguía.
@@ -144,7 +145,10 @@ def _end_of_play(start, end, hits, bounces, fps):
         if "x_m" in bounce:
             first_bounce = not serve_bounce_seen
             serve_bounce_seen = True
-            if _out_clearly(bounce) and not first_bounce and not play_continues(frame):
+            # Solo cuenta como fuera el primer bote tras un golpe: si la pelota ya botó dentro, que
+            # el segundo bote caiga fuera da igual (es un doble bote: el rival no llegó).
+            if (_out_clearly(bounce) and not first_bounce and previous_bounce is None
+                    and not play_continues(frame)):
                 return min(end, frame + after), "fuera"
             if (previous_bounce is not None and "x_m" in previous_bounce
                     and (previous_bounce["y_m"] < NET_Y) == (bounce["y_m"] < NET_Y) and not play_continues(frame)):

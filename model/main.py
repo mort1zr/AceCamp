@@ -11,6 +11,7 @@ from court_line_detector import CourtLineDetector
 from events import (
     call_bounces,
     call_counts,
+    decide_winners,
     detect_bounce_events,
     detect_hits,
     detect_points,
@@ -215,6 +216,8 @@ def run_pipeline(config, render=True):
     points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
                            main_camera=main_camera, serves=serves, doubt_margin=line_calls["doubt_margin_m"])
     bounces = call_bounces(bounces, points, doubles=line_calls["doubles"], margin=line_calls["doubt_margin_m"])
+    # Quién gana cada punto, con su confianza (TA-28).
+    points = decide_winners(points, bounces, all_hits, video_info.fps, ball_detections, player_detections)
 
     # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
     # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
@@ -228,6 +231,11 @@ def run_pipeline(config, render=True):
     counts = call_counts(bounces)
     model_statistics["bounces"] = {"count": len(bounces), "in": counts["dentro"], "out": counts["fuera"],
                                    "doubtful": counts["dudoso"]}
+    model_statistics["points"] = {
+        "count": len(points),
+        "won": {str(player): sum(p["winner"] == player for p in points) for player in (1, 2)},
+        "lowConfidence": sum(p["confidence_level"] == "baja" for p in points),
+    }
     result = {
         "model_statistics": model_statistics,
         "shots": stats_shots,
@@ -255,6 +263,7 @@ def run_pipeline(config, render=True):
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     mini_court = stats_box = None
     bounce_marker_frames = max(1, int(round(0.5 * video_info.fps)))
+    winner_label_frames = max(1, int(round(1.5 * video_info.fps)))
     with VideoWriter(output_video_path, fps=video_info.fps) as out:
         for i, frame in enumerate(iter_frames(input_video_path)):
             if i >= num_frames:
@@ -292,6 +301,13 @@ def run_pipeline(config, render=True):
             if current is not None:
                 cv2.putText(frame, f"Punto {current}", (int(10 * text_scale), int(110 * text_scale)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 255, 255), max(1, int(round(2 * text_scale))))
+            # Al acabar cada punto, durante 1,5 s: quién lo ganó, por qué y con qué confianza (TA-28).
+            ended = next((k for k, p in enumerate(points, start=1) if 0 < i - p["end"] <= winner_label_frames), None)
+            if ended is not None and points[ended - 1]["winner"] is not None:
+                p = points[ended - 1]
+                cv2.putText(frame, f"Punto {ended}: gana J{p['winner']} ({p['win_reason']}, confianza {p['confidence_level']})",
+                            (int(10 * text_scale), int(110 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale,
+                            (0, 255, 255), max(1, int(round(2 * text_scale))))
             frame = stats_box.draw(frame, frame_states[i])
             cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
                         text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))

@@ -177,7 +177,7 @@ class Match:
     bounces: list = field(default_factory=list)
     shots: list = field(default_factory=list)
     serves: list = field(default_factory=list)  # [{"frame", "player", "side"}]
-    points: list = field(default_factory=list)  # [{"start", "end", "server"}]
+    points: list = field(default_factory=list)  # [{"start", "end", "server", "winner", "how"}]
 
 
 def _mirror(rally):
@@ -191,7 +191,8 @@ def _mirror(rally):
     return rally
 
 
-def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=()):
+def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=(), out_points=(),
+                   double_fault_points=()):
     """Varios puntos seguidos: pausa sin pelota, lanzamiento del saque y peloteo.
 
     Saca el jugador 2 dos puntos y luego el 1 otros dos, desde la derecha y la izquierda
@@ -199,6 +200,11 @@ def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=())
     inicio de cada punto es el primer fotograma del lanzamiento de la pelota; el fin,
     el último fotograma con la pelota en juego. En los puntos de fault_points el primer
     saque es falta (bota largo) y, tras una pausa, viene el segundo saque.
+
+    Cada punto lleva su ganador real (winner) y cómo acabó (how):
+    - "ganador": el último golpe bota dentro y el rival no llega (gana quien lo dio);
+    - "fuera": en out_points el último golpe bota fuera (gana el rival de quien lo dio);
+    - "doble falta": en double_fault_points los dos saques son falta (gana el receptor).
     """
     rng = np.random.default_rng(seed + 1000)
     match = Match(fps, [], [])
@@ -207,20 +213,34 @@ def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=())
         serve_side = "derecha" if point % 2 == 0 else "izquierda"
         pause = int(rng.uniform(3.0, 7.0) * fps)
         point_start = None
-        if point in fault_points:
+        if point in fault_points or point in double_fault_points:
             fault = simulate_rally(1, fps=fps, seed=seed * 100 + point + 50, serve=True, serve_side=serve_side,
                                    serve_fault=True)
             if server == 1:
                 fault = _mirror(fault)
             point_start = _append_serve(match, fault, server, serve_side, pause, fps, fault=True)
             pause = int(rng.uniform(3.0, 5.0) * fps)
-        rally = simulate_rally(int(rng.integers(1, max_shots + 1)), fps=fps, seed=seed * 100 + point, serve=True,
-                               serve_side=serve_side)
-        if server == 1:
-            rally = _mirror(rally)
-        start = _append_serve(match, rally, server, serve_side, pause, fps, fault=False)
+        receiver = 1 if server == 2 else 2
+        if point in double_fault_points:
+            second = simulate_rally(1, fps=fps, seed=seed * 100 + point + 70, serve=True, serve_side=serve_side,
+                                    serve_fault=True)
+            if server == 1:
+                second = _mirror(second)
+            start = _append_serve(match, second, server, serve_side, pause, fps, fault=True)
+            winner, how = receiver, "doble falta"
+        else:
+            out = point in out_points
+            # Un golpe fuera necesita al menos el saque y un resto (si no, sería una falta).
+            shots = int(rng.integers(2 if out else 1, max_shots + 1))
+            rally = simulate_rally(shots, fps=fps, seed=seed * 100 + point, serve=True, serve_side=serve_side,
+                                   last_out=out)
+            if server == 1:
+                rally = _mirror(rally)
+            start = _append_serve(match, rally, server, serve_side, pause, fps, fault=False)
+            last = rally.shots[-1]["player"]
+            winner, how = (3 - last, "fuera") if out else (last, "ganador")
         match.points.append({"start": start if point_start is None else point_start,
-                             "end": len(match.ball_3d) - 1, "server": server})
+                             "end": len(match.ball_3d) - 1, "server": server, "winner": winner, "how": how})
     for _ in range(int(2 * fps)):
         match.ball_3d.append(None)
         match.players_m.append(match.players_m[-1])
