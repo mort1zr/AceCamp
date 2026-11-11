@@ -44,13 +44,13 @@ export function validateApplicationContact(input) {
   return errors
 }
 
-export function submitPublicApplication(db, { orgId, formId }, input) {
+export function normalizeApplicationContact(input, today = new Date().toISOString().slice(0, 10)) {
   // Se juntan los errores del jugador y los de contacto para mostrarlos todos a la vez.
   const errors = validateApplicationContact(input)
   let player
   try {
     // Las reglas calculan la edad con la misma fecha UTC.
-    player = normalizePlayer(input, new Date().toISOString().slice(0, 10))
+    player = normalizePlayer(input, today)
   } catch (failure) {
     if (!failure.fields) throw failure
     Object.assign(errors, failure.fields, errors)
@@ -58,26 +58,30 @@ export function submitPublicApplication(db, { orgId, formId }, input) {
   if (Object.keys(errors).length) {
     throw Object.assign(new Error('applications/invalid-contact'), { code: 'applications/validation', fields: errors })
   }
-  const city = text(input.city)
-  const email = text(input.email)
-  const message = text(input.message)
+  return {
+    fullName: player.fullName,
+    birthDate: player.birthDate,
+    city: text(input.city),
+    email: text(input.email),
+    graduationYear: player.graduationYear,
+    academy: player.academy,
+    guardian: player.guardian ?? null,
+    message: text(input.message),
+  }
+}
+
+export function submitPublicApplication(db, { orgId, formId }, input) {
+  const contact = normalizeApplicationContact(input)
   const now = serverTimestamp()
   return addDoc(collection(db, COLLECTIONS.applications), {
     orgId,
     formId,
     status: APPLICATION_STATUS.new,
-    fullName: player.fullName,
-    birthDate: player.birthDate,
-    city,
-    email,
-    graduationYear: player.graduationYear,
-    academy: player.academy,
-    guardian: player.guardian ?? null,
-    message,
+    ...contact,
     consent: {
       accepted: true,
       version: input.attachVideo ? APPLICATION_VIDEO_CONSENT_VERSION : APPLICATION_CONSENT_VERSION,
-      method: player.guardian ? 'guardian' : 'self',
+      method: contact.guardian ? 'guardian' : 'self',
       recordedBy: 'public-form',
       recordedAt: now,
     },

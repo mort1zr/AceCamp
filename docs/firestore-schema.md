@@ -318,6 +318,7 @@ de ser jugador del equipo.
 | `guardian` | `{ name, phone, email }` \| null | sí si es menor de 18 | |
 | `videoLinks` | string[] | no | Links de YouTube, máximo 5 |
 | `videoPaths` | string[] | no | Rutas privadas confirmadas por el servidor. La demo guarda un archivo opcional en `orgs/{orgId}/applications/{appId}/video.mp4` o `.mov`. |
+| `source` | string | no | `google-forms` en postulaciones importadas de una hoja privada. Su consentimiento registra el UID de quien hizo la importación. |
 | `videoUpload` | object | no | Reserva temporal de ruta y huella del archivo para reintentar sin sobrescribirlo. La escribe el servidor y la retira al confirmar `videoPaths`. |
 | `message` | string | no | Hasta 1000 caracteres |
 | `consent` | object | sí | Mismo formato que en `players`. El formulario usa `applications-v1` para datos y `applications-video-v1` al autorizar también un video. `method` es `'self'` o `'guardian'` y `recordedBy` es `'public-form'`. |

@@ -31,6 +31,8 @@ import { createFirestoreDashboardService } from '../../src/panel/lib/services/fi
 import { buildPlayerComparisonHistory } from '../../src/panel/lib/comparisonHistory.js'
 import { usagePeriod } from '../../src/panel/lib/usage.js'
 import { publicFormExists, submitPublicApplication } from '../../src/panel/lib/publicApplications.js'
+import { readGoogleFormResponses } from '../../src/panel/lib/googleFormsApplications.js'
+import { importGoogleFormApplications } from '../../src/panel/lib/services/googleFormsRecruitment.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -84,6 +86,40 @@ beforeEach(async () => {
 
 const coachDb = () => env.authenticatedContext(COACH, { email: 'coach@acecam.test' }).firestore()
 const anonDb = () => env.unauthenticatedContext().firestore()
+
+it('registra en privado la hoja de Google e importa cada respuesta una sola vez', async () => {
+  const db = coachDb()
+  const other = env.authenticatedContext(OTHER_COACH).firestore()
+  const visitor = anonDb()
+  const source = { formUrl: 'https://forms.gle/RespuestaDePrueba', spreadsheetId: 'sheet-test', sheetId: 12 }
+  const integration = database => doc(database, 'orgs', ORG, 'recruitmentIntegrations', 'googleForms')
+  await assertFails(setDoc(integration(other), source))
+  await assertSucceeds(setDoc(integration(db), source))
+  await assertFails(getDoc(integration(visitor)))
+  await assertFails(getDoc(integration(other)))
+
+  const { rows, invalidRows } = readGoogleFormResponses([
+    ['Marca temporal', 'Nombre completo', 'Fecha de nacimiento', 'Ciudad', 'Correo de contacto', 'Año de graduación', 'Autorización'],
+    [46336.75, 'Postulante Google', '2000-02-15', 'Lima', 'google@example.test', 2027, 'Sí, autorizo'],
+    [46336.76, 'Postulante sin permiso', '2000-01-01', 'Lima', 'otro@example.test', 2027, 'No'],
+  ])
+  expect(invalidRows).toHaveLength(1)
+  const options = { orgId: ORG, uid: COACH, source, rows }
+  const first = await Promise.all([
+    importGoogleFormApplications(db, options),
+    importGoogleFormApplications(db, options),
+  ])
+  expect(first.flatMap(result => result.failed)).toEqual([])
+  expect(first.reduce((sum, result) => sum + result.imported, 0)).toBe(1)
+  const applications = await getDocs(query(collection(db, 'applications'), where('orgId', '==', ORG)))
+  const imported = applications.docs.filter(item => item.data().source === 'google-forms')
+  expect(imported).toHaveLength(1)
+  expect(imported[0].data()).toMatchObject({ fullName: 'Postulante Google', consent: { recordedBy: COACH } })
+  await assertFails(getDoc(doc(other, 'applications', imported[0].id)))
+  await assertSucceeds(updateDoc(imported[0].ref, { status: 'en revisión' }))
+  await expect(importGoogleFormApplications(db, options)).resolves.toEqual({ imported: 0, existing: 1, failed: [] })
+  expect((await getDoc(imported[0].ref)).data().status).toBe('en revisión')
+})
 
 const newPlayer = (overrides = {}) => ({
   orgId: ORG, fullName: 'Valentina Quispe', birthDate: '2010-03-02', academy: 'Club Las Lomas',
