@@ -364,6 +364,13 @@ service cloud.firestore {
     // ---------- matches/{matchId} ----------
     // La web crea el partido 'en cola'; el worker (Admin SDK) lo procesa.
 
+    function validApplicationMatch(data) {
+      let application = get(/databases/$(database)/documents/applications/$(data.applicationId)).data;
+      return application.orgId == data.orgId && application.playerId == data.playerId
+        && data.videoPath in application.videoPaths
+        && data.videoPath.matches('^orgs/' + data.orgId + '/applications/' + data.applicationId + '/video[.](mp4|mov)$');
+    }
+
     match /matches/{matchId} {
       allow get: if signedIn() && (resource == null || canManage(resource.data));
       allow list: if canManage(resource.data);
@@ -374,7 +381,7 @@ service cloud.firestore {
              'createdBy', 'createdAt', 'status'])
         && request.resource.data.keys().hasOnly([
              'orgId', 'playerId', 'playerPosition', 'opponent', 'tournament', 'matchDate', 'result',
-             'surface', 'videoPath', 'inputFingerprint', 'createdBy', 'createdAt', 'status',
+             'surface', 'videoPath', 'inputFingerprint', 'applicationId', 'createdBy', 'createdAt', 'status',
              'startedAt', 'finishedAt', 'errorMessage', 'workerVersion', 'statistics'])
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -396,10 +403,13 @@ service cloud.firestore {
         && optionalText(request.resource.data, 'tournament', 120)
         && optionalText(request.resource.data, 'result', 120)
         && optionalIn(request.resource.data, 'surface', ['arcilla', 'dura', 'césped', 'otra'])
-        // El video tiene que estar en la carpeta de este partido y de esta organización (PCIT-24).
         && request.resource.data.videoPath is string
-        && request.resource.data.videoPath.matches(
-             '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$')
+        && (('applicationId' in request.resource.data)
+          ? request.resource.data.applicationId is string
+            && request.resource.data.applicationId.matches('^[A-Za-z0-9_-]{1,128}$')
+            && validApplicationMatch(request.resource.data)
+          : request.resource.data.videoPath.matches(
+            '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$'))
         // Cada partido nuevo cuenta como un análisis del mes (PCIT-41).
         && countsAsAnalysis(request.resource.data.orgId, matchId);
 

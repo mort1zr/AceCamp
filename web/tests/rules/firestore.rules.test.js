@@ -24,6 +24,7 @@ import {
 } from 'firebase/firestore'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createFirestorePlayersService } from '../../src/panel/lib/services/firestorePlayersService.js'
+import { createApplicationAnalysisService } from '../../src/panel/lib/services/applicationAnalysis.js'
 import { createFirestoreMatchesService } from '../../src/panel/lib/services/firestoreMatchesService.js'
 import { createFirestoreMatchNotesService } from '../../src/panel/lib/services/firestoreMatchNotesService.js'
 import { createFirestoreDashboardService } from '../../src/panel/lib/services/firestoreDashboardService.js'
@@ -516,6 +517,31 @@ describe('uso mensual de análisis (PCIT-41)', () => {
 })
 
 describe('applications', () => {
+  it('encola solo un análisis del video confirmado, consume un cupo y reintenta el mismo partido', async () => {
+    const db = coachDb()
+    const path = `orgs/${ORG}/applications/a-demo/video.mp4`
+    await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'applications', 'a-demo'), {
+      playerId: 'p-demo', videoPaths: [path],
+    }))
+    const service = createApplicationAnalysisService({ db, orgId: ORG, uid: COACH, role: 'coach', applicationId: 'a-demo' })
+    await assertFails(createMatch(db, 'forged', { applicationId: 'a-club', videoPath: path }))
+    await assertFails(createMatch(db, 'unconfirmed', { applicationId: 'a-demo', videoPath: path.replace('.mp4', '.mov') }))
+    await assertSucceeds(service.enqueue(path, 'abajo'))
+    await assertSucceeds(service.enqueue(path, 'abajo'))
+    const usage = (await getDoc(usageDoc(db))).data()
+    expect(usage.analyses).toBe(1)
+    const ref = doc(db, 'matches', usage.lastMatchId)
+    expect((await getDoc(ref)).data()).toMatchObject({
+      status: 'en cola', applicationId: 'a-demo', playerId: 'p-demo', playerPosition: 'abajo', videoPath: path,
+    })
+    await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'matches', ref.id), {
+      status: 'error', errorMessage: 'No se detectó la cancha.',
+    }))
+    await assertSucceeds(service.retry(ref.id))
+    expect((await getDoc(ref)).data()).toMatchObject({ status: 'en cola', errorMessage: null })
+    expect((await getDoc(usageDoc(db))).data().analyses).toBe(1)
+  })
+
   it('cambia el estado de una postulación de su organización', async () => {
     await assertSucceeds(updateDoc(doc(coachDb(), 'applications', 'a-demo'), { status: 'en revisión' }))
   })

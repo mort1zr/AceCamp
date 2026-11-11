@@ -3,7 +3,7 @@ import { normalizeDashboardStatistics } from '../dashboardOverview.js'
 import { isValidBirthDate } from '../players.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
-function reportMetrics(match) {
+export function reportMetrics(match) {
   const { playerId } = match
   const statistics = normalizeDashboardStatistics(decodeWorkerDashboardStatistics(match, { playerId }), playerId)
   const shots = statistics?.shots

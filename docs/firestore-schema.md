@@ -182,6 +182,7 @@ que el video terminó de subir** (PCIT-27). El worker (PCIT-35) lo procesa.
 | `result` | string | web | Opcional, ej. `'6-4 3-6 7-5'` |
 | `surface` | `'arcilla'` \| `'dura'` \| `'césped'` \| `'otra'` \| null | web | Opcional |
 | `videoPath` | string | web | Ruta en Storage que devuelve `uploadVideo()` |
+| `applicationId` | string opcional | web | Postulación de origen. En este caso `videoPath` apunta al archivo privado confirmado de la postulación. |
 | `inputFingerprint` | string | web | SHA-256 del formulario, para reintentos (PCIT-27) |
 | `createdBy` | string | web | `uid` |
 | `createdAt` | Timestamp | web | |

@@ -4,7 +4,7 @@ import { limitError, nextUsage, planLimit, quotaReached, usageRef } from '../usa
 import { isStorageVideoPath } from '../videoImportProtocol.js'
 import { planVigente } from '../planes.js'
 
-function checkQuota(org, counter) {
+export function checkQuota(org, counter) {
   // Una prueba vencida no tiene análisis (PCIT-170), igual que withinPlan en las reglas.
   const limit = planLimit(org.exists() ? planVigente(org.data()) : null)
   const used = counter.exists() ? counter.data().analyses : 0

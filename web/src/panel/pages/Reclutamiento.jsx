@@ -3,6 +3,7 @@ import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
 import PlayerProfile from '../components/players/PlayerProfile.jsx'
+import AnalisisPostulacion from '../components/recruitment/AnalisisPostulacion.jsx'
 import AsignarJugador from '../components/recruitment/AsignarJugador.jsx'
 import EnlacesPostulacion from '../components/recruitment/EnlacesPostulacion.jsx'
 import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
@@ -77,6 +78,7 @@ function Bandeja({ db, orgId, uid, role }) {
   const [notice, setNotice] = useState('')
   const [assignmentId, setAssignmentId] = useState('')
   const [profileId, setProfileId] = useState('')
+  const [videoApplicationId, setVideoApplicationId] = useState('')
   const playerService = useMemo(() => createFirestorePlayersService({ db, orgId, actorId: uid, role }), [db, orgId, uid, role])
   const roster = usePlayers(playerService)
 
@@ -89,10 +91,12 @@ function Bandeja({ db, orgId, uid, role }) {
         const rows = snapshot.docs
           .map((doc) => {
             const { orgId, fullName, city, graduationYear, status, createdAt, playerId,
-              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking, videoPaths } = doc.data()
+              birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking, videoPaths, videoLinks } = doc.data()
             return { id: doc.id, orgId, fullName, city, graduationYear, status, createdAt, playerId,
               birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking,
-              hasVideo: Array.isArray(videoPaths) && videoPaths.length > 0 }
+              hasVideo: Array.isArray(videoPaths) && videoPaths.length > 0,
+              videoPaths: Array.isArray(videoPaths) ? [...new Set(videoPaths.filter(path => typeof path === 'string'))] : [],
+              videoLinks: Array.isArray(videoLinks) ? videoLinks : [] }
           })
           .filter((row) => row.orgId === orgId)
           .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))
@@ -112,6 +116,7 @@ function Bandeja({ db, orgId, uid, role }) {
   const rows = result?.rows ?? []
   const assignment = rows.find(({ id }) => id === assignmentId)
   const profile = roster.rows.find(({ id }) => id === profileId)
+  const videoApplication = rows.find(({ id }) => id === videoApplicationId)
   const filtered = rows.filter((row) =>
     (!status || row.status === status) &&
     [row.fullName, row.city, applicationReference(row.id)].some((value) => normalize(value).includes(term)),
@@ -127,6 +132,14 @@ function Bandeja({ db, orgId, uid, role }) {
       key: 'action',
       label: 'Cambiar estado',
       render: (_, application) => <CambiarEstado application={application} onSave={saveStatus} />,
+    },
+    {
+      key: 'videoPaths',
+      label: 'Videos',
+      render: (_, application) => application.videoPaths.length || application.videoLinks.length ? (
+        <button type="button" className="players-button-secondary" aria-label={`Ver videos de ${application.fullName}`}
+          onClick={() => setVideoApplicationId(application.id)}>Ver videos</button>
+      ) : '—',
     },
     {
       key: 'playerId',
@@ -153,6 +166,9 @@ function Bandeja({ db, orgId, uid, role }) {
   }
 
   if (profile) return <PlayerProfile key={profile.id} player={profile} service={playerService} onBack={() => setProfileId('')} />
+  if (videoApplication) return <AnalisisPostulacion key={videoApplication.id} db={db} orgId={orgId} uid={uid} role={role}
+    application={videoApplication} canAnalyze={roster.rows.some(({ id }) => id === videoApplication.playerId)}
+    onBack={() => setVideoApplicationId('')} />
 
   return (
     <>
