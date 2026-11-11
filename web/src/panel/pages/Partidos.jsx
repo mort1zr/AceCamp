@@ -3,6 +3,7 @@ import { DataTable, EmptyState } from '../components/ui'
 import MatchReport from '../components/analysis/MatchReport.jsx'
 import { useAnalysisQueue } from '../hooks/useAnalysisQueue.js'
 import { usePlayers } from '../hooks/usePlayers.js'
+import { useNombreOrganizacion } from '../hooks/useNombreOrganizacion.js'
 import { formatMatchDate } from '../lib/dashboardEvolution.js'
 import { createFirestoreMatchesService } from '../lib/services/firestoreMatchesService.js'
 import { createFirestoreMatchNotesService } from '../lib/services/firestoreMatchNotesService.js'
@@ -17,7 +18,7 @@ function matchesErrorMessage(error) {
   return 'No pudimos cargar los partidos. Revisa tu conexión y vuelve a intentarlo.'
 }
 
-function MatchesList({ matchesService, playersService, notesService, videoService }) {
+function MatchesList({ matchesService, playersService, notesService, videoService, organizacion }) {
   const matches = useAnalysisQueue(matchesService, matchesErrorMessage)
   const players = usePlayers(playersService)
   const [playerId, setPlayerId] = useState('')
@@ -79,6 +80,7 @@ function MatchesList({ matchesService, playersService, notesService, videoServic
       playerName={playerNames.get(selectedMatch.playerId) || 'Jugador no disponible'}
       notesService={notesService}
       videoService={videoService}
+      organizacion={organizacion}
       onBack={() => setMatchId('')}
     />
   )
@@ -130,6 +132,7 @@ function MatchesList({ matchesService, playersService, notesService, videoServic
 
 export default function Partidos({ db, storage, session }) {
   const { uid, orgId, role } = session ?? {}
+  const organizacion = useNombreOrganizacion(db, orgId)
   const services = useMemo(() => {
     if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()
       || !['coach', 'admin'].includes(role)) return null
@@ -151,7 +154,7 @@ export default function Partidos({ db, storage, session }) {
           <p>Consulta los partidos analizados y su marcador.</p>
         </div>
       </header>
-      {services ? <MatchesList key={`${services.playersService.scopeKey}:${role}`} {...services} /> : (
+      {services ? <MatchesList key={`${services.playersService.scopeKey}:${role}`} {...services} organizacion={organizacion} /> : (
         <EmptyState title="Los partidos aún no están disponibles" description="Inicia sesión con tu equipo para consultar su historial." />
       )}
     </section>

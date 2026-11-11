@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { KpiCard as BaseKpiCard } from '../ui'
 import MatchNotes from './MatchNotes.jsx'
 import ProcessedVideo from './ProcessedVideo.jsx'
+import PdfPartido from '../pdf/PdfPartido.jsx'
+import { BotonPdf } from '../pdf/ReportePdf.jsx'
 import { useUnidades } from '../../hooks/useUnidades.js'
 import { formatMatchDate } from '../../lib/dashboardEvolution.js'
 import { convertirVelocidad, etiquetaVelocidad } from '../../lib/unidades.js'
@@ -23,14 +25,22 @@ function Speed({ label, value, units }) {
   )
 }
 
-export default function MatchReport({ match, playerName, notesService, videoService, onBack }) {
+export default function MatchReport({ match, playerName, notesService, videoService, organizacion, onBack }) {
   const units = useUnidades()
   const title = useRef(null)
+  const [exportando, setExportando] = useState(false)
+  const terminarPdf = useCallback(() => setExportando(false), [])
   useEffect(() => { title.current?.focus() }, [])
 
   return (
     <section className="mt-5 flex flex-col gap-5" aria-labelledby="match-report-title">
-      <button type="button" className="players-button-secondary self-start" onClick={onBack}>Volver al listado</button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button type="button" className="players-button-secondary" onClick={onBack}>Volver al listado</button>
+        <BotonPdf onClick={() => setExportando(true)} disabled={exportando} />
+      </div>
+      {exportando && (
+        <PdfPartido match={match} playerName={playerName} organizacion={organizacion} notesService={notesService} onTerminar={terminarPdf} />
+      )}
       <header className="rounded-card border border-line bg-surface p-5">
         <p className="players-eyebrow">Reporte del partido</p>
         <h2 id="match-report-title" ref={title} tabIndex={-1} className="font-display text-2xl font-bold">

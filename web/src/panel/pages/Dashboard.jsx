@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { EmptyState, ErrorState, LoadingState } from '../components/ui'
 import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
 import DashboardLatestMatch from '../components/dashboard/DashboardLatestMatch.jsx'
 import EvolutionPanel from '../components/dashboard/EvolutionPanel.jsx'
 import DashboardDetails from '../components/dashboard/DashboardDetails.jsx'
 import BloqueVacio from '../components/layout/BloqueVacio.jsx'
+import PdfJugador from '../components/pdf/PdfJugador.jsx'
+import { BotonPdf } from '../components/pdf/ReportePdf.jsx'
+import { useNombreOrganizacion } from '../hooks/useNombreOrganizacion.js'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { useDashboardOverview } from '../hooks/useDashboardOverview.js'
 import { playerAge } from '../lib/players.js'
@@ -251,7 +254,7 @@ function DashboardSelect({ id, label, children, value, disabled, onChange }) {
   )
 }
 
-function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilter }) {
+function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilter, onExportar }) {
   return (
     <header className="dashboard-head">
       <div>
@@ -280,15 +283,18 @@ function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilt
         <DashboardSelect id="dashboard-period" label="Periodo" value={period} disabled={!canFilter} onChange={onPeriodChange}>
           {dashboardPeriods.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </DashboardSelect>
+        <BotonPdf onClick={onExportar} disabled={!onExportar} />
       </div>
     </header>
   )
 }
 
-function DashboardWorkspace({ playersService, overviewService, renderEvolution }) {
+function DashboardWorkspace({ playersService, overviewService, renderEvolution, organizacion }) {
   const players = usePlayers(playersService)
   const [selectedId, setSelectedId] = useState('')
   const [period, setPeriod] = useState('all')
+  const [exportando, setExportando] = useState(false)
+  const terminarPdf = useCallback(() => setExportando(false), [])
   const selected =
     !players.loading && !players.error
       ? players.rows.find((player) => player.id === selectedId)
@@ -321,7 +327,18 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
         period={period}
         onPeriodChange={setPeriod}
         canFilter={Boolean(overview.data?.periods)}
+        onExportar={selected && ready ? () => setExportando(true) : undefined}
       />
+      {exportando && selected && ready && (
+        <PdfJugador
+          player={selected}
+          report={report}
+          periodo={dashboardPeriods.find(({ value }) => value === period)}
+          organizacion={organizacion}
+          sample={sample}
+          onTerminar={terminarPdf}
+        />
+      )}
 
       {players.loading ? (
         <div className={tarjeta} aria-busy="true">
@@ -469,6 +486,7 @@ export default function Dashboard({
   const uid = session?.uid
   const orgId = session?.orgId
   const role = session?.role ?? 'coach'
+  const organizacion = useNombreOrganizacion(db, orgId)
   const hasInjectedServices = playersService != null || overviewService != null
   const liveServices = useMemo(() => {
     if (
@@ -497,6 +515,7 @@ export default function Dashboard({
       playersService={players}
       overviewService={overview}
       renderEvolution={renderEvolution}
+      organizacion={organizacion}
     />
   )
 }

@@ -1,0 +1,376 @@
+.reporte-pdf {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm 14mm 16mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body > :not(.reporte-pdf) {
+    display: none !important;
+  }
+
+  .reporte-pdf {
+    --rp-tinta: #1a1815;
+    --rp-tinta2: #45403a;
+    --rp-gris: #6b6358;
+    --rp-linea: #e4ded4;
+    --rp-fondo: #f6f4ef;
+    --rp-lima: #d7f25c;
+    --rp-lima-tinta: #5a6b00;
+    --rp-arcilla: #d0623a;
+    --rp-azul: #00708f;
+    display: block;
+    color: var(--rp-tinta);
+    background: #fff;
+    font-family: 'Barlow', system-ui, sans-serif;
+    font-size: 10pt;
+    line-height: 1.45;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+.reporte-pdf h1,
+.reporte-pdf h2,
+.reporte-pdf h3 {
+  margin: 0;
+  font-family: 'Barlow Condensed', 'Barlow', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.rp-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--rp-tinta);
+}
+
+.rp-marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 17pt;
+  font-weight: 700;
+}
+
+.rp-org {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: right;
+}
+
+.rp-org p {
+  margin: 0;
+}
+
+.rp-org-nombre {
+  font-weight: 600;
+}
+
+.rp-org-tipo {
+  color: var(--rp-gris);
+  font-size: 8.5pt;
+}
+
+.rp-sello {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--rp-tinta);
+  color: var(--rp-lima);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 11pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rp-portada {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0 16px;
+}
+
+.rp-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--rp-arcilla);
+  color: #fff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 20pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rp-eyebrow {
+  margin: 0 0 2px;
+  color: var(--rp-lima-tinta);
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.rp-portada h1 {
+  font-size: 28pt;
+  line-height: 1;
+}
+
+.rp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-chips li {
+  padding: 2px 9px;
+  border: 1px solid var(--rp-linea);
+  border-radius: 999px;
+  color: var(--rp-tinta2);
+  font-size: 8.5pt;
+}
+
+.rp-seccion {
+  margin-top: 16px;
+  break-inside: avoid;
+}
+
+.rp-seccion-cabeza {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.rp-seccion h2 {
+  font-size: 14pt;
+}
+
+.rp-nota {
+  margin: 0;
+  color: var(--rp-gris);
+  font-size: 8.5pt;
+}
+
+.rp-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.rp-kpi {
+  padding: 9px 10px;
+  border: 1px solid var(--rp-linea);
+  border-radius: 8px;
+  break-inside: avoid;
+}
+
+.rp-kpi-etiqueta {
+  margin: 0;
+  color: var(--rp-gris);
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rp-kpi-valor {
+  margin: 4px 0 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 19pt;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rp-kpi-valor small {
+  margin-left: 3px;
+  color: var(--rp-gris);
+  font-family: 'Barlow', sans-serif;
+  font-size: 8pt;
+  font-weight: 600;
+}
+
+.rp-kpi-vacio {
+  color: #b9b0a2;
+}
+
+.rp-kpi-tendencia {
+  margin: 4px 0 0;
+  color: var(--rp-tinta2);
+  font-size: 7.5pt;
+}
+
+.rp-columnas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.rp-columnas > .rp-seccion {
+  margin-top: 0;
+}
+
+.rp-columnas .rp-kpis {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.rp-columnas + .rp-columnas,
+.rp-seccion + .rp-columnas {
+  margin-top: 16px;
+}
+
+.rp-chips .capitalize {
+  text-transform: capitalize;
+}
+
+.rp-tarjeta {
+  padding: 12px;
+  border: 1px solid var(--rp-linea);
+  border-radius: 8px;
+}
+
+.rp-grafico {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.rp-grafico text {
+  fill: var(--rp-gris);
+  font-family: 'Barlow', sans-serif;
+  font-size: 9px;
+}
+
+.rp-grafico .rp-valor {
+  fill: var(--rp-tinta);
+  font-weight: 600;
+}
+
+.rp-barras {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.rp-barra {
+  display: grid;
+  grid-template-columns: 100px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  font-size: 8.5pt;
+}
+
+.rp-barra dt {
+  color: var(--rp-tinta2);
+}
+
+.rp-barra dd {
+  margin: 0;
+}
+
+.rp-barra-pista {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--rp-fondo);
+  overflow: hidden;
+}
+
+.rp-barra-relleno {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--rp-lima-tinta);
+}
+
+.rp-barra-cifra {
+  font-weight: 600;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9pt;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-tabla th,
+.rp-tabla td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--rp-linea);
+  text-align: left;
+}
+
+.rp-tabla thead th {
+  color: var(--rp-gris);
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rp-tabla .rp-num {
+  text-align: right;
+}
+
+.rp-tabla .rp-gana {
+  font-weight: 700;
+}
+
+.rp-vacio {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--rp-linea);
+  border-radius: 8px;
+  color: var(--rp-gris);
+  font-size: 8.5pt;
+  text-align: center;
+}
+
+.rp-notas {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--rp-lima-tinta);
+  background: var(--rp-fondo);
+  white-space: pre-wrap;
+}
+
+.rp-pie {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 8px;
+  border-top: 1px solid var(--rp-linea);
+  color: var(--rp-gris);
+  font-size: 7.5pt;
+  break-inside: avoid;
+}
+
+.rp-pie p {
+  margin: 0;
+}
