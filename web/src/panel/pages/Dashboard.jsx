@@ -291,7 +291,9 @@ function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilt
 
 function DashboardWorkspace({ playersService, overviewService, renderEvolution, organizacion }) {
   const players = usePlayers(playersService)
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(
+    () => new URLSearchParams(window.location.search).get('jugador') ?? '',
+  )
   const [period, setPeriod] = useState('all')
   const [exportando, setExportando] = useState(false)
   const terminarPdf = useCallback(() => setExportando(false), [])

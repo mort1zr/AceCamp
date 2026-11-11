@@ -35,6 +35,7 @@ function usePropsPanel() {
     storage,
     auth,
     session,
+    nombre: profile?.displayName ?? '',
     uploadVideo,
     importVideo,
     maxBytes: MAX_VIDEO_BYTES,
