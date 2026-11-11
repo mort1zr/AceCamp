@@ -8,15 +8,13 @@ from camera import CutDetector, main_camera_frames, segments
 from config import config_from_args, resolve_path
 from court import CourtTracker
 from court_line_detector import CourtLineDetector
-from events import detect_bounce_events, detect_hits, detect_points, detect_serves, locate_bounces
+from events.serve_pose import POSE_WINDOW_FRAMES, PoseServeVerifier, filter_serves_by_pose, read_frames
 from mini_court import MiniCourt
-from stats import (
-    add_serve_and_rally_stats,
-    build_frame_states,
-    build_model_statistics,
-    measure_shots,
-    renumber_far_near,
-)
+from pipeline_analysis import analyze_detections
+from report import build_report, draw_scoreboard, scoreboard_states, serve_states, write_report
+from report.heatmap import write_heatmaps
+from report.html_report import write_html
+from stats import build_frame_states
 from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
 from utils import VideoWriter, get_video_info, iter_frames
 from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
@@ -24,12 +22,26 @@ from utils.player_stats_drawer_utils import StatsBox
 from utils.progress import report_progress
 
 MINI_COURT_BOUNCES = 6  # botes que se ven a la vez en la mini-pista
+# Color (BGR) de cada bote en el vídeo según su cantada (TA-24).
+CALL_COLORS = {"dentro": (0, 200, 0), "fuera": (0, 0, 255), "dudoso": (0, 215, 255)}
 
 
 # Con ball_image_size "auto", los vídeos más estrechos que esto se analizan ampliados a
 # AUTO_BALL_IMAGE_SIZE para buscar la pelota (en 640x360 mide 2-3 px y el detector la pierde).
 AUTO_SMALL_VIDEO_WIDTH = 1280
 AUTO_BALL_IMAGE_SIZE = 1280
+
+
+def draw_out_banner(frame, scale):
+    """Cartel «OUT» rojo arriba en el centro del fotograma (TA-25)."""
+    text, font = "OUT", cv2.FONT_HERSHEY_DUPLEX
+    size, thickness = 2.2 * scale, max(2, int(round(5 * scale)))
+    (w, h), _ = cv2.getTextSize(text, font, size, thickness)
+    x, y = (frame.shape[1] - w) // 2, int(40 * scale) + h
+    pad = int(12 * scale)
+    cv2.rectangle(frame, (x - pad, y - h - pad), (x + w + pad, y + pad), (0, 0, 180), -1)
+    cv2.putText(frame, text, (x, y), font, size, (255, 255, 255), thickness, cv2.LINE_AA)
+    return frame
 
 
 def resolve_ball_image_size(setting, video_width):
@@ -88,6 +100,22 @@ def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tra
     return result
 
 
+def pose_serve_filter(config, video_path, player_detections):
+    """Filtro de saques con pose (TA-19) si serves.pose_model está configurado; si no, None."""
+    model = config.get("serves", {}).get("pose_model")
+    if not model:
+        return None
+    verifier = PoseServeVerifier(str(resolve_path(model)), device=config["detection"]["device"])
+
+    def apply(serves):
+        numbers = [i for s in serves for i in range(s["frame"] - POSE_WINDOW_FRAMES, s["frame"] + POSE_WINDOW_FRAMES + 1)]
+        kept = filter_serves_by_pose(serves, player_detections, verifier, read_frames(video_path, numbers))
+        print(f"Pose (TA-19): {len(kept)}/{len(serves)} saques confirmados")
+        return kept
+
+    return apply
+
+
 def run_pipeline(config, render=True):
     """Analiza el vídeo de config["paths"]["input"].
 
@@ -101,6 +129,10 @@ def run_pipeline(config, render=True):
     if not input_video_path.exists():
         raise FileNotFoundError(f"No existe el vídeo de entrada: {input_video_path}")
     video_info = get_video_info(input_video_path)
+    min_resolution = config.get("worker", {}).get("min_resolution", 720)
+    if min(video_info.width, video_info.height) < min_resolution:
+        print(f"AVISO: el vídeo es de {video_info.width}x{video_info.height}. El modelo está optimizado para "
+              f"{min_resolution}p y 1080p; con menos resolución los resultados no son fiables.")
     video_hash = file_sha256(input_video_path)
     cache_dir = resolve_path(paths["cache_dir"])
 
@@ -181,40 +213,15 @@ def run_pipeline(config, render=True):
     # La selección interpola las cajas en los huecos; fuera de la cámara principal no hay jugadores.
     player_detections = [d if main else {} for d, main in zip(player_detections, main_camera)]
 
-    # Posiciones en metros sobre la pista
-    player_court_positions, ball_court_positions = MiniCourt.court_positions(player_detections,
-                                                                             ball_detections,
-                                                                             homography)
-
-    # Golpes (TA-22a) y saques (TA-18). Los saques se detectan por el lanzamiento y cuentan como
-    # golpes para los botes: si no, el raquetazo del saque parece un bote.
-    hits = detect_hits(ball_detections, player_detections, homography, video_info.fps)
-    serves = detect_serves(ball_detections, player_detections, homography, video_info.fps,
-                           main_camera=main_camera, hits=hits)
-    all_hits = sorted(set(hits) | {s["frame"] for s in serves})
-
-    # Botes (TA-22a) y su posición en la pista, en metros y con incertidumbre (TA-23).
-    bounces = detect_bounce_events(ball_detections, player_detections, homography, video_info.fps,
-                                   main_camera=main_camera, hits=all_hits)
-    bounces = locate_bounces(bounces, ball_detections, homography, video_info.fps, hits=all_hits,
-                             court_keypoints=court_keypoints)
-
-    # División en puntos (TA-17).
-    points = detect_points(ball_detections, player_detections, hits, bounces, video_info.fps,
-                           main_camera=main_camera, serves=serves)
-
-    # Golpes para las velocidades: los del detector de golpes (TA-22a) y los saques. El contador
-    # original (get_ball_shot_frames) contaba en fotogramas fijos y a 50 fps daba golpes falsos
-    # muy seguidos, con velocidades imposibles.
-    shots = measure_shots(all_hits, ball_detections, player_detections, player_court_positions,
-                          video_info.fps, main_camera=main_camera, hitters={s["frame"]: s["player"] for s in serves})
-
-    stats_shots, stats_positions = renumber_far_near(shots, player_court_positions)
-    model_statistics = build_model_statistics(stats_shots, stats_positions, video_info.fps, num_frames)
-    add_serve_and_rally_stats(model_statistics, points)
+    analysis = analyze_detections(ball_detections, player_detections, court_keypoints, homography, main_camera,
+                                  video_info.fps, config,
+                                  serve_filter=pose_serve_filter(config, input_video_path, player_detections))
+    shots, bounces, serves, points = analysis["shots"], analysis["bounces"], analysis["serves"], analysis["points"]
+    player_court_positions = analysis["player_court_positions"]
+    ball_court_positions = analysis["ball_court_positions"]
     result = {
-        "model_statistics": model_statistics,
-        "shots": stats_shots,
+        "model_statistics": analysis["model_statistics"],
+        "shots": analysis["stats_shots"],
         "output_video": None,
         # Datos intermedios: los usa el pre-etiquetado del set de validación (python -m eval.prelabel).
         "video_info": video_info,
@@ -227,18 +234,26 @@ def run_pipeline(config, render=True):
         "serves": serves,
         "points": points,
         "main_camera_segments": main_segments,
+        # Informe del partido (TA-30): lo escribe main() en --report-dir.
+        "report": build_report(analysis, video_info.fps, video=input_video_path.name),
+        "positions": analysis["positions"],
     }
     if not render:
         return result
 
     # Estadísticas de cada fotograma para el overlay (sin "nan": lo que aún no se mide es None)
     frame_states = build_frame_states(shots, num_frames)
+    # Marcador de cada fotograma (TA-30): el mismo que el informe.
+    score_states = scoreboard_states(points, num_frames)
+    serve_counts = serve_states(points, num_frames)  # saques acumulados para la caja (TA-21)
 
     # Segunda pasada: se vuelve a leer el vídeo y cada fotograma se dibuja y se escribe al momento.
     output_video_path = resolve_path(paths["output"])
     output_video_path.parent.mkdir(parents=True, exist_ok=True)
     mini_court = stats_box = None
     bounce_marker_frames = max(1, int(round(0.5 * video_info.fps)))
+    winner_label_frames = max(1, int(round(1.5 * video_info.fps)))
+    out_banner_frames = max(1, int(round(1.0 * video_info.fps)))
     with VideoWriter(output_video_path, fps=video_info.fps) as out:
         for i, frame in enumerate(iter_frames(input_video_path)):
             if i >= num_frames:
@@ -257,13 +272,30 @@ def run_pipeline(config, render=True):
             frame = mini_court.draw_frame(frame, player_court_positions[i], ball_court_positions[i])
             # Los últimos botes, en su posición de la pista (TA-23).
             recent = [b for b in bounces if b["frame"] <= i][-MINI_COURT_BOUNCES:]
-            frame = mini_court.draw_bounces(frame, [(b["x_m"], b["y_m"]) for b in recent])
+            # En la mini-pista, cada bote con el color de su cantada (TA-25).
+            frame = mini_court.draw_bounces(frame, [(b["x_m"], b["y_m"]) for b in recent],
+                                            colors=[CALL_COLORS.get(b.get("call"), (255, 0, 255)) for b in recent])
+            # Cartel OUT durante 1 s cuando un bote cae fuera (TA-25).
+            if any(b.get("call") == "fuera" and 0 <= i - b["frame"] < out_banner_frames for b in bounces):
+                draw_out_banner(frame, text_scale)
             for bounce in bounces:  # marca cada bote durante medio segundo
                 if 0 <= i - bounce["frame"] < bounce_marker_frames:
                     center = (int(bounce["x_px"]), int(bounce["y_px"]))
-                    cv2.circle(frame, center, int(18 * text_scale), (255, 0, 255), max(1, int(round(3 * text_scale))))
-                    cv2.putText(frame, "BOTE", (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.7 * text_scale, (255, 0, 255), max(1, int(round(2 * text_scale))))
+                    color = CALL_COLORS.get(bounce.get("call"), (255, 0, 255))
+                    label = f"BOTE {bounce['call'].upper()}" if bounce.get("call") else "BOTE"
+                    cv2.circle(frame, center, int(18 * text_scale), color, max(1, int(round(3 * text_scale))))
+                    cv2.putText(frame, label, (center[0] + int(22 * text_scale), center[1]), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7 * text_scale, color, max(1, int(round(2 * text_scale))))
+            # Velocidad del saque desde que bota, durante 1,5 s (TA-20). Es la velocidad media entre el
+            # golpe y el bote, no la máxima de un radar: se indica en el texto.
+            serve_speed = next((a for p in points for a in p["serve_attempts"] if a.get("speedKmh")
+                                and a.get("bounce_frame") is not None
+                                and 0 <= i - a["bounce_frame"] < winner_label_frames), None)
+            if serve_speed is not None:
+                cv2.putText(frame, f"Saque J{serve_speed['player']}: {serve_speed['speedKmh']:.0f} km/h "
+                            f"(media hasta el bote)", (int(10 * text_scale), int(150 * text_scale)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 255, 255),
+                            max(1, int(round(2 * text_scale))))
             for serve in serves:  # marca cada saque durante medio segundo, sobre el sacador
                 if 0 <= i - serve["frame"] < bounce_marker_frames and serve["player"] in player_detections[i]:
                     x1, y1, x2, _ = player_detections[i][serve["player"]]
@@ -274,7 +306,15 @@ def run_pipeline(config, render=True):
             if current is not None:
                 cv2.putText(frame, f"Punto {current}", (int(10 * text_scale), int(110 * text_scale)),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale, (0, 255, 255), max(1, int(round(2 * text_scale))))
-            frame = stats_box.draw(frame, frame_states[i])
+            # Al acabar cada punto, durante 1,5 s: quién lo ganó, por qué y con qué confianza (TA-28).
+            ended = next((k for k, p in enumerate(points, start=1) if 0 < i - p["end"] <= winner_label_frames), None)
+            if ended is not None and points[ended - 1]["winner"] is not None:
+                p = points[ended - 1]
+                cv2.putText(frame, f"Punto {ended}: gana J{p['winner']} ({p['win_reason']}, confianza {p['confidence_level']})",
+                            (int(10 * text_scale), int(110 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX, 0.8 * text_scale,
+                            (0, 255, 255), max(1, int(round(2 * text_scale))))
+            frame = stats_box.draw(frame, frame_states[i], serve_counts[i])
+            frame = draw_scoreboard(frame, score_states[i])
             cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
                         text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))
             out.write(frame)
@@ -301,6 +341,17 @@ def main(argv=None):
         stats_path.parent.mkdir(parents=True, exist_ok=True)
         stats_path.write_text(json.dumps(result["model_statistics"], indent=2, ensure_ascii=False))
         print(f"Estadísticas guardadas en {stats_path}")
+    report_dir = write_report(result["report"], resolve_path(config["paths"]["report_dir"]),
+                              positions=result["positions"])
+    print(f"Informe del partido en {report_dir} (report.json, points.csv, bounces.csv, positions.csv)")
+    # Mapas de calor de cada jugador (TA-33) del partido y de cada set (TA-34; con --heatmap-set N,
+    # solo de ese set), con escala de color común, y el informe HTML con selector de jugador y set.
+    sets = sorted({row["set"] for row in result["positions"]})
+    if config.get("heatmap_set") is not None:
+        sets = [int(config["heatmap_set"])]
+    maps = write_heatmaps(result["positions"], result["video_info"].fps, report_dir, sets=sets)
+    print(f"Mapas de calor: {', '.join(sorted(maps))}")
+    print(f"Informe HTML: {write_html(result['report'], maps, report_dir)}")
     return result
 
 

@@ -5,6 +5,8 @@ paths:
   input: input_videos/input_video.mp4
   output: output_videos/output_video.avi
   cache_dir: cache
+  # Informe del partido (TA-30): report.json y points.csv. Se escribe en cada ejecución.
+  report_dir: output_videos/informe
 
 models:
   # Detector de jugadores (los descarga scripts/download_models.py). Con el vídeo de ejemplo en CPU,
@@ -50,6 +52,48 @@ cameras:
   # Cuánto puede desplazarse la pista respecto a su posición habitual (fracción del ancho del
   # fotograma) para seguir contando como cámara principal.
   max_shift_fraction: 0.08
+
+line_calls:
+  # Dentro, fuera o dudoso de cada bote (TA-24). Un bote a menos de este margen de una línea
+  # (por dentro o por fuera) es dudoso: la posición no basta para decidir. En un saque, un
+  # dudoso no cuenta como falta.
+  doubt_margin_m: 0.15
+  # Comparar los botes del peloteo con la pista de dobles (true) o la de individuales (false).
+  doubles: false
+
+bounces:
+  # Detector de botes: rules (TA-22a, por defecto) o trained (clasificador de TA-22b, entrenado con
+  # peloteos simulados: python training/train_bounce_classifier.py). Con los botes marcados a mano,
+  # el entrenado no mejora a las reglas (ver README del modelo): queda como alternativa.
+  detector: rules
+  classifier: models/bounce_classifier.json
+
+serves:
+  # Refuerzo del saque con pose (TA-19): models/yolov8m-pose.pt (python scripts/download_models.py --pose)
+  # descarta los saques en que el sacador no levanta la muñeca por encima de la cabeza. null = sin pose.
+  # Compara con y sin pose: python scripts/compare_serve_pose.py --input ... --labels ...
+  pose_model: null
+
+rallies:
+  # Peloteos (TA-35, TA-36), contando el saque: corto hasta short_max golpes, medio hasta
+  # medium_max y largo a partir de ahí.
+  short_max: 4
+  medium_max: 8
+
+match:
+  # Cómo empieza el partido (TA-29). Se puede sobrescribir con --match-config match.yaml.
+  # Sacador del primer punto del vídeo: 1 (fondo lejano), 2 (cercano) o auto (el que detecta el modelo).
+  first_server: auto
+  best_of: 3
+  games_per_set: 6
+  tiebreak_points: 7
+  match_tiebreak_points: 10
+  no_ad: false
+  # Último set: tiebreak (a 7), advantage (sin tie-break) o match_tiebreak (super tie-break a 10).
+  final_set: tiebreak
+  # Marcador al empezar el vídeo, si empieza a mitad de partido. Ejemplo:
+  #   initial_score: {sets: [[6, 4]], games: [2, 1], points: ["30", "15"], server: 1}
+  initial_score: null
 
 worker:
   # Duración máxima del vídeo que acepta el worker, en segundos. Los más largos pasan a

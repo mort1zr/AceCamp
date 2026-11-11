@@ -109,13 +109,21 @@ class MiniCourt:
             cv2.circle(frame, self.meters_to_mini(position), self.point_radius, color, -1)
         return frame
 
-    def draw_bounces(self, frame, positions_m, color=(255, 0, 255)):
-        """Marca botes (x_m, y_m) en la mini-pista con una cruz; el último, más grande."""
+    def draw_bounces(self, frame, positions_m, color=(255, 0, 255), colors=None):
+        """Marca botes (x_m, y_m) en la mini-pista con una cruz; el último, más grande.
+
+        colors: un color por bote (p. ej., según su cantada, TA-25); si no, todos en color.
+        """
         for k, position in enumerate(positions_m):
+            color_k = colors[k] if colors is not None else color
             x, y = self.meters_to_mini(position)
             size = self.point_radius + (2 if k == len(positions_m) - 1 else 0)
-            cv2.line(frame, (x - size, y - size), (x + size, y + size), color, self.line_thickness)
-            cv2.line(frame, (x - size, y + size), (x + size, y - size), color, self.line_thickness)
+            if colors is not None:  # círculo relleno con borde oscuro: se ve sobre el fondo claro
+                cv2.circle(frame, (x, y), size + 1, color_k, -1, cv2.LINE_AA)
+                cv2.circle(frame, (x, y), size + 1, (40, 40, 40), 1, cv2.LINE_AA)
+                continue
+            cv2.line(frame, (x - size, y - size), (x + size, y + size), color_k, self.line_thickness)
+            cv2.line(frame, (x - size, y + size), (x + size, y - size), color_k, self.line_thickness)
         return frame
 
     def draw_frame(self, frame, player_positions, ball_positions):

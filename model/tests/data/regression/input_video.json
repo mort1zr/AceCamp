@@ -1,0 +1,143 @@
+{
+ "hits": [
+  10,
+  56,
+  94,
+  129,
+  182
+ ],
+ "serves": [],
+ "bounces": [
+  {
+   "frame": 46,
+   "x_m": 5.32,
+   "y_m": 0.97,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 81,
+   "x_m": 3.04,
+   "y_m": 19.66,
+   "call": "dentro",
+   "inferred": true
+  },
+  {
+   "frame": 117,
+   "x_m": 1.78,
+   "y_m": 3.27,
+   "call": "dentro",
+   "inferred": false
+  },
+  {
+   "frame": 166,
+   "x_m": 7.25,
+   "y_m": 17.18,
+   "call": "dentro",
+   "inferred": true
+  },
+  {
+   "frame": 205,
+   "x_m": 8.9,
+   "y_m": 1.12,
+   "call": "dentro",
+   "inferred": true
+  }
+ ],
+ "points": [
+  {
+   "start": 1,
+   "end": 213,
+   "server": 2,
+   "shots": 5,
+   "end_reason": "sin pelota",
+   "winner": 2,
+   "win_reason": "no devuelta",
+   "confidence_level": "media"
+  }
+ ],
+ "statistics": {
+  "schemaVersion": "acecam.model-stats.v1",
+  "durationSeconds": 7.1,
+  "players": {
+   "1": {
+    "shots": {
+     "count": 1,
+     "sumSpeedKmh": 79.9,
+     "maxSpeedKmh": 79.9
+    },
+    "movement": {
+     "distanceMeters": 16.9,
+     "avgSpeedKmh": 8.9,
+     "maxSpeedKmh": 16.9
+    },
+    "serve": {
+     "count": 0,
+     "fromRight": 0,
+     "fromLeft": 0,
+     "sumSpeedKmh": 0.0,
+     "sampleCount": 0
+    }
+   },
+   "2": {
+    "shots": {
+     "count": 2,
+     "sumSpeedKmh": 153.8,
+     "maxSpeedKmh": 89.9
+    },
+    "movement": {
+     "distanceMeters": 15.0,
+     "avgSpeedKmh": 7.9,
+     "maxSpeedKmh": 10.8
+    },
+    "serve": {
+     "count": 0,
+     "fromRight": 0,
+     "fromLeft": 0,
+     "sumSpeedKmh": 0.0,
+     "sampleCount": 0
+    }
+   }
+  },
+  "rallies": {
+   "count": 1,
+   "sumShots": 5,
+   "longestShots": 5,
+   "short": 0,
+   "medium": 1,
+   "long": 0
+  },
+  "bounces": {
+   "count": 5,
+   "in": 5,
+   "out": 0,
+   "doubtful": 0
+  },
+  "points": {
+   "count": 1,
+   "won": {
+    "1": 0,
+    "2": 1
+   },
+   "lowConfidence": 0,
+   "corrected": 0,
+   "toReview": []
+  },
+  "score": {
+   "text": "0-0 0-15",
+   "sets": [],
+   "tiebreaks": [],
+   "games": [
+    0,
+    0
+   ],
+   "points": [
+    "0",
+    "15"
+   ],
+   "in_tiebreak": false,
+   "server": 2,
+   "winner": null
+  }
+ }
+}

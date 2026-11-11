@@ -19,6 +19,7 @@ def dm(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "DRIVE_FILES", {"models/a.pt": "id-a"})
     monkeypatch.setattr(module, "URL_FILES", {"models/b.pt": "https://example.test/b.pt"})
     monkeypatch.setattr(module, "TRACKNET_FILES", {})
+    monkeypatch.setattr(module, "POSE_FILES", {})
     monkeypatch.setattr(module, "SAMPLE_VIDEO", {})
     return module
 
@@ -38,7 +39,7 @@ def test_known_hashes_are_valid_hex(dm):
     spec = importlib.util.spec_from_file_location("real", SCRIPT)
     real = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(real)
-    files = {**real.DRIVE_FILES, **real.URL_FILES, **real.TRACKNET_FILES, **real.SAMPLE_VIDEO}
+    files = {**real.DRIVE_FILES, **real.URL_FILES, **real.TRACKNET_FILES, **real.POSE_FILES, **real.SAMPLE_VIDEO}
     assert set(real.EXPECTED_SHA256) == set(files)  # cada archivo descargable tiene su entrada
     for value in real.EXPECTED_SHA256.values():
         assert value is None or (len(value) == 64 and int(value, 16) >= 0)

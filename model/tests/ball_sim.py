@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from court import COURT_KEYPOINTS_M, COURT_LENGTH, DOUBLES_WIDTH, NET_Y, CourtHomography
+from court.court_model import ALLEY_WIDTH
 
 G = 9.81
 RESTITUTION = 0.72  # velocidad vertical que conserva la pelota al botar
@@ -54,8 +55,15 @@ class Rally:
     shots: list = field(default_factory=list)  # [{"frame", "player"}]
 
 
-def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derecha", serve_fault=False):
-    """Peloteo entre el jugador 1 (fondo lejano) y el 2 (fondo cercano). Empieza golpeando el 2."""
+def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derecha", serve_fault=False,
+                   last_out=False, last_net=False):
+    """Peloteo entre el jugador 1 (fondo lejano) y el 2 (fondo cercano). Empieza golpeando el 2.
+
+    last_out: el último golpe bota fuera de la pista de individuales (por un lado o largo), a
+    0,4-2 m de la línea.
+    last_net: el último golpe se queda en la red: cae y bota en el lado de quien golpeó, a 0,5-2 m
+    de la red.
+    """
     rng = np.random.default_rng(seed)
     dt_sub = 1.0 / (fps * 20)
     t, frame_t = 0.0, 0.0
@@ -86,6 +94,23 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
             target = np.array([rng.uniform(1.5, 9.5), rng.uniform(1.0, NET_Y - 2.0)])
         else:
             target = np.array([rng.uniform(1.5, 9.5), rng.uniform(NET_Y + 2.0, COURT_LENGTH - 1.0)])
+        if shot_index < num_shots - 1 and not (serve and shot_index == 0):
+            # Una pelota que se devuelve cae al alcance del receptor (hasta ~3 m a cada lado): en un
+            # partido real nadie golpea una pelota a la que no llega. El último golpe no se limita.
+            reach = players[receiver][0]
+            target[0] = float(np.clip(target[0], max(1.5, reach - 3.0), min(9.5, reach + 3.0)))
+        if last_out and shot_index == num_shots - 1:
+            miss = rng.uniform(0.4, 2.0)
+            kind = rng.integers(3)
+            if kind == 0:  # ancha por la izquierda
+                target[0] = ALLEY_WIDTH - miss
+            elif kind == 1:  # ancha por la derecha
+                target[0] = DOUBLES_WIDTH - ALLEY_WIDTH + miss
+            else:  # larga
+                target[1] = -miss if receiver == 1 else COURT_LENGTH + miss
+        if last_net and shot_index == num_shots - 1:
+            short = rng.uniform(0.5, 2.0)
+            target[1] = NET_Y + short if hitter == 2 else NET_Y - short
         flight = rng.uniform(0.55, 0.9) if not (serve and shot_index == 0) else 0.55
         vel = np.array([(target[0] - pos[0]) / flight, (target[1] - pos[1]) / flight,
                         (0.5 * G * flight ** 2 - pos[2]) / flight])
@@ -125,6 +150,7 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
             last_shot = shot_index == num_shots - 1
             if bounced and t - first_bounce_t > 0.2 and (reached or falling_low) and not last_shot:
                 players[receiver][1] = pos[1] + (-0.5 if receiver == 1 else 0.5)
+                players[receiver][0] = pos[0] - 0.6  # la golpea a un brazo de distancia
                 break
             if last_shot and bounced and t - first_bounce_t > 0.5:
                 break  # el último golpe es un ganador: se sigue 0,5 s tras su bote
@@ -134,8 +160,13 @@ def simulate_rally(num_shots=6, fps=30.0, seed=0, serve=False, serve_side="derec
     return rally
 
 
-def render_detections(rally, camera, noise_px=1.5, miss_rate=0.03, seed=0):
-    """Cajas de pelota y jugadores por fotograma, como las devuelve el pipeline."""
+def render_detections(rally, camera, noise_px=1.5, miss_rate=0.03, seed=0, occlusion_rate=0.0):
+    """Cajas de pelota y jugadores por fotograma, como las devuelve el pipeline.
+
+    Una pelota fuera del encuadre no se detecta. occlusion_rate: probabilidad de perder la pelota
+    en cada fotograma en que está delante de un jugador (en vídeo real el detector la pierde a
+    menudo cuando se solapa con el jugador, justo en el golpe).
+    """
     rng = np.random.default_rng(seed + 100)
     ball, players = [], []
     for ball_3d, players_m in zip(rally.ball_3d, rally.players_m):
@@ -150,6 +181,13 @@ def render_detections(rally, camera, noise_px=1.5, miss_rate=0.03, seed=0):
             ball.append({})
             continue
         cx, cy = camera.project(ball_3d)[0] + rng.normal(0, noise_px, 2)
+        if not (0 <= cx < camera.width and 0 <= cy < camera.height):
+            ball.append({})
+            continue
+        if occlusion_rate and any(x1 <= cx <= x2 and y1 <= cy <= y2 for x1, y1, x2, y2 in frame_players.values()) \
+                and rng.random() < occlusion_rate:
+            ball.append({})
+            continue
         ball.append({1: [cx - 6, cy - 6, cx + 6, cy + 6]})
     return ball, players
 
@@ -162,7 +200,7 @@ class Match:
     bounces: list = field(default_factory=list)
     shots: list = field(default_factory=list)
     serves: list = field(default_factory=list)  # [{"frame", "player", "side"}]
-    points: list = field(default_factory=list)  # [{"start", "end", "server"}]
+    points: list = field(default_factory=list)  # [{"start", "end", "server", "winner", "how"}]
 
 
 def _mirror(rally):
@@ -176,7 +214,8 @@ def _mirror(rally):
     return rally
 
 
-def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=()):
+def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=(), out_points=(),
+                   double_fault_points=(), net_points=()):
     """Varios puntos seguidos: pausa sin pelota, lanzamiento del saque y peloteo.
 
     Saca el jugador 2 dos puntos y luego el 1 otros dos, desde la derecha y la izquierda
@@ -184,6 +223,12 @@ def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=())
     inicio de cada punto es el primer fotograma del lanzamiento de la pelota; el fin,
     el último fotograma con la pelota en juego. En los puntos de fault_points el primer
     saque es falta (bota largo) y, tras una pausa, viene el segundo saque.
+
+    Cada punto lleva su ganador real (winner) y cómo acabó (how):
+    - "ganador": el último golpe bota dentro y el rival no llega (gana quien lo dio);
+    - "fuera": en out_points el último golpe bota fuera (gana el rival de quien lo dio);
+    - "doble falta": en double_fault_points los dos saques son falta (gana el receptor);
+    - "red": en net_points el último golpe se queda en la red (gana el rival de quien lo dio).
     """
     rng = np.random.default_rng(seed + 1000)
     match = Match(fps, [], [])
@@ -192,20 +237,34 @@ def simulate_match(num_points=4, fps=30.0, seed=0, max_shots=8, fault_points=())
         serve_side = "derecha" if point % 2 == 0 else "izquierda"
         pause = int(rng.uniform(3.0, 7.0) * fps)
         point_start = None
-        if point in fault_points:
+        if point in fault_points or point in double_fault_points:
             fault = simulate_rally(1, fps=fps, seed=seed * 100 + point + 50, serve=True, serve_side=serve_side,
                                    serve_fault=True)
             if server == 1:
                 fault = _mirror(fault)
             point_start = _append_serve(match, fault, server, serve_side, pause, fps, fault=True)
             pause = int(rng.uniform(3.0, 5.0) * fps)
-        rally = simulate_rally(int(rng.integers(1, max_shots + 1)), fps=fps, seed=seed * 100 + point, serve=True,
-                               serve_side=serve_side)
-        if server == 1:
-            rally = _mirror(rally)
-        start = _append_serve(match, rally, server, serve_side, pause, fps, fault=False)
+        receiver = 1 if server == 2 else 2
+        if point in double_fault_points:
+            second = simulate_rally(1, fps=fps, seed=seed * 100 + point + 70, serve=True, serve_side=serve_side,
+                                    serve_fault=True)
+            if server == 1:
+                second = _mirror(second)
+            start = _append_serve(match, second, server, serve_side, pause, fps, fault=True)
+            winner, how = receiver, "doble falta"
+        else:
+            out, net = point in out_points, point in net_points
+            # Un golpe fuera o a la red necesita al menos el saque y un resto (si no, sería una falta).
+            shots = int(rng.integers(2 if out or net else 1, max_shots + 1))
+            rally = simulate_rally(shots, fps=fps, seed=seed * 100 + point, serve=True, serve_side=serve_side,
+                                   last_out=out, last_net=net)
+            if server == 1:
+                rally = _mirror(rally)
+            start = _append_serve(match, rally, server, serve_side, pause, fps, fault=False)
+            last = rally.shots[-1]["player"]
+            winner, how = (3 - last, "fuera") if out else (3 - last, "red") if net else (last, "ganador")
         match.points.append({"start": start if point_start is None else point_start,
-                             "end": len(match.ball_3d) - 1, "server": server})
+                             "end": len(match.ball_3d) - 1, "server": server, "winner": winner, "how": how})
     for _ in range(int(2 * fps)):
         match.ball_3d.append(None)
         match.players_m.append(match.players_m[-1])

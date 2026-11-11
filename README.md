@@ -22,6 +22,7 @@ entorno Python se descargan en cada PC; no están incluidos en Git.
 
 ## Documentación
 
+- [Modelo de análisis: uso, informe, métricas y limitaciones](model/README.md).
 - [Frontend e integración con Firebase](web/README.md).
 - [Contrato de datos](docs/firestore-schema.md).
 - [Permisos por rol](docs/PCIT-39-permisos-por-rol.md).
