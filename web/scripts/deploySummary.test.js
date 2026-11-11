@@ -17,9 +17,16 @@ describe('resumen del despliegue (PCIT-200)', () => {
   })
 
   it('muestra qué paso falló y los que no llegaron a correr', () => {
-    const texto = deploySummary({ ...produccion, CHECK_OUTCOME: 'failure', RULES_OUTCOME: 'skipped' })
+    const texto = deploySummary({ ...produccion, RULES_OUTCOME: 'failure', CHECK_OUTCOME: 'skipped' })
+    expect(texto).toContain('| Reglas e índices de Firestore | ❌ Falló |')
+    expect(texto).toContain('| Comprobación de la web en vivo | ⏭️ No se ejecutó |')
+  })
+
+  it('las filas siguen el orden del workflow: reglas antes de la comprobación', () => {
+    const texto = deploySummary({ ...produccion, CHECK_OUTCOME: 'failure' })
+    expect(texto).toContain('| Reglas e índices de Firestore | ✅ Bien |')
     expect(texto).toContain('| Comprobación de la web en vivo | ❌ Falló |')
-    expect(texto).toContain('| Reglas e índices de Firestore | ⏭️ No se ejecutó |')
+    expect(texto.indexOf('Reglas e índices')).toBeLessThan(texto.indexOf('Comprobación de la web'))
   })
 
   it('vista previa de una PR: su URL y sin pasos de producción', () => {

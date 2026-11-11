@@ -24,8 +24,8 @@ export function deploySummary(env) {
   ]
   if (produccion) {
     filas.push(
-      ['Comprobación de la web en vivo', estado(env.CHECK_OUTCOME)],
       ['Reglas e índices de Firestore', estado(env.RULES_OUTCOME)],
+      ['Comprobación de la web en vivo', estado(env.CHECK_OUTCOME)],
       ['Reglas de Storage', env.DEPLOY_STORAGE_RULES === 'true'
         ? estado(env.RULES_OUTCOME)
         : '⏭️ Omitidas (requieren el plan Blaze; ver docs/devsecops.md)'],

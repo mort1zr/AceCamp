@@ -13,8 +13,8 @@ La web de AceCam se publica sola desde GitHub Actions en
 | 4 | Merge en `main` | GitHub | Revisión aprobada por @mort1zr cuando toca `.github/` o `firebase/`. |
 | 5 | Build de producción | `deploy-web.yml` | Inyecta la versión (`ACECAM_VERSION` = commit) en `<meta name="acecam-version">` (PCIT-198). |
 | 6 | Publicar en Hosting | `deploy-web.yml` | Sube `web/dist` al canal `live`. |
-| 7 | Comprobar la web en vivo | `scripts/checkDeploy.mjs` | Descarga la web publicada hasta 6 veces y exige que su versión sea el commit desplegado (PCIT-199). |
-| 8 | Reglas e índices | `deploy-web.yml` | Publica `firestore.rules` y los índices. Storage solo con `DEPLOY_STORAGE_RULES=true`. |
+| 7 | Reglas e índices | `deploy-web.yml` | Publica `firestore.rules` y los índices. Storage solo con `DEPLOY_STORAGE_RULES=true`. |
+| 8 | Comprobar la web en vivo | `scripts/checkDeploy.mjs` | Descarga la web publicada hasta 6 veces y exige que su versión sea el commit desplegado (PCIT-199). Va después de las reglas para que un fallo aquí no deje la web nueva con las reglas viejas. |
 | 9 | Resumen | `scripts/deploySummary.mjs` | Tabla en la página del run con la URL, la versión y el resultado de cada paso, también si algo falla (PCIT-200). |
 
 ## Qué versión está publicada

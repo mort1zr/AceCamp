@@ -14,7 +14,7 @@ La web está publicada en **https://acecam-e93a2.web.app** (Firebase Hosting).
 | --- | --- |
 | 1. Rama de trabajo | El equipo desarrolla en ramas como `panel_web/conexiones`. |
 | 2. Pull request a `main` | La CI de la web corre lint, pruebas, build, CSP y reglas. El despliegue publica una **URL de vista previa** (dura 7 días) y la deja como comentario en la PR. |
-| 3. Merge en `main` | Se publica en Hosting, se comprueba que la web en vivo sirve la versión del commit y se publican las reglas e índices de Firestore. |
+| 3. Merge en `main` | Se publica en Hosting, se publican las reglas e índices de Firestore y se comprueba que la web en vivo sirve la versión del commit. |
 | 4. Resumen | La página del run en GitHub Actions muestra una tabla con la URL, la versión y el resultado de cada paso. |
 
 Para saber qué versión está publicada, abre la web, mira el código fuente y busca
