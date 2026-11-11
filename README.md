@@ -1,8 +1,24 @@
 # AceCam
 
+[![CI de la web](https://github.com/mort1zr/Proyecto_Carrera_III_Tenis/actions/workflows/web-ci.yml/badge.svg?branch=main)](https://github.com/mort1zr/Proyecto_Carrera_III_Tenis/actions/workflows/web-ci.yml)
+[![Despliegue en Firebase Hosting](https://github.com/mort1zr/Proyecto_Carrera_III_Tenis/actions/workflows/deploy-web.yml/badge.svg?branch=main)](https://github.com/mort1zr/Proyecto_Carrera_III_Tenis/actions/workflows/deploy-web.yml)
+
 Panel para gestionar jugadores, analizar videos de tenis y consultar estadísticas
-y el video procesado. Desarrollo del equipo en `panel_web/conexiones`; integración
-mediante PR hacia `panel_web/base`.
+y el video procesado.
+
+## Producción
+
+La web está publicada en **https://acecam-e93a2.web.app** (Firebase Hosting).
+
+| Paso | Qué pasa |
+| --- | --- |
+| 1. Rama de trabajo | El equipo desarrolla en ramas como `panel_web/conexiones`. |
+| 2. Pull request a `main` | La CI de la web corre lint, pruebas, build, CSP y reglas. El despliegue publica una **URL de vista previa** (dura 7 días) y la deja como comentario en la PR. |
+| 3. Merge en `main` | Se publica en Hosting, se comprueba que la web en vivo sirve la versión del commit y se publican las reglas e índices de Firestore. |
+| 4. Resumen | La página del run en GitHub Actions muestra una tabla con la URL, la versión y el resultado de cada paso. |
+
+Para saber qué versión está publicada, abre la web, mira el código fuente y busca
+`<meta name="acecam-version">`: su valor es el commit del build.
 
 ## Encender el programa
 
