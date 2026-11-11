@@ -188,7 +188,8 @@ const colores = ['bg-series1', 'bg-electric', 'bg-series3', 'bg-accent']
 const tarjeta = 'rounded-card border border-line bg-surface p-5'
 const etiqueta = 'text-xs font-semibold tracking-[0.08em] text-muted uppercase'
 const subtitulo = 'font-display text-[22px] leading-tight font-bold tracking-[0.01em]'
-const enlace = 'text-sm font-semibold text-accent-ink hover:underline'
+const enlace =
+  '-mx-2 -my-3 inline-flex min-h-11 items-center px-2 text-sm font-semibold text-accent-ink hover:underline'
 const boton =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border px-4 text-sm font-semibold whitespace-nowrap transition-colors'
 const botonNormal = `${boton} border-line2 bg-surface2 text-text hover:bg-line`

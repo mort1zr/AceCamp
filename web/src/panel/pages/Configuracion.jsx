@@ -1014,6 +1014,18 @@ function Plan({ t, plan, locale, esOrganizacion }) {
   )
 }
 
+function centrarPestana(boton) {
+  if (!boton) return
+  const centrar = () => {
+    const barra = boton.parentElement
+    if (!barra) return
+    const caja = barra.getBoundingClientRect()
+    const pestana = boton.getBoundingClientRect()
+    barra.scrollLeft += pestana.left - caja.left - (caja.width - pestana.width) / 2
+  }
+  ;(document.fonts?.ready ?? Promise.resolve()).then(() => requestAnimationFrame(centrar))
+}
+
 function Contenido({ seccion, t, datos, service, bloqueado, locale, esOrganizacion }) {
   if (seccion === 'cuenta')
     return <Cuenta t={t} datos={datos?.account} service={service} bloqueado={bloqueado} />
@@ -1087,15 +1099,16 @@ export default function Configuracion({ service: inyectado, db, auth, session })
       <div className="flex flex-wrap items-start gap-5">
         <nav
           aria-label={t.menu}
-          className={`${tarjeta} flex flex-[1_1_220px] flex-col gap-0.5 p-2 max-md:-mx-1 max-md:flex-row max-md:overflow-x-auto max-md:p-1.5 max-md:[scrollbar-width:none] lg:sticky lg:top-24`}
+          className={`${tarjeta} flex flex-[1_1_220px] flex-col gap-0.5 p-2 max-xl:-mx-1 max-xl:basis-full max-xl:flex-row max-xl:overflow-x-auto max-xl:p-1.5 max-xl:[scrollbar-width:none] max-xl:[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] xl:sticky xl:top-24`}
         >
           {visibles.map((clave) => (
             <button
               key={clave}
               type="button"
               aria-current={seccion === clave ? 'page' : undefined}
+              ref={seccion === clave ? centrarPestana : undefined}
               onClick={() => elegir(clave)}
-              className="flex min-h-11 w-full cursor-pointer items-center rounded-[10px] px-3.5 text-left text-[15px] font-semibold whitespace-nowrap text-text2 max-md:w-auto max-md:shrink-0 transition-colors hover:bg-surface2 hover:text-text aria-[current=page]:bg-line aria-[current=page]:text-text"
+              className="flex min-h-11 w-full cursor-pointer items-center rounded-[10px] px-3.5 text-left text-[15px] font-semibold whitespace-nowrap text-text2 max-xl:w-auto max-xl:shrink-0 transition-colors hover:bg-surface2 hover:text-text aria-[current=page]:bg-line aria-[current=page]:text-text"
             >
               {t.pestanas[clave]}
             </button>
