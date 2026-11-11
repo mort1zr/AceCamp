@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { DataTable } from '../ui'
+import MatchStatistics from '../analysis/MatchStatistics.jsx'
 import { playerAge, playersErrorMessage } from '../../lib/players.js'
 import PlayerForm from './PlayerForm.jsx'
 
@@ -64,6 +65,7 @@ export default function PlayerProfile({ service, player, onBack }) {
 
   const age = playerAge(player.birthDate)
   const allowed = service.canViewProfile?.(player)
+  const latestMatch = history?.rows?.[0]
   function closeDelete() {
     setConfirmDelete(false)
     deleteButton.current?.focus()
@@ -122,6 +124,15 @@ export default function PlayerProfile({ service, player, onBack }) {
         <h2>Apoderado</h2>
         {allowed && player.guardian ? <dl><div><dt>Nombre del apoderado</dt><dd>{player.guardian.name || 'Sin datos'}</dd></div><div><dt>Teléfono del apoderado</dt><dd>{player.guardian.phone || 'Sin datos'}</dd></div><div><dt>Correo del apoderado</dt><dd>{player.guardian.email || 'Sin datos'}</dd></div></dl> : <p>Sin apoderado registrado.</p>}
       </section>
+      {latestMatch && (
+        <section className="players-profile-history" aria-labelledby="player-statistics-title">
+          <h2 id="player-statistics-title">Estadísticas del último partido analizado</h2>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted">{dateLabel(latestMatch.matchDate)} · {latestMatch.opponent || 'Rival sin registrar'}</p>
+            <MatchStatistics match={latestMatch} />
+          </div>
+        </section>
+      )}
       <section className="players-profile-history">
         <h2>Partidos analizados</h2>
         <DataTable

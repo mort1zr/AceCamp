@@ -19,7 +19,7 @@ export function TarjetaEstadistica({ label, value, unit, description, comparison
 
 export function TarjetasEstadisticas({ cards }) {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))]">
       {cards.map(({ id, ...card }) => <TarjetaEstadistica key={id} {...card} />)}
     </div>
   )

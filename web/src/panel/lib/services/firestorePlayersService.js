@@ -1,6 +1,7 @@
 import { addDoc, collection, deleteField, doc, getDocFromServer, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
-import { normalizePlayer, PLAYER_CONSENT_VERSION, PLAYER_EDITABLE_FIELDS } from '../players.js'
+import { isValidBirthDate, normalizePlayer, PLAYER_CONSENT_VERSION, PLAYER_EDITABLE_FIELDS } from '../players.js'
 import { COLLECTIONS } from '../schema.js'
+import { reportMetrics } from '../workerDashboardStatistics.js'
 
 /** db and identity come from Axel's authenticated app, never from form fields. */
 export function createFirestorePlayersService({ db, orgId, actorId, role = 'coach', onlyOwned = false, includeDeleted = false }) {
@@ -51,11 +52,18 @@ export function createFirestorePlayersService({ db, orgId, actorId, role = 'coac
       ]
       if (!isAdmin) filters.push(where('createdBy', '==', actorId))
       return onSnapshot(query(collection(db, 'matches'), ...filters), snapshot => {
-        const rows = snapshot.docs.map(document => {
-          const { opponent, matchDate, tournament, result } = document.data()
-          return { id: document.id, opponent, matchDate, tournament, result }
+        const rows = snapshot.docs.flatMap(document => {
+          const match = document.data()
+          if (match.orgId !== orgId || match.playerId !== player.id || match.status !== 'listo'
+            || (!isAdmin && match.createdBy !== actorId)) return []
+          const { opponent, matchDate, tournament, result } = match
+          return [{
+            id: document.id, opponent, tournament, result,
+            matchDate: isValidBirthDate(matchDate) ? matchDate : '',
+            ...reportMetrics(match),
+          }]
         })
-        onMatches(rows.sort((a, b) => (b.matchDate ?? '').localeCompare(a.matchDate ?? '')))
+        onMatches(rows.sort((a, b) => b.matchDate.localeCompare(a.matchDate) || a.id.localeCompare(b.id)))
       }, onError)
     },
     async create(input) {
