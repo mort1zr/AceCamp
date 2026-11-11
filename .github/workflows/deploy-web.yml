@@ -110,6 +110,15 @@ jobs:
           # La misma versión de firebase-tools que web/package-lock.json.
           firebaseToolsVersion: 15.34.2
 
+      # PCIT-199: comprobar que producción responde y sirve el commit recién publicado.
+      # Reintenta unos segundos por la caché del CDN; si no, el despliegue falla.
+      - name: Comprobar la web publicada
+        if: steps.config.outputs.ok == 'true' && github.event_name != 'pull_request'
+        working-directory: web
+        env:
+          EXPECTED_VERSION: ${{ github.sha }}
+        run: node scripts/checkDeploy.mjs "https://${FIREBASE_PROJECT}.web.app/" "$EXPECTED_VERSION"
+
       # Las reglas solo se publican desde main y después de pasar test:rules en la CI.
       # Storage exige el plan Blaze: sus reglas solo se publican con la variable de
       # repositorio DEPLOY_STORAGE_RULES = true. Sin ella (plan Spark) se publican
