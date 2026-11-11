@@ -19,6 +19,7 @@ La web está publicada en **https://acecam-e93a2.web.app** (Firebase Hosting).
 
 Para saber qué versión está publicada, abre la web, mira el código fuente y busca
 `<meta name="acecam-version">`: su valor es el commit del build.
+Detalle y diagnóstico de fallos: [docs/PCIT-55-publicacion-en-hosting.md](docs/PCIT-55-publicacion-en-hosting.md).
 
 ## Encender el programa
 
@@ -41,6 +42,7 @@ entorno Python se descargan en cada PC; no están incluidos en Git.
 - [Modelo de análisis: uso, informe, métricas y limitaciones](model/README.md).
 - [Frontend e integración con Firebase](web/README.md).
 - [Contrato de datos](docs/firestore-schema.md).
+- [Publicación en Firebase Hosting](docs/PCIT-55-publicacion-en-hosting.md) y [DevSecOps](docs/devsecops.md).
 - [Permisos por rol](docs/PCIT-39-permisos-por-rol.md).
 - [Contador y límites de análisis por plan](docs/PCIT-41-limite-de-analisis.md).
 - [Gestión de jugadores](docs/PCIT-42-gestion-completa-jugadores.md).

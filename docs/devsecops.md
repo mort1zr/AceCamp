@@ -76,6 +76,8 @@ En **Settings → Rules → Rulesets → New branch ruleset**:
 
 ## 3. Despliegue en Firebase Hosting
 
+Flujo completo, cómo ver la versión publicada y qué hacer si falla cada paso: [PCIT-55 · Publicación en Firebase Hosting](PCIT-55-publicacion-en-hosting.md).
+
 **Costo:**
 
 - Hosting entra en la cuota gratuita: 10 GB guardados y 360 MB por día de transferencia.
