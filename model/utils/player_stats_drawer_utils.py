@@ -19,7 +19,7 @@ FONT = cv2.FONT_HERSHEY_SIMPLEX
 WHITE = (255, 255, 255)
 
 # Medidas en píxeles para un fotograma de 1080 de alto.
-BOX_WIDTH, BOX_HEIGHT = 350, 230
+BOX_WIDTH, BOX_HEIGHT = 350, 300
 GAP_BELOW_MINI_COURT = 20
 ROWS = (
     ("Vel. golpe", "last_shot_kmh"),
@@ -59,8 +59,11 @@ class StatsBox:
         cv2.putText(frame, text, (self.start_x + int(x * s), self.start_y + int(y * s)), FONT, size * s, WHITE,
                     max(1, int(round(thickness * s))), cv2.LINE_AA)
 
-    def draw(self, frame, state):
-        """Dibuja la caja con el FrameState del fotograma (lo modifica y lo devuelve)."""
+    def draw(self, frame, state, serves=None):
+        """Dibuja la caja con el FrameState del fotograma (lo modifica y lo devuelve).
+
+        serves: saques acumulados de cada jugador hasta este fotograma (report.serve_states, TA-21).
+        """
         overlay = frame.copy()
         cv2.rectangle(overlay, (self.start_x, self.start_y), (self.end_x, self.end_y), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
@@ -74,6 +77,14 @@ class StatsBox:
             self._text(frame, label, 10, y, 0.45, 1)
             self._text(frame, format_speed(getattr(state.players[1], field)), 140, y, 0.45, 1)
             self._text(frame, format_speed(getattr(state.players[2], field)), 250, y, 0.45, 1)
+        if serves is not None:
+            y = 90 + 38 * len(ROWS)
+            self._text(frame, "Saques", 10, y, 0.45, 1)
+            self._text(frame, "1er saque", 10, y + 38, 0.45, 1)
+            for player, x in ((1, 140), (2, 250)):
+                pct = serves[player]["firstPct"]
+                self._text(frame, str(serves[player]["count"]), x, y, 0.45, 1)
+                self._text(frame, MISSING if pct is None else f"{pct} %", x, y + 38, 0.45, 1)
         return frame
 
 

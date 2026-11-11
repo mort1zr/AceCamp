@@ -34,6 +34,7 @@ import numpy as np
 from court import COURT_LENGTH, DOUBLES_WIDTH, per_frame
 from utils import get_center_of_bbox
 
+DUPLICATE_AFTER_SERVE_SECONDS = 0.27
 MIN_TOSS_SECONDS = 0.2
 MAX_TOSS_GAP_SECONDS = 0.1
 TOSS_MAX_HEIGHT_BOXES = 1.5  # la pelota no sube más de 1,5 alturas de la caja del jugador sobre ella
@@ -89,6 +90,15 @@ def _hit_frame(ball_detections, start, last, fps):
         if k >= 2 and speed > HIT_SPEED_JUMP * toss_speed:
             return frames[k]
     return last
+
+
+def drop_toss_hits(hits, serves, fps):
+    """Golpes sin los falsos del saque: durante el lanzamiento la pelota sube y baja junto al
+    sacador y parece un golpe; y justo tras el saque no puede haber otro golpe (el resto tarda
+    más de DUPLICATE_AFTER_SERVE_SECONDS en llegar)."""
+    after = int(round(DUPLICATE_AFTER_SERVE_SECONDS * fps))
+    return [h for h in hits
+            if not any(s["toss_start"] <= h < s["frame"] or 0 < h - s["frame"] <= after for s in serves)]
 
 
 def detect_serves(ball_detections, player_detections, homography, fps, main_camera=None, hits=None):

@@ -148,6 +148,14 @@ def serve_stats(points, player):
     }
     if speeds:
         stats["maxSpeedKmh"] = _round(max(speeds))
+    # Faltas (TA-21): solo si se supo de todos los saques si entraron.
+    if attempts and all(a["fault"] is not None for a in attempts):
+        stats["faults"] = sum(a["fault"] is True for a in attempts)
+    # Aces: puntos que ganó con el saque sin que el rival la devolviera (TA-28: "saque no devuelto").
+    # Incluye los saques que el rival toca sin devolverlos; la cámara no distingue un ace de uno así.
+    own = [p for p in points if p.get("serve_attempts") and p["serve_attempts"][0]["player"] == player]
+    if own and all("win_reason" in p for p in own):
+        stats["aces"] = sum(p.get("winner") == player and p["win_reason"] == "saque no devuelto" for p in own)
     served = [p["serve_attempts"] for p in points if p.get("serve_attempts") and p["serve_attempts"][0]["player"] == player]
     if served and all(s[0]["fault"] is not None for s in served):
         stats["firstServeAttempts"] = len(served)
@@ -158,24 +166,37 @@ def serve_stats(points, player):
     return stats
 
 
-def rally_stats(points):
+def rally_length(point):
+    """Golpes del peloteo de un punto, saque incluido (un primer saque que fue falta no cuenta)."""
+    return point["shots"] - max(0, len(point.get("serve_attempts", [])) - 1)
+
+
+def rally_category(length, short_max=RALLY_SHORT_MAX, medium_max=RALLY_MEDIUM_MAX):
+    """"short", "medium" o "long" (TA-35). Los cortes se configuran en config.yaml (rallies)."""
+    if length <= short_max:
+        return "short"
+    return "medium" if length <= medium_max else "long"
+
+
+def rally_stats(points, short_max=RALLY_SHORT_MAX, medium_max=RALLY_MEDIUM_MAX):
     """Peloteos del partido: cuántos, golpes totales, el más largo y por longitud (opción A)."""
-    lengths = [p["shots"] - max(0, len(p.get("serve_attempts", [])) - 1) for p in points]
+    lengths = [rally_length(p) for p in points]
+    categories = [rally_category(n, short_max, medium_max) for n in lengths]
     return {
         "count": len(lengths),
         "sumShots": sum(lengths),
         "longestShots": max(lengths) if lengths else 0,
-        "short": sum(n <= RALLY_SHORT_MAX for n in lengths),
-        "medium": sum(RALLY_SHORT_MAX < n <= RALLY_MEDIUM_MAX for n in lengths),
-        "long": sum(n > RALLY_MEDIUM_MAX for n in lengths),
+        "short": categories.count("short"),
+        "medium": categories.count("medium"),
+        "long": categories.count("long"),
     }
 
 
-def add_serve_and_rally_stats(model_statistics, points):
+def add_serve_and_rally_stats(model_statistics, points, short_max=RALLY_SHORT_MAX, medium_max=RALLY_MEDIUM_MAX):
     """Añade serve a cada jugador y rallies al partido (TA-17, TA-18). Devuelve el mismo objeto."""
     for player in (FAR_PLAYER, NEAR_PLAYER):
         model_statistics["players"][str(player)]["serve"] = serve_stats(points, player)
-    model_statistics["rallies"] = rally_stats(points)
+    model_statistics["rallies"] = rally_stats(points, short_max, medium_max)
     return model_statistics
 
 
@@ -214,4 +235,26 @@ def to_match_statistics(model_statistics, player_position):
     }
     if "rallies" in model_statistics:
         statistics["rallies"] = model_statistics["rallies"]
+    order = (player - 1, opponent - 1)  # índices de [jugador 1, jugador 2] → [player, opponent]
+    score = model_statistics.get("score")
+    if score:  # marcador del modelo (TA-29/TA-30), visto desde el jugador registrado
+        winner = score.get("winner")
+        statistics["score"] = {
+            "sets": [
+                {"playerGames": completed_set[order[0]], "opponentGames": completed_set[order[1]]}
+                for completed_set in score["sets"]
+            ],
+            "games": [score["games"][order[0]], score["games"][order[1]]],
+            "points": [score["points"][order[0]], score["points"][order[1]]],
+            "winner": None if winner is None else ("player" if winner == player else "opponent"),
+        }
+    points = model_statistics.get("points")
+    if points:
+        statistics["points"] = {
+            "count": points["count"],
+            "playerWon": points["won"][str(player)],
+            "opponentWon": points["won"][str(opponent)],
+            "lowConfidence": points["lowConfidence"],
+            "toReview": len(points.get("toReview", [])),
+        }
     return statistics

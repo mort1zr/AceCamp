@@ -14,7 +14,14 @@ function reportMetrics(match) {
   const rallies = available ? match.statistics.rallies : null
   const value = raw => typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null
   const count = raw => Number.isSafeInteger(raw) && raw >= 0 ? raw : null
+  const sets = available ? match.statistics.score?.sets : null
+  const setScores = Array.isArray(sets) ? sets.flatMap((set, index) => {
+    const playerGames = count(Array.isArray(set) ? set[0] : set?.playerGames)
+    const opponentGames = count(Array.isArray(set) ? set[1] : set?.opponentGames)
+    return playerGames == null || opponentGames == null ? [] : [{ set: index + 1, playerGames, opponentGames }]
+  }) : []
   return {
+    setScores,
     measuredShots: shots?.sampleCount ?? null,
     averageShotSpeed: shots?.sampleCount > 0 ? shots.sumKmh / shots.sampleCount : null,
     maxShotSpeed: shots?.sampleCount > 0 && Number.isFinite(max) && max >= 0 ? max : null,

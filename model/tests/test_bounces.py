@@ -116,7 +116,9 @@ def test_bounces_of_the_sample_video():
     hits = detect_hits(ball, players, homographies, data["fps"])
     found = detect_bounces(ball, players, homographies, data["fps"], hits=hits)
 
-    assert hits == [10, 56, 94, 182]
+    # El golpe del 129 ocurre con la pelota sin detectar (127-135, junto al jugador del fondo): se
+    # deduce del cambio de dirección antes y después del hueco.
+    assert hits == [10, 56, 94, 129, 182]
     result, _ = match_events(found, data["bounces_labeled"], 2)
     assert result.true_positives >= 4
     assert result.false_positives <= 1
@@ -210,3 +212,74 @@ def test_bounces_of_a_low_resolution_highlight_with_court_marks():
     result, _ = match_events(found, data["bounces_labeled"], 2)
     assert result.recall >= 0.8
     assert result.f1 >= 0.7
+
+
+def test_a_hit_hidden_by_the_player_is_inferred_from_the_gap():
+    """La pelota desaparece 8 fotogramas junto al jugador del fondo y vuelve en sentido contrario."""
+    homography = CAMERA.homography()
+    players = [{1: [900, 150, 960, 260], 2: [900, 800, 1000, 1000]} for _ in range(60)]
+    ball = []
+    for i in range(60):
+        if 22 <= i <= 29:
+            ball.append({})  # tapada por el jugador
+            continue
+        y = 420 - 9 * i if i < 22 else 222 + 9 * (i - 26)  # sube hacia el jugador 1 y vuelve
+        ball.append({1: [925, y - 5, 935, y + 5]})
+    hits = detect_hits(ball, players, homography, 30)
+    assert len(hits) == 1 and 22 <= hits[0] <= 29
+    # Sin jugador cerca no es un golpe.
+    far_away = [{1: [200, 150, 260, 260], 2: [900, 800, 1000, 1000]} for _ in range(60)]
+    assert detect_hits(ball, far_away, homography, 30) == []
+
+
+def test_toss_and_duplicate_hits_around_a_serve_are_dropped():
+    from events.serves import drop_toss_hits
+
+    serves = [{"frame": 100, "toss_start": 80}]
+    assert drop_toss_hits([50, 85, 99, 100, 104, 130], serves, 30) == [50, 100, 130]
+
+
+def test_no_bounce_right_after_a_hit():
+    """Tras un golpe la pelota tarda en botar: un cambio de dirección a los 0,2 s es aún el golpe."""
+    rally = simulate_rally(6, seed=3)
+    ball, players = render_detections(rally, CAMERA, seed=3)
+    homography = CAMERA.homography()
+    hits = detect_hits(ball, players, homography, 30)
+    found = detect_bounces(ball, players, homography, 30, hits=hits)
+    assert all(not 0 < b - h <= 9 for b in found for h in hits)
+
+
+def test_the_bounce_of_the_last_shot_is_found_with_a_smaller_kink():
+    """Golpe ganador raso: el salto del bote (0,3) no llega al umbral normal (0,45), pero tras el
+    último golpe de la jugada la pelota tiene que botar y se acepta el mayor salto."""
+    homography = CAMERA.homography()
+    # En y = 650 px la pista mide unos 27 px por metro: pasar de 10 a 1,5 px por fotograma es un
+    # salto de ~0,31 m por fotograma.
+    ball, y, v = [], 250.0, 10.0
+    for i in range(70):
+        if i == 40:
+            v = 1.5
+        y += v
+        ball.append({1: [955, y - 5, 965, y + 5]} if 10 <= i else {})
+    players = [{1: [900, 100, 960, 200], 2: [200, 900, 300, 1070]} for _ in range(70)]
+    normal = detect_bounces(ball, players, homography, 30, hits=[])
+    with_last_hit = detect_bounces(ball, players, homography, 30, hits=[12])
+    assert normal == [] and len(with_last_hit) == 1 and abs(with_last_hit[0] - 40) <= 2
+
+
+def test_bounces_of_a_real_720p_highlight():
+    """h4 (1280x720, 50 fps): 6 botes marcados a mano. La pelota de estos datos es anterior al
+    filtro de marcas quietas, así que hay falsos; el objetivo es no perder los reales."""
+    import json
+    from pathlib import Path
+
+    from court import CourtHomography
+
+    data = json.loads((Path(__file__).parent / "data" / "h4_detections.json").read_text())
+    ball = [{int(k): v for k, v in f.items()} for f in data["ball"]]
+    players = [{int(k): v for k, v in f.items()} for f in data["players"]]
+    homographies = [CourtHomography.from_keypoints(k) for k in data["court_keypoints"]]
+    hits = detect_hits(ball, players, homographies, data["fps"])
+    found = detect_bounces(ball, players, homographies, data["fps"], hits=hits)
+    result, _ = match_events(found, data["bounces_labeled"], 3)
+    assert result.recall >= 0.8 and result.f1 >= 0.65

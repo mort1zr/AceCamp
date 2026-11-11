@@ -1,0 +1,15 @@
+# Configuración de un partido concreto (TA-29). Copia este archivo, ajústalo y pásalo con:
+#   python main.py --input input_videos/partido.mp4 --match-config match.yaml
+# Lo que no indiques queda como en la sección match de config.yaml.
+match:
+  # Quién saca el primer punto del vídeo: 1 (fondo lejano), 2 (cercano) o auto.
+  first_server: 2
+  best_of: 3
+  no_ad: false
+  final_set: tiebreak
+  # El vídeo empieza con este marcador (quitar o dejar en null si empieza 0-0).
+  initial_score:
+    sets: [[6, 4]]
+    games: [2, 1]
+    points: ["30", "15"]
+    server: 2

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { KpiCard as BaseKpiCard } from '../ui'
+import { DataTable, KpiCard as BaseKpiCard } from '../ui'
 import MatchNotes from './MatchNotes.jsx'
 import ProcessedVideo from './ProcessedVideo.jsx'
 import { useUnidades } from '../../hooks/useUnidades.js'
@@ -7,6 +7,11 @@ import { formatMatchDate } from '../../lib/dashboardEvolution.js'
 import { convertirVelocidad, etiquetaVelocidad } from '../../lib/unidades.js'
 
 const numberFormat = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
+const setColumns = [
+  { key: 'set', label: 'Set' },
+  { key: 'playerGames', label: 'Jugador', align: 'right' },
+  { key: 'opponentGames', label: 'Rival', align: 'right' },
+]
 
 function KpiCard({ value, description, ...props }) {
   return <BaseKpiCard {...props} value={value} description={value == null ? 'Sin datos' : description} />
@@ -74,8 +79,14 @@ export default function MatchReport({ match, playerName, notesService, videoServ
           <ProcessedVideo matchId={match.id} path={match.processedVideoPath} service={videoService} />
         </section>
         <section className="rounded-card border border-line bg-surface p-5">
-          <h3 className="font-semibold">Desglose por set</h3>
-          <p className="mt-2 text-sm text-muted">Sin datos del desglose por set.</p>
+          {match.setScores?.length > 0 ? (
+            <DataTable caption="Desglose por set" columns={setColumns} rows={match.setScores} rowKey="set" />
+          ) : (
+            <>
+              <h3 className="font-semibold">Desglose por set</h3>
+              <p className="mt-2 text-sm text-muted">Sin datos del desglose por set.</p>
+            </>
+          )}
         </section>
       </div>
       <MatchNotes matchId={match.id} service={notesService} />

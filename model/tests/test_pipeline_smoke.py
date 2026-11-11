@@ -88,7 +88,10 @@ def fake_models(monkeypatch):
 def test_pipeline_runs_end_to_end(fake_models, tmp_path, synthetic_video):
     output = tmp_path / "salida.avi"
 
-    main.main(["--input", str(synthetic_video), "--output", str(output), "--cache-dir", str(tmp_path / "cache")])
+    main.main(["--input", str(synthetic_video), "--output", str(output), "--cache-dir", str(tmp_path / "cache"),
+               "--report-dir", str(tmp_path / "informe")])
+    # El informe del partido se escribe en cada ejecución (TA-30).
+    assert (tmp_path / "informe" / "report.json").exists() and (tmp_path / "informe" / "points.csv").exists()
 
     info = get_video_info(output)
     assert info.frame_count == NUM_FRAMES
@@ -98,6 +101,7 @@ def test_pipeline_runs_end_to_end(fake_models, tmp_path, synthetic_video):
 
 def run(video, tmp_path, *extra):
     return main.main(["--input", str(video), "--output", str(tmp_path / "salida.avi"),
+                      "--report-dir", str(tmp_path / "informe"),
                       "--cache-dir", str(tmp_path / "cache"), *extra])
 
 

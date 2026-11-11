@@ -110,6 +110,7 @@ it('abre el reporte con el contrato del worker y mantiene los filtros al volver'
           movement: { distanceMeters: 31, avgSpeedKmh: 3, maxSpeedKmh: 10 },
           serve: { count: 1, sampleCount: 1, sumSpeedKmh: 100, firstServeAttempts: 2, firstServeIn: 1, doubleFaults: 0 } },
         rallies: { count: 2, sumShots: 10, longestShots: 7 },
+        score: { sets: [{ playerGames: 6, opponentGames: 0 }, { playerGames: 4, opponentGames: 6 }] },
       },
     }),
     record('m-unknown', { ...fields, opponent: 'Rival sin medición', statistics: { schemaVersion: 'anterior' } }),
@@ -138,12 +139,16 @@ it('abre el reporte con el contrato del worker y mantiene los filtros al volver'
   act(() => guardarUnidades('mph'))
   expect(card('Velocidad máxima de golpe').getByText(/43[.,]5/)).toBeTruthy()
   expect(report.getByText('Video procesado no disponible.')).toBeTruthy()
-  expect(report.getByText('Sin datos del desglose por set.')).toBeTruthy()
+  const sets = within(report.getByRole('table', { name: 'Desglose por set' }))
+  expect(sets.getAllByRole('row').map(row => Array.from(row.cells, cell => cell.textContent))).toEqual([
+    ['Set', 'Jugador', 'Rival'], ['1', '6', '0'], ['2', '4', '6'],
+  ])
   await user.click(report.getByRole('button', { name: 'Volver al listado' }))
   expect(screen.getByLabelText('Jugador').value).toBe('p-a')
   expect(screen.getByLabelText('Desde').value).toBe('2026-10-23')
   expect(document.activeElement).toBe(screen.getByRole('region', { name: 'Historial de partidos' }))
   await user.click(screen.getByRole('button', { name: /Ver reporte del partido con Rival sin medición/ }))
+  expect(screen.getByText('Sin datos del desglose por set.')).toBeTruthy()
   expect(within(screen.getByRole('heading', { name: 'Golpes medidos' }).closest('article')).getByText('Sin datos')).toBeTruthy()
   expect(onSnapshot).toHaveBeenCalledTimes(2)
   rerender(<Partidos db={db} />)
