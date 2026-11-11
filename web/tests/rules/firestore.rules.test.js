@@ -148,7 +148,14 @@ describe('aislamiento por organización', () => {
       const db = context.firestore()
       const ready = (await getDoc(doc(db, 'matches', 'm-ready'))).data()
       await setDoc(doc(db, 'users', admin), { orgId: ORG, role: 'admin' })
-      await setDoc(doc(db, 'matches', 'm-teammate'), { ...ready, createdBy: teammate, matchDate: '2026-11-01' })
+      const statistics = sumSpeedKmh => ({
+        schemaVersion: 'acecam.match-stats.v1',
+        player: { shots: { count: 1, sumSpeedKmh } },
+      })
+      await updateDoc(doc(db, 'matches', 'm-ready'), { statistics: statistics(50) })
+      await setDoc(doc(db, 'matches', 'm-teammate'), {
+        ...ready, createdBy: teammate, matchDate: '2026-11-01', statistics: statistics(90),
+      })
     })
     const player = { id: 'p-demo', orgId: ORG, createdBy: COACH }
     const coachIdentity = { db: coachDb(), orgId: ORG, actorId: COACH, role: 'coach' }
@@ -166,8 +173,11 @@ describe('aislamiento por organización', () => {
     const readHistory = (service, currentPlayer) => read((receive, fail) => service.subscribeAnalyzedMatches(currentPlayer, receive, fail))
 
     const history = await readHistory(coach, player)
-    expect(history).toEqual([{ id: 'm-ready', opponent: 'J. Luna', matchDate: '2026-10-31', tournament: '', result: '' }])
-    expect((await readHistory(administrator, player)).map(match => match.id)).toEqual(['m-teammate', 'm-ready'])
+    expect(history).toMatchObject([{
+      id: 'm-ready', opponent: 'J. Luna', matchDate: '2026-10-31', tournament: '', result: '', averageShotSpeed: 50,
+    }])
+    expect((await readHistory(administrator, player)).map(({ id, averageShotSpeed }) => [id, averageShotSpeed]))
+      .toEqual([['m-teammate', 90], ['m-ready', 50]])
     await expect(readHistory(coach, { ...player, createdBy: teammate })).rejects.toMatchObject({ code: 'permission-denied' })
     await expect(readHistory(administrator, { ...player, orgId: OTHER_ORG })).rejects.toMatchObject({ code: 'permission-denied' })
     expect((await read(createFirestoreMatchesService(coachIdentity).subscribe)).map(match => match.id)).toEqual(['m-ready'])
