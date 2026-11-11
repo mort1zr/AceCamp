@@ -14,11 +14,6 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
 
-    function inOrg(orgId) {
-      return request.auth != null
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.orgId == orgId;
-    }
-
     function validVideo(fileName) {
       return request.resource.size > 0
         && request.resource.size <= 500 * 1024 * 1024
@@ -30,7 +25,9 @@ service firebase.storage {
     function canAccess(orgId, matchId, beforeCreate) {
       let user = firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
       let path = /databases/(default)/documents/matches/$(matchId);
-      return inOrg(orgId) && user.role in ['admin', 'coach']
+      // PCIT-188: la administración de plataforma no concede acceso a videos.
+      // Este permiso se decide con el rol y la organización de la ficha del equipo.
+      return user.orgId == orgId && user.role in ['admin', 'coach']
         && (user.role == 'admin' || (firestore.exists(path)
           ? firestore.get(path).data.orgId == orgId && firestore.get(path).data.createdBy == request.auth.uid
           : beforeCreate));

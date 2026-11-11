@@ -40,6 +40,10 @@ service cloud.firestore {
       return signedIn() && get(userPath(request.auth.uid)).data.role == 'admin';
     }
 
+    function isPlatformAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+    }
+
     function canManage(data) {
       return inOrg(data.orgId) && (isAdmin() || data.createdBy == request.auth.uid);
     }
@@ -136,13 +140,19 @@ service cloud.firestore {
         && consent.recordedBy == recordedBy;
     }
 
+    // PCIT-188. Solo un operador con acceso al proyecto puede conceder o revocar este permiso.
+    match /platformAdmins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
     // ---------- users/{uid} ----------
     // Se crea en el registro (PCIT-21), en el mismo lote que su organización.
 
     match /users/{uid} {
       allow get: if signedIn()
-        && (uid == request.auth.uid || (resource != null && inOrg(resource.data.orgId)));
-      allow list: if inOrg(resource.data.orgId);
+        && (uid == request.auth.uid || isPlatformAdmin() || (resource != null && inOrg(resource.data.orgId)));
+      allow list: if isPlatformAdmin() || inOrg(resource.data.orgId);
 
       allow create: if signedIn()
         && uid == request.auth.uid
@@ -184,8 +194,8 @@ service cloud.firestore {
     // ---------- orgs/{orgId} ----------
 
     match /orgs/{orgId} {
-      allow get: if inOrg(orgId);
-      allow list: if false;
+      allow get: if isPlatformAdmin() || inOrg(orgId);
+      allow list: if isPlatformAdmin();
 
       // Se crea en el registro, junto con la ficha del usuario que la crea.
       allow create: if signedIn()
@@ -222,7 +232,7 @@ service cloud.firestore {
       // Contador de análisis del mes (PCIT-41). Solo sube de uno en uno y junto con
       // el alta de un partido nuevo; borrar un partido no devuelve el análisis.
       match /usage/{period} {
-        allow get, list: if inOrg(orgId);
+        allow get, list: if isPlatformAdmin() || inOrg(orgId);
 
         allow create, update: if inOrg(orgId)
           && period == currentPeriod()

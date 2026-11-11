@@ -87,6 +87,41 @@ beforeEach(async () => {
 const coachDb = () => env.authenticatedContext(COACH, { email: 'coach@acecam.test' }).firestore()
 const anonDb = () => env.unauthenticatedContext().firestore()
 
+it('autoriza lecturas de plataforma con un permiso separado y revocable', async () => {
+  const platformUid = 'admin-plataforma'
+  const teamAdminUid = 'admin-equipo'
+  const platform = env.authenticatedContext(platformUid).firestore()
+  const teamAdmin = env.authenticatedContext(teamAdminUid).firestore()
+  const marker = database => doc(database, 'platformAdmins', platformUid)
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore()
+    await setDoc(marker(db), {})
+    await setDoc(doc(db, 'users', teamAdminUid), { orgId: ORG, role: 'admin' })
+    await setDoc(doc(db, 'orgs', OTHER_ORG, 'usage', '2026-11'), { analyses: 3 })
+  })
+
+  expect((await assertSucceeds(getDoc(marker(platform)))).exists()).toBe(true)
+  await assertFails(getDoc(marker(teamAdmin)))
+  await assertFails(getDoc(marker(anonDb())))
+  await assertFails(setDoc(doc(teamAdmin, 'platformAdmins', teamAdminUid), {}))
+  await assertFails(deleteDoc(marker(platform)))
+  await assertFails(getDocs(collection(platform, 'platformAdmins')))
+  await assertFails(getDocs(collection(teamAdmin, 'orgs')))
+
+  expect((await assertSucceeds(getDocs(collection(platform, 'orgs')))).size).toBe(2)
+  expect((await assertSucceeds(getDocs(collection(platform, 'users')))).size).toBe(3)
+  await assertSucceeds(getDoc(doc(platform, 'orgs', OTHER_ORG, 'usage', '2026-11')))
+  await assertFails(updateDoc(doc(platform, 'orgs', OTHER_ORG), { name: 'Otro nombre' }))
+  await assertFails(updateDoc(doc(platform, 'users', OTHER_COACH), { displayName: 'Otro nombre' }))
+  await assertFails(getDoc(doc(platform, 'matches', 'm-ready')))
+  await assertFails(getDoc(doc(platform, 'players', 'p-demo')))
+  await assertFails(getDoc(doc(platform, 'applications', 'a-demo')))
+
+  await env.withSecurityRulesDisabled(context => deleteDoc(marker(context.firestore())))
+  await assertFails(getDocs(collection(platform, 'orgs')))
+  await assertFails(getDoc(doc(platform, 'users', OTHER_COACH)))
+})
+
 it('registra en privado la hoja de Google e importa cada respuesta una sola vez', async () => {
   const db = coachDb()
   const other = env.authenticatedContext(OTHER_COACH).firestore()

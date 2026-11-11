@@ -295,6 +295,10 @@ el conflicto de escritura y los rechazos de acceso en Firebase Emulator Suite.
 En el emulador, abre **Partidos → Ver reporte → Tu nota** con una cuenta de
 prueba y un partido Listo accesible.
 
+## `platformAdmins/{uid}`
+
+La existencia del documento autoriza a la cuenta de Firebase Auth a entrar en `/admin` y consultar organizaciones, usuarios y uso mensual. El cliente solo puede leer su propia marca. Un operador del proyecto administra las marcas mediante la consola o el Admin SDK.
+
 ## `applications/{appId}`
 
 Postulación que llega del formulario público (PCIT-54). Datos del jugador antes
