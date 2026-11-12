@@ -1,0 +1,379 @@
+.tarjeta-jugador-escena {
+  flex-shrink: 0;
+  width: 230px;
+  perspective: 900px;
+  filter: drop-shadow(0 18px 28px rgb(0 0 0 / 0.45));
+  transition: filter 0.3s;
+}
+
+.tarjeta-jugador {
+  --mx: 50%;
+  --my: 30%;
+  --rx: 0deg;
+  --ry: 0deg;
+  --forma: path('M0 40Q2 34 8 33Q60 26 100 8Q115 2 130 8Q170 26 222 33Q228 34 230 40V262Q230 282 210 296L127 326Q115 332 103 326L20 296Q0 282 0 262Z');
+  position: relative;
+  margin: 0;
+  aspect-ratio: 23 / 33;
+  clip-path: var(--forma);
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  background: var(--marco);
+  color: var(--tinta);
+  cursor: default;
+}
+
+.tarjeta-jugador[data-activa] {
+  transition: transform 0.08s linear;
+}
+
+.tarjeta-jugador--oro {
+  --marco: linear-gradient(160deg, #fff4bf, #c99a3e 45%, #f6dc8a 70%, #9c7426);
+  --fondo: linear-gradient(165deg, #fbefb8 0%, #e6c36c 38%, #d4a94e 62%, #f1d98f 100%);
+  --tinta: #2b2108;
+  --linea: rgb(43 33 8 / 0.28);
+}
+
+.tarjeta-jugador--plata {
+  --marco: linear-gradient(160deg, #ffffff, #9aa1aa 45%, #e7eaee 70%, #7b828c);
+  --fondo: linear-gradient(165deg, #f7f8fa 0%, #cdd2d8 40%, #b5bbc3 62%, #e9ecef 100%);
+  --tinta: #1f2328;
+  --linea: rgb(31 35 40 / 0.25);
+}
+
+.tarjeta-jugador--bronce {
+  --marco: linear-gradient(160deg, #ffd9b8, #a8653a 45%, #e4a77a 70%, #7a4424);
+  --fondo: linear-gradient(165deg, #f6cfae 0%, #d39468 40%, #bd7a4e 62%, #e9b893 100%);
+  --tinta: #2c170a;
+  --linea: rgb(44 23 10 / 0.28);
+}
+
+.tarjeta-jugador-cuerpo {
+  position: absolute;
+  inset: 5px;
+  clip-path: path('M0 38Q2 32 8 31Q57 24 96 7Q110 1 124 7Q163 24 212 31Q218 32 220 38V253Q220 272 201 285L122 315Q110 321 98 315L19 285Q0 272 0 253Z');
+  background: var(--fondo);
+  overflow: hidden;
+}
+
+.tarjeta-jugador-cuerpo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 68% 28%, rgb(255 255 255 / 0.55), transparent 55%);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+.tarjeta-jugador-lateral {
+  position: absolute;
+  top: 14%;
+  left: 8%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  width: 3.6rem;
+}
+
+.tarjeta-jugador-media {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2.7rem;
+  font-weight: 700;
+  line-height: 0.85;
+}
+
+.tarjeta-jugador-bandera {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.tarjeta-jugador-escudo {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 2.2rem;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+  background: var(--tinta);
+  color: #d7f25c;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.tarjeta-jugador-avatar {
+  position: absolute;
+  top: 8.5%;
+  right: -3%;
+  z-index: 2;
+  width: 66%;
+  height: 36%;
+}
+
+.tarjeta-jugador-placa {
+  position: absolute;
+  top: 43.8%;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  text-align: center;
+}
+
+.tarjeta-jugador-nombre {
+  margin: 0;
+  padding: 0.35rem 0.6rem 0.3rem;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45) 18%, rgb(255 255 255 / 0.45) 82%, transparent);
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tarjeta-jugador-atributos {
+  position: absolute;
+  top: 55%;
+  left: 9%;
+  right: 9%;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: 0.1rem;
+  margin: 0;
+}
+
+.tarjeta-jugador-atributos > div {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.tarjeta-jugador-atributos > div:nth-child(even) {
+  border-left: 1px solid var(--linea);
+  padding-left: 0.7rem;
+}
+
+.tarjeta-jugador-atributos svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.tarjeta-jugador-atributos dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tarjeta-jugador-atributos dt {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.tarjeta-jugador-logros {
+  position: absolute;
+  top: 71%;
+  left: 11%;
+  right: 11%;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 0;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--linea);
+  text-align: center;
+}
+
+.tarjeta-jugador-logros > div + div {
+  border-left: 1px solid var(--linea);
+}
+
+.tarjeta-jugador-logros dt {
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.tarjeta-jugador-logros dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.tarjeta-jugador-pie {
+  position: absolute;
+  bottom: 12%;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-style: italic;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+.tarjeta-jugador-pie strong {
+  font-size: 0.95rem;
+}
+
+.tarjeta-jugador-brillo,
+.tarjeta-jugador-holo,
+.tarjeta-jugador-rayos {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.tarjeta-jugador-brillo {
+  background: linear-gradient(115deg, transparent 32%, rgb(255 255 255 / 0.65) 48%, transparent 62%);
+  background-size: 260% 260%;
+  background-position: var(--mx) var(--my);
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+  transition: opacity 0.3s;
+}
+
+.tarjeta-jugador-holo {
+  background: repeating-linear-gradient(110deg, #ff8ab8 0%, #8af6ff 6%, #fdff9a 12%, #a6ff8a 18%, #c49aff 24%, #ff8ab8 30%);
+  background-size: 320% 320%;
+  background-position: var(--mx) var(--my);
+  mix-blend-mode: soft-light;
+  opacity: 0.45;
+  transition: opacity 0.35s;
+}
+
+.tarjeta-jugador-rayos {
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 1.5px rgb(79 227 255 / 0.85)) drop-shadow(0 0 5px rgb(79 227 255 / 0.55));
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+
+.tarjeta-jugador-rayo-halo,
+.tarjeta-jugador-rayo-nucleo {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.tarjeta-jugador-rayo-halo {
+  stroke: #4fe3ff;
+  stroke-width: 1.9;
+  stroke-opacity: 0.62;
+}
+
+.tarjeta-jugador-rayo-nucleo {
+  stroke: #f2ffff;
+  stroke-width: 0.7;
+  stroke-opacity: 0.95;
+}
+
+.tarjeta-jugador[data-activa] .tarjeta-jugador-brillo {
+  opacity: 0.7;
+}
+
+.tarjeta-jugador[data-activa] .tarjeta-jugador-holo {
+  opacity: 0.75;
+}
+
+.tarjeta-jugador[data-activa] .tarjeta-jugador-rayos {
+  opacity: 0.88;
+}
+
+.tarjeta-jugador-escena:has(.tarjeta-jugador[data-activa]) {
+  filter: drop-shadow(0 18px 28px rgb(0 0 0 / 0.45)) drop-shadow(0 0 13px rgb(79 227 255 / 0.35));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tarjeta-jugador:not([data-activa]) .tarjeta-jugador-brillo {
+    animation: tarjeta-barrido 6s ease-in-out infinite;
+  }
+
+  .tarjeta-jugador:not([data-activa]) .tarjeta-jugador-holo {
+    animation: tarjeta-iridiscente 8s ease-in-out infinite;
+  }
+}
+
+@keyframes tarjeta-iridiscente {
+  0%,
+  100% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 70%;
+  }
+}
+
+@keyframes tarjeta-barrido {
+  0%,
+  55% {
+    background-position: 100% 100%;
+  }
+  85%,
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.tarjeta-jugador-marco {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.tarjeta-jugador-marco path {
+  fill: none;
+  stroke: var(--linea);
+  stroke-width: 1.2;
+}
+
+.tarjeta-jugador-reducida {
+  flex-shrink: 0;
+}
+
+.tarjeta-jugador-escena--compacta .tarjeta-jugador-logros,
+.tarjeta-jugador-escena--compacta .tarjeta-jugador-pie {
+  display: none;
+}
+
+.tarjeta-jugador-escena--compacta .tarjeta-jugador-atributos {
+  top: 62%;
+  row-gap: 0.45rem;
+}

@@ -42,6 +42,7 @@ function usePropsPanel() {
     storage,
     auth,
     session,
+    nombre: profile?.displayName ?? '',
     videoApi,
     uploadVideo,
     importVideo,

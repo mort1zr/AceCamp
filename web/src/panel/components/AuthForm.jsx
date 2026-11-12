@@ -23,7 +23,7 @@ export function Field({ id, label, error, compacto = false, type = 'text', ...in
       type={esClave && visible ? 'text' : type}
       aria-invalid={error ? 'true' : undefined}
       aria-describedby={error ? errorId : undefined}
-      className={`w-full rounded-lg border bg-bg px-3 text-sm ${compacto ? 'py-2' : 'py-2.5'} ${esClave ? 'pr-11' : ''} text-text placeholder:text-placeholder focus:border-accent focus:outline-none ${
+      className={`w-full rounded-lg border bg-bg px-3 text-sm ${compacto ? 'py-2' : 'py-2.5'} ${esClave ? 'pr-11' : ''} text-text placeholder:text-placeholder focus:border-accent-ink focus:ring-1 focus:ring-accent-ink focus:outline-none ${
         error ? 'border-bad' : 'border-line2'
       }`}
       {...inputProps}

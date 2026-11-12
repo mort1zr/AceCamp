@@ -589,13 +589,15 @@ describe('uso mensual de análisis (PCIT-41)', () => {
       await assertFails(createMatch(coachDb(), 'm-151'))
     })
 
-    it('sin plan o con un plan desconocido no se analiza; Ultra no tiene tope', async () => {
+    it('sin plan o con un plan desconocido no se analiza; Ultra llega hasta 500', async () => {
       await preparar('free')
       await assertFails(createMatch(coachDb(), 'm-free'))
       await preparar('inventado')
       await assertFails(createMatch(coachDb(), 'm-inventado'))
-      await preparar('ultra', 5000)
+      await preparar('ultra', 499)
       await assertSucceeds(createMatch(coachDb(), 'm-ultra'))
+      await preparar('ultra', 500)
+      await assertFails(createMatch(coachDb(), 'm-ultra-tope'))
     })
 
     it('el contador es de la organización: suma los análisis de todos sus entrenadores', async () => {
@@ -738,6 +740,13 @@ describe('applications', () => {
       { email: 'correo-invalido' },
       { playerId: 'p-demo' },
       { message: 'a'.repeat(1001) },
+      { utr: -1 },
+      { utr: 99 },
+      { nationalRanking: 0 },
+      { dominantHand: 'ambidiestro' },
+      { videoLinks: ['http://inseguro.test/video'] },
+      { videoLinks: Array(6).fill('https://youtu.be/abc') },
+      { sorpresa: 'campo no permitido' },
     ]
     for (const [index, overrides] of candidates.entries()) {
       await assertFails(setDoc(doc(visitor, 'applications', `invalid-${index}`), newPublicApplication(overrides)))
@@ -748,5 +757,9 @@ describe('applications', () => {
       consent: { ...newPublicApplication().consent, method: 'guardian' },
     })
     await assertSucceeds(setDoc(doc(visitor, 'applications', 'minor'), validGuardian))
+    await assertSucceeds(setDoc(doc(visitor, 'applications', 'perfil'), newPublicApplication({
+      utr: 9.5, nationalRanking: 12, dominantHand: 'zurdo', backhand: 'dos manos',
+      videoLinks: ['https://youtu.be/abc', 'https://www.youtube.com/watch?v=xyz'],
+    })))
   })
 })

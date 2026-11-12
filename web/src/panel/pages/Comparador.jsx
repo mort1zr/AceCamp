@@ -1,78 +1,39 @@
 import { useMemo, useState } from 'react'
-import { DataTable, EmptyState, ErrorState, LoadingState, SegmentedControl } from '../components/ui'
+import { EmptyState, ErrorState, LoadingState, SegmentedControl } from '../components/ui'
+import TarjetaJugador from '../components/dashboard/TarjetaJugador.jsx'
+import { MarcoComparacion, RadarSuperpuesto, TablaComparacion } from '../components/comparador/ComparacionVisual.jsx'
 import { useDashboardOverview } from '../hooks/useDashboardOverview.js'
 import { usePlayers } from '../hooks/usePlayers.js'
-import { useUnidades } from '../hooks/useUnidades.js'
 import { buildPlayerComparisonHistory, comparisonPeriods } from '../lib/comparisonHistory.js'
 import { formatMatchDate } from '../lib/dashboardEvolution.js'
-import { dashboardMetricDefinitions, isDashboardMetricValue } from '../lib/dashboardOverview.js'
 import { createFirestoreDashboardService } from '../lib/services/firestoreDashboardService.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
-import { convertirVelocidad, etiquetaVelocidad } from '../lib/unidades.js'
 import './jugadores.css'
+import PelotaTitulo from '../components/layout/PelotaTitulo.jsx'
 
-const numberFormat = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
 const comparisonModes = [
   { value: 'players', label: 'Jugador contra jugador' },
   { value: 'periods', label: 'Por periodos' },
   { value: 'matches', label: 'Partido contra partido' },
 ]
 
-function comparisonRows(overviews, units) {
-  const loading = overviews.some(overview => overview.status === 'loading')
-  return dashboardMetricDefinitions.map(metric => {
-    const values = overviews.map(overview => {
-      const value = overview.data?.metrics?.[metric.key]
-      if (overview.status !== 'ready' || !isDashboardMetricValue(metric, value)) return null
-      return Number((metric.speed ? convertirVelocidad(value, units) : value).toFixed(1))
-    })
-    const comparable = values.filter(value => value !== null)
-    const best = !loading && comparable.length >= 2
-      ? (metric.lowerIsBetter ? Math.min(...comparable) : Math.max(...comparable))
-      : null
-    return {
-      id: metric.key,
-      metric: metric.label,
-      values,
-      unit: metric.speed ? etiquetaVelocidad(units) : metric.unit,
-      best,
-      tied: best !== null && comparable.filter(value => value === best).length > 1,
-    }
-  })
-}
-
 function ComparisonTable({ caption, labels, overviews }) {
-  const units = useUnidades()
-  const columns = [{ key: 'metric', label: 'Indicador' }, ...labels.map((label, index) => ({
-    key: `comparison-${index}`,
-    label,
-    render: (_, row) => {
-      const value = row.values[index]
-      if (value === null) return overviews[index].status === 'ready' ? 'Sin datos' : '—'
-      const unit = row.unit ? ` ${row.unit}` : ''
-      return (
-        <div className="flex flex-wrap items-center gap-2">
-          <span>{numberFormat.format(value)}{unit}</span>
-          {value === row.best && (
-            <strong className="rounded-full border border-accent-line px-2 py-0.5 text-xs text-accent-ink">
-              {row.tied ? 'Empate' : 'Mejor valor'}
-            </strong>
-          )}
-        </div>
-      )
-    },
-  }))]
-
+  const columnas = labels.map((titulo, index) => ({ clave: `col-${index}`, titulo, resumen: overviews[index] }))
   return (
-    <>
-      <DataTable caption={caption} columns={columns} rows={comparisonRows(overviews, units)} />
-      <p className="players-footnote">Partidos y golpes medidos indican el volumen de datos. En dobles faltas se destaca el menor valor.</p>
-    </>
+    <MarcoComparacion
+      n={columnas.length}
+      cabeceras={columnas.map(columna => (
+        <div className="cmp-col" key={columna.clave}>
+          <h3 className="cmp-titulo">{columna.titulo}</h3>
+        </div>
+      ))}
+    >
+      <div className="cmp-scroll"><TablaComparacion caption={caption} columnas={columnas} /></div>
+    </MarcoComparacion>
   )
 }
 
-function ComparisonWorkspace({ players, overviewService }) {
-  const [selection, setSelection] = useState(['', ''])
+function ComparisonWorkspace({ players, overviewService, selection, setSelection }) {
   const selectedPlayers = selection.map(id => players.find(player => player.id === id))
   const canCompare = selectedPlayers.filter(Boolean).length >= 2
   const ids = canCompare ? selectedPlayers.map(player => player?.id ?? '') : []
@@ -92,41 +53,60 @@ function ComparisonWorkspace({ players, overviewService }) {
 
   if (players.length < 2) return <EmptyState title="Necesitas dos jugadores" description="Registra al menos dos jugadores para comparar sus indicadores." />
 
+  const columnas = selectedPlayers.map((player, index) => ({
+    clave: `col-${index}`,
+    titulo: player?.fullName || `Jugador ${index + 1}`,
+    jugador: player,
+    resumen: overviews[index],
+  }))
+  const comparables = columnas.filter(columna => columna.jugador && columna.resumen.status === 'ready')
+
   return (
     <>
-      <div className="my-5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-3" role="group" aria-label="Columnas del comparador">
-        {selection.map((id, index) => (
-          <div key={index} className="players-field rounded-card border border-line bg-surface p-4">
-            <label htmlFor={`compare-player-${index}`}>Jugador {index + 1}</label>
-            <select id={`compare-player-${index}`} value={selectedPlayers[index]?.id ?? ''} onChange={event => select(index, event.target.value)}>
-              <option value="">Selecciona un jugador</option>
-              {players.map(player => (
-                <option key={player.id} value={player.id} disabled={player.id !== id && selection.includes(player.id)}>{player.fullName}</option>
-              ))}
-            </select>
-            {selection.length > 2 && (
-              <button type="button" className="players-button-secondary mt-3" aria-label={`Quitar columna ${index + 1}`} onClick={() => setSelection(previous => previous.length > 2 ? previous.filter((_, position) => position !== index) : previous)}>Quitar</button>
-            )}
-            {overviews[index].status === 'loading' && <p role="status" className="mt-2 text-sm text-muted">Cargando indicadores…</p>}
-            {overviews[index].status === 'error' && (
-              <ErrorState title="No pudimos cargar sus indicadores" description={overviews[index].error} onRetry={overviews[index].retry} />
-            )}
-          </div>
-        ))}
-      </div>
-      <button
-        type="button"
-        className="players-button-secondary mb-5"
-        disabled={selection.length >= Math.min(4, players.length)}
-        onClick={() => setSelection(previous => previous.length < Math.min(4, players.length) ? [...previous, ''] : previous)}
-      >Añadir jugador</button>
-      {canCompare ? (
-        <ComparisonTable
-          caption="Comparación de jugadores"
-          labels={selectedPlayers.map((player, index) => player?.fullName || `Jugador ${index + 1}`)}
-          overviews={overviews}
-        />
-      ) : <EmptyState title="Selecciona al menos dos jugadores" description="Los indicadores disponibles aparecerán lado a lado." />}
+      <MarcoComparacion
+        n={selection.length}
+        cabeceras={selection.map((id, index) => {
+          const player = selectedPlayers[index]
+          const overview = overviews[index]
+          return (
+            <div key={index} className="cmp-col">
+              {selection.length > 2 && (
+                <button type="button" className="cmp-quitar" aria-label={`Quitar columna ${index + 1}`} onClick={() => setSelection(previous => previous.length > 2 ? previous.filter((_, position) => position !== index) : previous)}>×</button>
+              )}
+              {player ? (
+                <div className="cmp-carta">
+                  <TarjetaJugador
+                    player={player}
+                    metrics={overview.data?.metrics}
+                    indice={Math.max(0, players.findIndex(item => item.id === player.id))}
+                    escala={selection.length > 3 ? 0.62 : 0.72}
+                  />
+                </div>
+              ) : <div className="cmp-vacia">Elige un jugador para compararlo</div>}
+              <div className="players-field">
+                <label className="sr-only" htmlFor={`compare-player-${index}`}>Jugador {index + 1}</label>
+                <select id={`compare-player-${index}`} value={player?.id ?? ''} onChange={event => select(index, event.target.value)}>
+                  <option value="">Selecciona un jugador</option>
+                  {players.map(item => (
+                    <option key={item.id} value={item.id} disabled={item.id !== id && selection.includes(item.id)}>{item.fullName}</option>
+                  ))}
+                </select>
+              </div>
+              {overview.status === 'loading' && <p role="status" className="cmp-estado">Cargando indicadores…</p>}
+              {overview.status === 'error' && (
+                <ErrorState title="No pudimos cargar sus indicadores" description={overview.error} onRetry={overview.retry} />
+              )}
+            </div>
+          )
+        })}
+      >
+        {canCompare ? (
+          <>
+            {comparables.length >= 2 && <RadarSuperpuesto columnas={comparables} />}
+            <div className="cmp-scroll"><TablaComparacion caption="Comparación de jugadores" columnas={columnas} /></div>
+          </>
+        ) : <div className="p-5"><EmptyState title="Selecciona al menos dos jugadores" description="Los indicadores disponibles aparecerán lado a lado." /></div>}
+      </MarcoComparacion>
     </>
   )
 }
@@ -214,14 +194,26 @@ function HistoryComparison({ players, historyService, mode }) {
 function ComparisonPanel({ playersService, overviewService, historyService }) {
   const players = usePlayers(playersService)
   const [mode, setMode] = useState('players')
+  const [selection, setSelection] = useState(['', ''])
   if (players.loading) return <LoadingState title="Cargando jugadores…" />
   if (players.error) return <ErrorState title="No pudimos cargar los jugadores" description={players.error} onRetry={players.retry} />
   if (players.rows.length === 0) return <EmptyState title="Aún no hay jugadores" description="Registra un jugador para comparar su rendimiento." />
+  const maxJugadores = Math.min(4, players.rows.length)
 
   return (
     <>
-      <div className="mt-5"><SegmentedControl label="Modo de comparación" options={comparisonModes} value={mode} onChange={setMode} /></div>
-      {mode === 'players' ? <ComparisonWorkspace players={players.rows} overviewService={overviewService} /> : (
+      <div className="mt-5 flex flex-wrap items-end justify-between gap-3">
+        <SegmentedControl label="Modo de comparación" options={comparisonModes} value={mode} onChange={setMode} />
+        {mode === 'players' && players.rows.length >= 2 && (
+          <button
+            type="button"
+            className="players-button-secondary"
+            disabled={selection.length >= maxJugadores}
+            onClick={() => setSelection(previous => previous.length < maxJugadores ? [...previous, ''] : previous)}
+          >Añadir jugador</button>
+        )}
+      </div>
+      {mode === 'players' ? <ComparisonWorkspace players={players.rows} overviewService={overviewService} selection={selection} setSelection={setSelection} /> : (
         <HistoryComparison players={players.rows} historyService={historyService} mode={mode} />
       )}
     </>
@@ -246,7 +238,7 @@ export default function Comparador({ db, session }) {
       <header className="players-page-heading">
         <div>
           <p className="players-eyebrow">Rendimiento del equipo</p>
-          <h1 id="comparison-title">Comparador<span className="players-title-dot">.</span></h1>
+          <h1 id="comparison-title">Comparador<PelotaTitulo /></h1>
           <p>Compara jugadores o revisa el rendimiento de un mismo jugador por periodos y partidos.</p>
         </div>
       </header>

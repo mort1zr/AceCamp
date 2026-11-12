@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { DataTable } from '../ui'
 import MatchStatistics from '../analysis/MatchStatistics.jsx'
 import { playerAge, playersErrorMessage } from '../../lib/players.js'
+import PaginacionTabla, { tamanosPagina } from '../ui/PaginacionTabla.jsx'
+import { EsqueletoTabla } from '../dashboard/EsqueletoDashboard.jsx'
+import '../dashboard/esqueleto.css'
+import TarjetaJugador from '../dashboard/TarjetaJugador.jsx'
+import { useMetricasEquipo } from '../../hooks/useMetricasEquipo.js'
+import { posicionRanking, valoracionJugador } from '../../lib/valoracion.js'
+import Marcador from './Marcador.jsx'
 import PlayerForm from './PlayerForm.jsx'
 
 const sportFields = [
@@ -10,7 +17,6 @@ const sportFields = [
   ['Mano dominante', 'dominantHand'],
   ['Revés', 'backhand'],
   ['UTR', 'utr'],
-  ['Ranking nacional', 'nationalRanking'],
   ['Entrenador en su academia', 'coachName'],
 ]
 
@@ -22,13 +28,19 @@ const matchColumns = [
   { key: 'matchDate', label: 'Fecha', render: dateLabel },
   { key: 'opponent', label: 'Rival' },
   { key: 'tournament', label: 'Torneo', render: value => value || '—' },
-  { key: 'result', label: 'Resultado', render: value => value || '—' },
+  { key: 'result', label: 'Resultado', render: value => <Marcador value={value} /> },
 ]
 
-export default function PlayerProfile({ service, player, onBack }) {
+export default function PlayerProfile({ service, player, onBack, roster = [], rankingService }) {
+  const metricas = useMetricasEquipo(rankingService, true)
+  const indice = Math.max(0, roster.findIndex(fila => fila.id === player.id))
+  const ranking = metricas ? posicionRanking(roster, metricas, player.id) : null
+  const totalRanking = metricas ? roster.filter(fila => valoracionJugador(fila, metricas[fila.id]).media != null).length : 0
   const { id, orgId, createdBy } = player
   const heading = useRef(null)
   const [history, setHistory] = useState(null)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(tamanosPagina[0])
   const [attempt, setAttempt] = useState(0)
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -81,34 +93,44 @@ export default function PlayerProfile({ service, player, onBack }) {
       if (active.current) setMutationError(playersErrorMessage(error, 'remove'))
     } finally { if (active.current) setDeleting(false) }
   }
-  if (editing) return <PlayerForm service={service} initialPlayer={player} onCancel={() => setEditing(false)} onCreated={() => setEditing(false)} />
+
+  const pages = Math.max(1, Math.ceil((history?.rows?.length ?? 0) / pageSize))
+  const currentPage = Math.min(page, pages)
+  const visibleRows = history?.rows?.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   return (
     <section className="players-page" aria-labelledby="player-profile-title">
       {service.mode === 'demo' && <aside className="players-demo-notice"><strong>Modo demostración</strong><span>Perfil de ejemplo.</span></aside>}
-      <button type="button" className="players-button-secondary" onClick={onBack}>Volver a Jugadores</button>
-      <header className="players-profile-heading">
-        <p className="players-eyebrow">Perfil del jugador</p>
-        <h1 id="player-profile-title" ref={heading} tabIndex={-1}>{player.fullName}</h1>
-      </header>
-      <div className="players-form-actions">
-        {allowed && service.update && <button type="button" className="players-button-secondary" onClick={() => { setEditing(true); setConfirmDelete(false) }}>Editar jugador</button>}
-        {allowed && service.remove && <button ref={deleteButton} type="button" className="players-button-secondary" onClick={() => { setConfirmDelete(true); setMutationError(null) }}>Eliminar de la plantilla</button>}
+      <button type="button" className="players-button-secondary players-volver" onClick={onBack}><span aria-hidden="true">←</span> Volver a Jugadores</button>
+      <div className="players-profile-top">
+        <header className="players-profile-heading">
+          <p className="players-eyebrow">Perfil del jugador</p>
+          <h1 id="player-profile-title" ref={heading} tabIndex={-1}>{player.fullName}</h1>
+        </header>
+      <div className="players-form-actions players-profile-actions">
+          {allowed && service.update && <button type="button" className="players-button-secondary" onClick={() => { setEditing(true); setConfirmDelete(false) }}>Editar jugador</button>}
+          {allowed && service.remove && <button ref={deleteButton} type="button" className="players-button-secondary players-button-borde-peligro" onClick={() => { setConfirmDelete(true); setMutationError(null) }}>Eliminar de la lista</button>}
+        </div>
       </div>
-      {confirmDelete && <section className="players-form-panel" role="alertdialog" aria-labelledby="player-delete-title" aria-describedby="player-delete-description" onKeyDown={event => { if (event.key === 'Escape' && !deleting) closeDelete() }}>
-        <h2 id="player-delete-title">Eliminar de la plantilla a {player.fullName}</h2>
-        <p id="player-delete-description">El jugador dejará de aparecer en la plantilla y en nuevos análisis. Sus partidos, videos, datos y notas se conservarán para consultar el historial.</p>
-        {mutationError && <p role="alert">{mutationError}</p>}
-        <div className="players-form-actions"><button ref={cancelDelete} type="button" className="players-button-secondary" disabled={deleting} onClick={closeDelete}>Cancelar</button><button type="button" className="players-button-primary" disabled={deleting} onClick={remove}>{deleting ? 'Eliminando…' : 'Confirmar eliminación'}</button></div>
-      </section>}
+      {confirmDelete && <div className="players-modal players-popup" onMouseDown={event => { if (event.target === event.currentTarget && !deleting) closeDelete() }}>
+        <section className="players-popup-card" role="alertdialog" aria-modal="true" aria-labelledby="player-delete-title" aria-describedby="player-delete-description" onKeyDown={event => { if (event.key === 'Escape' && !deleting) closeDelete() }}>
+          <span className="players-popup-icono" aria-hidden="true">!</span>
+          <h2 id="player-delete-title">Eliminar de la lista a {player.fullName}</h2>
+          <p id="player-delete-description">El jugador dejará de aparecer en la lista de jugadores y en nuevos análisis. Sus partidos, videos, datos y notas se conservarán para consultar el historial.</p>
+          {mutationError && <p role="alert" className="players-save-error">{mutationError}</p>}
+          <div className="players-form-actions"><button ref={cancelDelete} type="button" className="players-button-secondary" disabled={deleting} onClick={closeDelete}>Cancelar</button><button type="button" className="players-button-peligro" disabled={deleting} onClick={remove}>{deleting ? 'Eliminando…' : 'Confirmar eliminación'}</button></div>
+        </section>
+      </div>}
+      <div className="players-profile-layout">
+      <div className="players-profile-carta"><TarjetaJugador player={player} metrics={metricas?.[player.id]} indice={indice} ranking={ranking} /></div>
+      <div className="players-profile-datos">
       <div className="players-profile-grid">
         <section className="players-form-panel">
           <h2>Datos generales</h2>
           <dl>
             <div><dt>Fecha de nacimiento</dt><dd>{dateLabel(player.birthDate)}</dd></div>
             <div><dt>Edad</dt><dd>{age === null ? 'Sin datos' : `${age} años`}</dd></div>
-            <div><dt>Nacionalidad</dt><dd>{player.nationality || 'Sin datos'}</dd></div>
-            <div><dt>Año de graduación</dt><dd>{player.graduationYear ?? 'Sin datos'}</dd></div>
+            <div><dt>País de nacimiento</dt><dd>{player.nationality || 'Sin datos'}</dd></div>
           </dl>
         </section>
         <section className="players-form-panel">
@@ -117,13 +139,13 @@ export default function PlayerProfile({ service, player, onBack }) {
             {sportFields.map(([label, key]) => (
               <div key={key}><dt>{label}</dt><dd>{(player[key] ?? '') === '' ? 'Sin datos' : player[key]}</dd></div>
             ))}
+            <div><dt>Ranking AceCam</dt><dd>{ranking == null ? 'Sin datos' : `#${ranking}${totalRanking ? ` de ${totalRanking}` : ''}`}</dd></div>
           </dl>
         </section>
       </div>
-      <section className="players-form-panel" aria-label="Datos del apoderado">
-        <h2>Apoderado</h2>
-        {allowed && player.guardian ? <dl><div><dt>Nombre del apoderado</dt><dd>{player.guardian.name || 'Sin datos'}</dd></div><div><dt>Teléfono del apoderado</dt><dd>{player.guardian.phone || 'Sin datos'}</dd></div><div><dt>Correo del apoderado</dt><dd>{player.guardian.email || 'Sin datos'}</dd></div></dl> : <p>Sin apoderado registrado.</p>}
-      </section>
+      </div>
+      </div>
+      {editing && <PlayerForm service={service} initialPlayer={player} onCancel={() => setEditing(false)} onCreated={() => setEditing(false)} />}
       {latestMatch && (
         <section className="players-profile-history" aria-labelledby="player-statistics-title">
           <h2 id="player-statistics-title">Estadísticas del último partido analizado</h2>
@@ -135,16 +157,17 @@ export default function PlayerProfile({ service, player, onBack }) {
       )}
       <section className="players-profile-history">
         <h2>Partidos analizados</h2>
-        <DataTable
+        {history === null ? <EsqueletoTabla etiqueta="partidos" /> : <DataTable
+          resizable
           caption="Historial de partidos analizados"
           columns={matchColumns}
-          rows={history?.rows}
-          loading={history === null}
+          rows={visibleRows}
           error={history?.error}
           onRetry={retry}
           emptyTitle="Aún no hay partidos analizados"
           emptyDescription="Los partidos aparecerán aquí cuando termine el análisis."
-        />
+        />}
+        {history?.rows && <PaginacionTabla total={history.rows.length} page={currentPage} pageSize={pageSize} etiqueta="partidos" onPage={setPage} onPageSize={size => { setPageSize(size); setPage(1) }} />}
       </section>
     </section>
   )

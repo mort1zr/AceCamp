@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DataTable } from '../components/ui'
+import PaginacionTabla, { tamanosPagina } from '../components/ui/PaginacionTabla.jsx'
 import PlayerForm from '../components/players/PlayerForm.jsx'
 import PlayerProfile from '../components/players/PlayerProfile.jsx'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { playerAge } from '../lib/players.js'
+import { createFirestoreRankingService } from '../lib/services/firestoreRankingService.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
+import '../components/dashboard/esqueleto.css'
+import { EsqueletoTabla } from '../components/dashboard/EsqueletoDashboard.jsx'
+import PelotaTitulo from '../components/layout/PelotaTitulo.jsx'
 
-const pageSize = 10
 
 function searchName(value) {
   return (value ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('es')
@@ -18,18 +22,20 @@ function academyName(player) {
 }
 
 const columns = [
-  { key: 'fullName', label: 'Jugador', render: name => <div className="players-name"><span className="players-avatar" aria-hidden="true">{(name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(word => word[0]).join('')}</span><span>{name || 'Sin nombre'}</span></div> },
+  { key: 'fullName', label: 'Jugador', minWidth: 200, render: name => <div className="players-name"><span className="players-avatar" aria-hidden="true">{(name ?? '?').split(' ').filter(Boolean).slice(0, 2).map(word => word[0]).join('')}</span><span>{name || 'Sin nombre'}</span></div> },
   { key: 'birthDate', label: 'Edad', render: birthDate => { const age = playerAge(birthDate); return age == null ? '—' : `${age} años` } },
   { key: 'academy', label: 'Academia', render: (_, player) => academyName(player) || 'Sin academia' },
+  { key: 'utr', label: 'UTR', render: utr => (utr == null ? '—' : utr) },
 ]
 
-function PlayersWorkspace({ service }) {
+function PlayersWorkspace({ service, rankingService }) {
   const { rows, loading, error, retry } = usePlayers(service)
   const [showForm, setShowForm] = useState(false)
   const [notice, setNotice] = useState('')
   const [name, setName] = useState('')
   const [academy, setAcademy] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(tamanosPagina[0])
   const [profileId, setProfileId] = useState('')
   const addButton = useRef(null)
   const formWasOpen = useRef(false)
@@ -50,6 +56,7 @@ function PlayersWorkspace({ service }) {
   const profilePlayer = rows.find(player => player.id === profileId && service.canViewProfile?.(player))
   const listColumns = service.canViewProfile ? [...columns, {
     key: 'profile',
+    align: 'right',
     label: 'Perfil',
     render: (_, player) => service.canViewProfile(player) && (
       <button type="button" className="players-button-secondary" disabled={showForm} aria-label={`Ver perfil de ${player.fullName}`} onClick={() => setProfileId(player.id)}>Ver perfil</button>
@@ -72,13 +79,13 @@ function PlayersWorkspace({ service }) {
   }
 
   if (profilePlayer) return (
-    <PlayerProfile key={profilePlayer.id} service={service} player={profilePlayer} onBack={() => setProfileId('')} />
+    <PlayerProfile key={profilePlayer.id} service={service} player={profilePlayer} roster={rows} rankingService={rankingService} onBack={() => setProfileId('')} />
   )
 
   return (
     <section className="players-page" aria-labelledby="players-title">
       {service.mode === 'demo' && <aside className="players-demo-notice"><strong>Modo demostración</strong><span>Datos de ejemplo. Usa nombres ficticios: las altas solo duran en esta sesión.</span></aside>}
-      <header className="players-page-heading"><div><p className="players-eyebrow">Tu equipo, en un solo lugar</p><h1 id="players-title">Jugadores<span className="players-title-dot">.</span></h1><p>Conoce a tus jugadores. Acompaña su evolución.</p></div><button ref={addButton} type="button" className="players-button-primary" onClick={() => { setShowForm(true); setNotice('') }} aria-expanded={showForm} disabled={showForm}><span aria-hidden="true">＋</span> Nuevo jugador</button></header>
+      <header className="players-page-heading"><div><p className="players-eyebrow">Tu equipo, en un solo lugar</p><h1 id="players-title">Jugadores<PelotaTitulo /></h1><p>Conoce a tus jugadores. Acompaña su evolución.</p></div><button ref={addButton} type="button" className="players-button-primary" onClick={() => { setShowForm(true); setNotice('') }} aria-expanded={showForm} disabled={showForm}><span aria-hidden="true">＋</span> Nuevo jugador</button></header>
       <p className="players-notice" role="status">{notice}</p>
       {showForm && <PlayerForm service={service} onCancel={closeForm} onCreated={player => { setNotice(`${player.fullName} se registró correctamente.`); closeForm() }} />}
       <div className="players-list-heading">
@@ -103,11 +110,14 @@ function PlayersWorkspace({ service }) {
               {academyOptions.map(option => <option key={option} value={`academy:${option}`}>{option || 'Sin academia'}</option>)}
             </select>
           </div>
-          {filtered && <button type="button" className="players-button-secondary" onClick={() => { setName(''); setAcademy(''); setPage(1) }}>Limpiar filtros</button>}
+          <div className="players-limpiar" data-visible={filtered || undefined} aria-hidden={!filtered || undefined} inert={!filtered}>
+            <button type="button" className="players-button-secondary" onClick={() => { setName(''); setAcademy(''); setPage(1) }}>Limpiar filtros</button>
+          </div>
         </div>
       )}
       {hasPlayers && matchingRows.length > 0 && <p className="players-table-hint">Desliza la tabla para ver todas las columnas.</p>}
-      <DataTable
+      {loading ? <EsqueletoTabla /> : <DataTable
+        resizable
         caption="Jugadores registrados"
         columns={listColumns}
         rows={matchingRows.slice(offset, offset + pageSize)}
@@ -116,13 +126,9 @@ function PlayersWorkspace({ service }) {
         onRetry={retry}
         emptyTitle={noMatches ? 'No se encontraron jugadores' : 'Tu equipo empieza aquí'}
         emptyDescription={noMatches ? 'Cambia el nombre o la academia, o limpia los filtros.' : 'Registra a tu primer jugador para vincular sus videos y seguir su evolución.'}
-      />
-      {hasPlayers && pageCount > 1 && (
-        <nav className="players-pagination" aria-label="Páginas de jugadores">
-          <button type="button" className="players-button-secondary" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Anterior</button>
-          <span role="status">Página {currentPage} de {pageCount}</span>
-          <button type="button" className="players-button-secondary" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Siguiente</button>
-        </nav>
+      />}
+      {hasPlayers && (
+        <PaginacionTabla total={matchingRows.length} page={currentPage} pageSize={pageSize} etiqueta="jugadores" onPage={setPage} onPageSize={size => { setPageSize(size); setPage(1) }} />
       )}
       <p className="players-footnote">Cada jugador es una historia. El siguiente paso es analizar su juego.</p>
     </section>
@@ -141,15 +147,19 @@ export default function Jugadores({ service, db, session }) {
     return createFirestorePlayersService({ db, actorId: uid, orgId, role })
   }, [db, uid, orgId, role])
 
+  const rankingService = useMemo(() => {
+    if (service || !db || !['coach', 'admin'].includes(role) || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()) return null
+    return createFirestoreRankingService({ db, actorId: uid, orgId, role })
+  }, [service, db, uid, orgId, role])
   const playersService = service ?? liveService
   if (!playersService) return (
     <section className="players-page" aria-labelledby="players-title">
       <aside className="players-demo-notice"><strong>Los jugadores aún no están disponibles</strong><span>Cuando tu sesión de equipo esté disponible, podrás consultar y registrar jugadores.</span></aside>
-      <header className="players-page-heading"><div><p className="players-eyebrow">Tu equipo, en un solo lugar</p><h1 id="players-title">Jugadores<span className="players-title-dot">.</span></h1><p>Conoce a tus jugadores. Acompaña su evolución.</p></div></header>
+      <header className="players-page-heading"><div><p className="players-eyebrow">Tu equipo, en un solo lugar</p><h1 id="players-title">Jugadores<PelotaTitulo /></h1><p>Conoce a tus jugadores. Acompaña su evolución.</p></div></header>
       <div className="players-list-heading"><h2>Tu plantilla</h2><span>0 jugadores</span></div>
       <DataTable caption="Jugadores registrados" columns={columns} rows={[]} loading={false} error={null} emptyTitle="Tu equipo empieza aquí" emptyDescription="Registra a tu primer jugador para vincular sus videos y seguir su evolución." />
       <p className="players-footnote">Cada jugador es una historia. El siguiente paso es analizar su juego.</p>
     </section>
   )
-  return <PlayersWorkspace key={`${playersService.scopeKey}:${role ?? ''}`} service={playersService} />
+  return <PlayersWorkspace key={`${playersService.scopeKey}:${role ?? ''}`} service={playersService} rankingService={rankingService} />
 }

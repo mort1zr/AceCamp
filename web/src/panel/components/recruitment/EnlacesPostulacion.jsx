@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { addDoc, deleteDoc, doc, getDoc, onSnapshot, serverTimestamp } from 'firebase/firestore'
 import { applicationForms, publicApplicationPath } from '../../lib/publicApplications.js'
 import { COLLECTIONS } from '../../lib/schema.js'
+import './bandeja.css'
 
 function Enlaces({ db, orgId }) {
   const [forms, setForms] = useState(null)
@@ -41,27 +42,40 @@ function Enlaces({ db, orgId }) {
   }
 
   return (
-    <section className="rounded-lg border border-line p-4" aria-label="Enlaces de postulación">
-      <h2 className="font-semibold">Enlaces de postulación</h2>
-      <p className="mb-2 text-sm">Comparte un enlace para recibir postulaciones sin cuenta.</p>
-      <button type="button" className="players-button-secondary" disabled={busy || forms == null} onClick={() => change()}>Crear enlace</button>
-      {forms?.length > 0 && (
-        <ul className="mt-3 space-y-2">
-          {forms.map((formId) => {
+    <section className="rec-enlace" aria-label="Enlaces de postulación">
+      <p className="rec-etiqueta">Tu formulario de postulación</p>
+      {forms?.length > 0 ? (
+        <ul>
+          {forms.map((formId, index) => {
             const url = new URL(publicApplicationPath(orgId, formId), window.location.origin).href
             return (
-              <li key={formId} className="flex flex-wrap items-center gap-2">
-                <a className="break-all text-sm underline" href={url} target="_blank" rel="noopener">{url}</a>
-                <button type="button" className="players-button-secondary" onClick={() => copiar(formId, url)}>
-                  {copiado === formId ? 'Enlace copiado' : 'Copiar enlace'}
-                </button>
+              <li key={formId}>
+                <div className="rec-url-caja">
+                  <a className="rec-url" href={url} title={url} target="_blank" rel="noopener">{new URL(url).host}{publicApplicationPath(orgId, formId)}</a>
+                  <button type="button" className="rec-copiar" aria-label={copiado === formId ? 'Enlace copiado' : 'Copiar enlace'} title={copiado === formId ? 'Copiado' : 'Copiar enlace'} onClick={() => copiar(formId, url)}>
+                    {copiado === formId ? (
+                      <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                    ) : (
+                      <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></svg>
+                    )}
+                  </button>
+                </div>
+                <button type="button" className="players-button-secondary" onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>Vista previa</button>
                 <button type="button" className="players-button-secondary" disabled={busy} onClick={() => change(formId)}>Desactivar</button>
+                {index === forms.length - 1 && (
+                  <button type="button" className="players-button-secondary" disabled={busy || forms == null} onClick={() => change()}>Crear enlace</button>
+                )}
               </li>
             )
           })}
         </ul>
+      ) : (
+        <>
+          <p className="rec-nota">Comparte un enlace para recibir postulaciones sin cuenta.</p>
+          <button type="button" className="players-button-secondary rec-crear" disabled={busy || forms == null} onClick={() => change()}>Crear enlace</button>
+        </>
       )}
-      {error && <p className="players-field-error mt-2" role="alert">{error}</p>}
+      {error && <p className="players-field-error" role="alert">{error}</p>}
     </section>
   )
 }

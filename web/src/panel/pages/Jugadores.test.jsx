@@ -52,6 +52,10 @@ it('muestra las tarjetas del último partido analizado de la ficha y conserva el
       return () => {}
     })
     .mockImplementationOnce((_, receive) => {
+      receive({ docs: [] })
+      return () => {}
+    })
+    .mockImplementationOnce((_, receive) => {
       publish = receive
       receive({ docs: [] })
       return () => {}
@@ -207,6 +211,9 @@ describe('Jugadores v1', () => {
     expect(screen.getByText('1 de 12 jugadores')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
     expect(screen.getByText('Página 1 de 2')).toBeTruthy()
+    await user.selectOptions(screen.getByLabelText('Jugadores por página'), '50')
+    expect(screen.getByText('Página 1 de 1')).toBeTruthy()
+    expect(screen.getByText('1–12 de 12')).toBeTruthy()
     expect(screen.getByText('12 jugadores')).toBeTruthy()
   })
 
@@ -233,7 +240,6 @@ describe('Jugadores v1', () => {
     await user.click(await screen.findByRole('button', { name: 'Ver perfil de Camila Ríos' }))
     expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Camila Ríos' }))
     expect(screen.getByText('zurdo')).toBeTruthy()
-    expect(screen.getByText('reservado@example.test')).toBeTruthy()
     expect(await screen.findByRole('alert')).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
     const history = await screen.findByRole('table', { name: 'Historial de partidos analizados' })

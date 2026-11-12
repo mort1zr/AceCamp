@@ -1,19 +1,34 @@
-import { useMemo, useState } from 'react'
-import { EmptyState, ErrorState, LoadingState } from '../components/ui'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
+import { Link } from 'react-router'
+import { EmptyState, ErrorState } from '../components/ui'
 import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
 import DashboardLatestMatch from '../components/dashboard/DashboardLatestMatch.jsx'
 import EvolutionPanel from '../components/dashboard/EvolutionPanel.jsx'
-import DashboardDetails from '../components/dashboard/DashboardDetails.jsx'
+import DashboardEvolution from '../components/dashboard/DashboardEvolution.jsx'
+import MovimientoCard from '../components/dashboard/MovimientoCard.jsx'
+import PeloteosCard from '../components/dashboard/PeloteosCard.jsx'
+import SaqueCard from '../components/dashboard/SaqueCard.jsx'
 import BloqueVacio from '../components/layout/BloqueVacio.jsx'
+import PdfJugador from '../components/pdf/PdfJugador.jsx'
+import { BotonPdf } from '../components/pdf/ReportePdf.jsx'
+import PanelJugador from '../components/dashboard/PanelJugador.jsx'
+import TarjetaJugador from '../components/dashboard/TarjetaJugador.jsx'
+import { posicionRanking, valoracionJugador } from '../lib/valoracion.js'
+import { useArrastre } from '../hooks/useArrastre.js'
+import { useMetricasEquipo } from '../hooks/useMetricasEquipo.js'
+import { useNombreOrganizacion } from '../hooks/useNombreOrganizacion.js'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { useDashboardOverview } from '../hooks/useDashboardOverview.js'
-import { playerAge } from '../lib/players.js'
 import { dashboardPeriods } from '../lib/dashboardPeriods.js'
 import { completeDashboardMetricDefinitions } from '../lib/dashboardOverview.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import { createFirestoreDashboardService } from '../lib/services/firestoreDashboardService.js'
+import { createFirestoreRankingService } from '../lib/services/firestoreRankingService.js'
 import './jugadores.css'
 import './dashboard.css'
+import { EsqueletoJugadores, EsqueletoResumen } from '../components/dashboard/EsqueletoDashboard.jsx'
+import PelotaTitulo from '../components/layout/PelotaTitulo.jsx'
 
 const tarjeta = 'rounded-card border border-line bg-surface p-5'
 const subtitulo = 'font-display text-[22px] leading-tight font-bold tracking-[0.01em]'
@@ -71,24 +86,11 @@ const secciones = [
     texto: 'El último partido aparecerá aquí con su marcador y sus números clave.',
   },
   {
-    clave: 'radar',
-    titulo: 'Radar del jugador',
-    nota: 'Perfil normalizado',
-    vacio: 'Sin datos',
-    texto: 'El modelo aún no entrega puntuaciones comparables de 0–100. No se convierten velocidades o distancias en calificaciones inventadas.',
-  },
-  {
     clave: 'saque',
     titulo: 'Saque',
     nota: 'Resultado de cada punto al saque',
     vacio: 'Sin saques medidos',
     texto: 'Primeros y segundos saques adentro, dobles faltas y sus velocidades.',
-  },
-  {
-    clave: 'golpes',
-    titulo: 'Derecha vs. revés',
-    vacio: 'Sin datos',
-    texto: 'El modelo todavía no clasifica los golpes como derecha o revés. Los golpes medidos no se asignan a un lado sin evidencia.',
   },
   {
     clave: 'peloteos',
@@ -108,15 +110,6 @@ const secciones = [
 
 const indicadores = completeDashboardMetricDefinitions.map(metric => metric.label)
 
-function iniciales(nombre) {
-  return nombre
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join('')
-}
-
 function SeccionVacia({ seccion }) {
   return (
     <div className={`${tarjeta} flex flex-col gap-4`}>
@@ -134,20 +127,21 @@ function SeccionVacia({ seccion }) {
   )
 }
 
-function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = false, details, serveEvolution, playerId, sample }) {
-  const [partido, radar] = secciones
+function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = false, details, serveEvolution, evolution, renderEvolution, playerId, sample }) {
+  const [partido] = secciones
+  const rejilla = 'grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4'
   return (
     <>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
+      <div className={rejilla}>
         {latestMatch ? <DashboardLatestMatch match={latestMatch} /> : (
           <SeccionVacia seccion={filtered
             ? { ...partido, vacio: 'No hay partidos analizados en este periodo', texto: 'Elige otro periodo para consultar sus partidos.' }
             : partido} />
         )}
-        <SeccionVacia seccion={radar} />
+        {!conEvolucion && <SaqueCard serve={details?.serve} playerId={playerId} />}
       </div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
-        {conEvolucion && (
+      <div className={rejilla}>
+        {conEvolucion ? (
           <SeccionVacia
             seccion={{
               clave: 'evolucion',
@@ -157,10 +151,22 @@ function SeccionesDashboard({ conEvolucion = false, latestMatch, filtered = fals
               texto: 'Verás cómo cambia su rendimiento partido a partido.',
             }}
           />
+        ) : (
+          <>
+            <EvolutionPanel playerId={playerId} evolution={evolution} sample={sample} renderEvolution={renderEvolution} />
+            <section className="dashboard-panel dashboard-evolution" aria-labelledby="serve-evolution-title">
+              <div className="dashboard-panel-heading"><div><p className="players-eyebrow">Hasta el bote, por partido</p><h2 id="serve-evolution-title">Evolución del saque</h2></div><span className="dashboard-unit">Partidos analizados</span></div>
+              <DashboardEvolution playerId={playerId} evolution={serveEvolution} metric="averageServeSpeed" sample={sample} />
+            </section>
+          </>
         )}
       </div>
-      <DashboardDetails details={details} serveEvolution={serveEvolution} playerId={playerId} sample={sample} />
-      <SeccionVacia seccion={secciones.find(section => section.clave === 'golpes')} />
+      {!conEvolucion && (
+        <div className={rejilla}>
+          <PeloteosCard rallies={details?.rallies} playerId={playerId} />
+          <MovimientoCard movement={details?.movement} />
+        </div>
+      )}
     </>
   )
 }
@@ -176,6 +182,89 @@ function IndicadoresVacios() {
         </div>
       ))}
     </div>
+  )
+}
+
+function ElegirJugador({ players, metricas, onSelect }) {
+  const carrusel = useArrastre()
+  return (
+    <section
+      aria-labelledby="dashboard-elegir"
+      className={`${tarjeta} dashboard-hud flex flex-col gap-5`}
+    >
+      <div className="flex flex-col gap-2">
+        <p className="panel-jugador-aviso">
+          <span aria-hidden="true" className="panel-jugador-punto" />
+          Selección de jugador
+        </p>
+        <h2 id="dashboard-elegir" className="panel-jugador-titulo">
+          Elige un jugador
+        </h2>
+        <p className="text-[15px] text-muted">
+          Selecciona a quién quieres analizar para ver su rendimiento, su evolución y sus últimos
+          partidos.
+        </p>
+      </div>
+      <ul
+        ref={carrusel}
+        aria-label="Jugadores"
+        tabIndex={0}
+        className="-mx-5 flex cursor-grab snap-x snap-mandatory items-center data-arrastrando:cursor-grabbing data-arrastrando:snap-none data-arrastrando:select-none scroll-px-5 gap-4 overflow-x-auto px-5 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {players.map((player, indice) => {
+          const name =
+            typeof player.fullName === 'string' && player.fullName.trim()
+              ? player.fullName
+              : 'Sin nombre'
+          return (
+            <li key={player.id} className="shrink-0 snap-start">
+              <button
+                type="button"
+                aria-label={name}
+                onClick={(evento) => onSelect(player.id, evento.currentTarget)}
+                className="block cursor-pointer rounded-[14px] transition-transform duration-300 hover:-translate-y-1"
+              >
+                <TarjetaJugador
+                  player={player}
+                  metrics={metricas?.[player.id]}
+                  indice={indice}
+                  escala={0.62}
+                />
+              </button>
+            </li>
+          )
+        })}
+        <li className="shrink-0 snap-start">
+          <Link
+            to="/jugadores"
+            draggable={false}
+            style={{ width: 230 * 0.62, height: 330 * 0.62 }}
+            className="flex flex-col items-center justify-center gap-3 rounded-[14px] border border-dashed border-line3 text-muted transition-colors hover:border-accent-line hover:text-text"
+          >
+            <span
+              aria-hidden="true"
+              className="grid size-12 place-items-center rounded-full border border-dashed border-line3"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+            <span className="text-center">
+              <span className="block font-semibold">Agregar jugador</span>
+              <span className="block text-[13px]">Ir a Jugadores</span>
+            </span>
+          </Link>
+        </li>
+      </ul>
+    </section>
   )
 }
 
@@ -204,32 +293,17 @@ function PerfilVacio({ children }) {
   )
 }
 
-function Perfil({ player, sample }) {
-  const name =
-    typeof player.fullName === 'string' && player.fullName.trim() ? player.fullName : 'Sin nombre'
-  const age = playerAge(player.birthDate)
+function Perfil({ player, metrics, indice, ranking, total }) {
   return (
-    <div className={`${tarjeta} dashboard-profile flex flex-wrap items-center gap-5`}>
-      <span
-        aria-hidden="true"
-        className="grid size-21 shrink-0 place-items-center rounded-full bg-series1 font-display text-[28px] font-bold text-on-accent uppercase"
-      >
-        {iniciales(name)}
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <p className={etiqueta}>Jugador seleccionado</p>
-        <h2 className="font-display text-[40px] leading-none font-bold [overflow-wrap:anywhere]">
-          {name}
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          <span className="dashboard-chip">
-            {age == null ? 'Edad sin registrar' : `${age} años`}
-          </span>
-          <span className="dashboard-chip">{player.academy || 'Sin academia registrada'}</span>
-          <span className="dashboard-chip">
-            {sample ? 'Perfil de ejemplo' : 'Perfil del equipo'}
-          </span>
-        </div>
+    <div className={`${tarjeta} dashboard-profile flex flex-wrap items-center gap-6 max-sm:justify-center sm:gap-8`}>
+      <TarjetaJugador player={player} metrics={metrics} indice={indice} ranking={ranking} />
+      <div className="dashboard-perfil-info flex min-w-60 flex-1">
+        <PanelJugador
+          player={player}
+          metrics={metrics}
+          ranking={ranking}
+          total={total}
+        />
       </div>
     </div>
   )
@@ -251,15 +325,85 @@ function DashboardSelect({ id, label, children, value, disabled, onChange }) {
   )
 }
 
-function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilter }) {
+function useCabeceraFija(activa) {
+  const cabecera = useRef(null)
+  const centinela = useRef(null)
+  const completo = useRef(0)
+  const [pegada, setPegada] = useState(false)
+
+  useEffect(() => {
+    if (!activa) return undefined
+    let cuadro = 0
+    const revisar = () => {
+      cuadro = 0
+      const marca = centinela.current
+      const elemento = cabecera.current
+      if (!marca || !elemento) return
+      const alto = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--barra-alto')) || 0
+      const fija = marca.getBoundingClientRect().top < alto
+      if (!fija) completo.current = elemento.offsetHeight
+      setPegada(fija)
+    }
+    const programar = () => {
+      if (!cuadro) cuadro = requestAnimationFrame(revisar)
+    }
+    revisar()
+    window.addEventListener('scroll', programar, { passive: true })
+    window.addEventListener('resize', programar)
+    return () => {
+      cancelAnimationFrame(cuadro)
+      window.removeEventListener('scroll', programar)
+      window.removeEventListener('resize', programar)
+    }
+  }, [activa])
+
+  useLayoutEffect(() => {
+    const elemento = cabecera.current
+    if (!elemento) return
+    if (!pegada || !activa) {
+      elemento.style.marginBottom = ''
+      return
+    }
+    const copia = elemento.cloneNode(true)
+    copia.removeAttribute('id')
+    copia.querySelectorAll('[id]').forEach((nodo) => nodo.removeAttribute('id'))
+    copia.classList.add('dashboard-head-medir')
+    copia.setAttribute('aria-hidden', 'true')
+    copia.dataset.pegada = ''
+    Object.assign(copia.style, {
+      position: 'absolute',
+      visibility: 'hidden',
+      pointerEvents: 'none',
+      width: `${elemento.offsetWidth}px`,
+      marginBottom: '0px',
+    })
+    elemento.parentElement.appendChild(copia)
+    const compacto = copia.offsetHeight
+    copia.remove()
+    elemento.style.marginBottom = `${Math.max(0, completo.current - compacto)}px`
+  }, [pegada, activa])
+
+  return { cabecera, centinela, pegada: pegada && activa }
+}
+
+function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilter, onExportar }) {
+  const { cabecera, centinela, pegada } = useCabeceraFija(Boolean(selected))
   return (
-    <header className="dashboard-head">
+    <>
+    <div ref={centinela} aria-hidden="true" className="dashboard-centinela" />
+    <header
+      ref={cabecera}
+      className={`dashboard-head ${selected ? 'dashboard-head-fija' : ''}`}
+      data-pegada={pegada || undefined}
+    >
       <div>
         <p className="players-eyebrow">Una mirada a su rendimiento</p>
         <h1 id="dashboard-title">
-          Dashboard<span className="players-title-dot">.</span>
+          Dashboard<PelotaTitulo />
         </h1>
+        <p className="players-subtitle">Rendimiento, evolución y partidos de cada jugador.</p>
       </div>
+      {selected && (
       <div className="dashboard-controls">
         <DashboardSelect
           id="dashboard-player"
@@ -280,22 +424,65 @@ function Cabecera({ players, selected, onSelect, period, onPeriodChange, canFilt
         <DashboardSelect id="dashboard-period" label="Periodo" value={period} disabled={!canFilter} onChange={onPeriodChange}>
           {dashboardPeriods.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
         </DashboardSelect>
+        <BotonPdf
+          onClick={onExportar}
+          disabled={!onExportar}
+          className="players-button-primary"
+        >
+          <span className="dashboard-pdf-texto">Exportar PDF</span>
+        </BotonPdf>
       </div>
+      )}
     </header>
+    </>
   )
 }
 
-function DashboardWorkspace({ playersService, overviewService, renderEvolution }) {
+function DashboardWorkspace({
+  playersService,
+  overviewService,
+  rankingService,
+  renderEvolution,
+  organizacion,
+}) {
   const players = usePlayers(playersService)
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedId, setSelectedId] = useState(
+    () => new URLSearchParams(window.location.search).get('jugador') ?? '',
+  )
   const [period, setPeriod] = useState('all')
+  const [exportando, setExportando] = useState(false)
+  const terminarPdf = useCallback(() => setExportando(false), [])
   const selected =
     !players.loading && !players.error
       ? players.rows.find((player) => player.id === selectedId)
       : null
   const overview = useDashboardOverview(overviewService, selected?.id ?? '')
+  const metricasEquipo = useMetricasEquipo(rankingService, true)
+  const elegirJugador = (id, origen) => {
+    const reducido = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    const escena = origen?.querySelector('.tarjeta-jugador-escena')
+    if (!escena || reducido || typeof document.startViewTransition !== 'function') {
+      setSelectedId(id)
+      return
+    }
+    escena.style.viewTransitionName = 'tarjeta-jugador'
+    document.startViewTransition(() => flushSync(() => setSelectedId(id)))
+  }
   const ready = overview.status === 'ready'
-  const report = ready ? (period === 'all' ? overview.data : overview.data?.periods?.[period]) : null
+  const [ultimo, setUltimo] = useState(null)
+  if (ready && selected && (ultimo?.player.id !== selected.id || ultimo.data !== overview.data)) {
+    setUltimo({ player: selected, data: overview.data })
+  }
+  const enTransicion =
+    overview.status === 'loading' &&
+    Boolean(selected && ultimo) &&
+    ultimo.player.id !== selected.id &&
+    players.rows.some((player) => player.id === ultimo.player.id)
+  const visible = enTransicion ? ultimo.player : selected
+  const datos = enTransicion ? ultimo.data : overview.data
+  const estado = enTransicion ? 'ready' : overview.status
+  const report =
+    ready || enTransicion ? (period === 'all' ? datos : datos?.periods?.[period]) : null
   const sample = playersService.mode === 'demo'
   const sinIndicadores =
     overview.status === 'unavailable' ||
@@ -321,12 +508,20 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
         period={period}
         onPeriodChange={setPeriod}
         canFilter={Boolean(overview.data?.periods)}
+        onExportar={selected && ready ? () => setExportando(true) : undefined}
       />
+      {exportando && selected && ready && (
+        <PdfJugador
+          player={selected}
+          report={report}
+          periodo={dashboardPeriods.find(({ value }) => value === period)}
+          organizacion={organizacion}
+          onTerminar={terminarPdf}
+        />
+      )}
 
       {players.loading ? (
-        <div className={tarjeta} aria-busy="true">
-          <LoadingState title="Cargando jugadores…" />
-        </div>
+        <EsqueletoJugadores />
       ) : players.error ? (
         <div className={tarjeta}>
           <ErrorState
@@ -336,34 +531,40 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
           />
         </div>
       ) : !selected ? (
-        <>
+        players.rows.length === 0 ? (
           <PerfilVacio>
-            {players.rows.length === 0 ? (
-              <EmptyState
-                title="Tu equipo empieza con un jugador"
-                description="Registra un jugador para poder consultar su rendimiento."
-              />
-            ) : (
-              <EmptyState
-                title="Cada jugador tiene su propia historia"
-                description="Elige un jugador en el selector para ver su resumen de rendimiento."
-              />
-            )}
+            <EmptyState
+              title="Tu equipo empieza con un jugador"
+              description="Registra un jugador para poder consultar su rendimiento."
+            />
           </PerfilVacio>
-          <IndicadoresVacios />
-          <SeccionesDashboard conEvolucion />
-        </>
+        ) : (
+          <ElegirJugador
+            players={players.rows}
+            metricas={metricasEquipo}
+            onSelect={elegirJugador}
+          />
+        )
       ) : (
-        <>
-          <Perfil player={selected} sample={sample} />
-          {overview.status === 'loading' ? (
-            <div className={tarjeta} aria-busy="true">
-              <LoadingState
-                title="Cargando resumen…"
-                description="Estamos reuniendo los indicadores del jugador seleccionado."
-              />
-            </div>
-          ) : overview.status === 'error' ? (
+        <div className="dashboard-desplegar" aria-busy={enTransicion || undefined}>
+          <Perfil
+            player={visible}
+            metrics={datos?.metrics}
+            indice={players.rows.findIndex((player) => player.id === visible.id)}
+            ranking={
+              metricasEquipo ? posicionRanking(players.rows, metricasEquipo, visible.id) : null
+            }
+            total={
+              metricasEquipo
+                ? players.rows.filter(
+                    (fila) => valoracionJugador(fila, metricasEquipo[fila.id]).media != null,
+                  ).length
+                : 0
+            }
+          />
+          {estado === 'loading' ? (
+            <EsqueletoResumen />
+          ) : estado === 'error' ? (
             <div className={tarjeta}>
               <ErrorState
                 title="No pudimos cargar el resumen"
@@ -382,7 +583,7 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                     {sample ? 'Ejemplos de interfaz' : 'Indicadores disponibles'}
                   </span>
                 </div>
-                {overview.data?.periods && period === 'all' && (
+                {datos?.periods && period === 'all' && (
                   <p className="text-[13px] text-muted">Elige un periodo para ver la comparación con el anterior.</p>
                 )}
                 <DashboardMetrics
@@ -412,23 +613,19 @@ function DashboardWorkspace({ playersService, overviewService, renderEvolution }
                   />
                 </div>
               )}
-              <EvolutionPanel
-                playerId={selected.id}
-                evolution={report?.evolution}
-                sample={sample}
-                renderEvolution={ready ? renderEvolution : undefined}
-              />
               <SeccionesDashboard
-                latestMatch={report?.latestMatch?.playerId === selected.id ? report.latestMatch : null}
+                latestMatch={report?.latestMatch?.playerId === visible.id ? report.latestMatch : null}
                 filtered={period !== 'all'}
                 details={report?.details}
                 serveEvolution={report?.serveEvolution}
-                playerId={selected.id}
+                evolution={report?.evolution}
+                renderEvolution={ready || enTransicion ? renderEvolution : undefined}
+                playerId={visible.id}
                 sample={sample}
               />
             </>
           )}
-        </>
+        </div>
       )}
       <p className="dashboard-footnote">
         Los datos ausentes se muestran como «Sin datos». Un cero solo se muestra cuando está
@@ -469,6 +666,7 @@ export default function Dashboard({
   const uid = session?.uid
   const orgId = session?.orgId
   const role = session?.role ?? 'coach'
+  const organizacion = useNombreOrganizacion(db, orgId)
   const hasInjectedServices = playersService != null || overviewService != null
   const liveServices = useMemo(() => {
     if (
@@ -484,6 +682,7 @@ export default function Dashboard({
     return {
       players: createFirestorePlayersService(identity),
       overview: createFirestoreDashboardService(identity),
+      ranking: createFirestoreRankingService(identity),
     }
   }, [hasInjectedServices, db, uid, orgId, role])
   const players = playersService ?? liveServices?.players
@@ -496,7 +695,9 @@ export default function Dashboard({
       key={players.scopeKey}
       playersService={players}
       overviewService={overview}
+      rankingService={liveServices?.ranking}
       renderEvolution={renderEvolution}
+      organizacion={organizacion}
     />
   )
 }

@@ -4,7 +4,7 @@ import { analysisErrorMessage } from './analysis.js'
 
 describe('límite del plan', () => {
   it('usa los mismos valores que las reglas', () => {
-    expect([planLimit('free'), planLimit('prueba'), planLimit('basico'), planLimit('pro'), planLimit('ultra')]).toEqual([0, 15, 30, 150, null])
+    expect([planLimit('free'), planLimit('prueba'), planLimit('basico'), planLimit('pro'), planLimit('ultra')]).toEqual([0, 15, 30, 150, 500])
     expect(planLimit('inventado')).toBe(0)
     expect(planLimit(undefined)).toBe(0)
   })

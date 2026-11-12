@@ -1,4 +1,5 @@
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { buildDashboardDetails } from '../dashboardDetails.js'
 import { isValidBirthDate } from '../players.js'
 import { reportMetrics } from '../workerDashboardStatistics.js'
 
@@ -28,6 +29,7 @@ export function createFirestoreMatchesService({ db, orgId, actorId, role }) {
             result: row.result,
             processedVideoPath: row.processedVideoPath,
             ...reportMetrics(row),
+            details: buildDashboardDetails([{ ...row, id: document.id }], { orgId, playerId: row.playerId }),
           }]
         })
         rows.sort((a, b) => b.matchDate.localeCompare(a.matchDate) || a.id.localeCompare(b.id))

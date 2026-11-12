@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import BloqueVacio from '../components/layout/BloqueVacio.jsx'
-import { ErrorState, LoadingState, StatusBadge } from '../components/ui'
+import { ErrorState, StatusBadge } from '../components/ui'
+import { useContador } from '../hooks/useContador.js'
 import { useInicio } from '../hooks/useInicio.js'
+import { useUnidades } from '../hooks/useUnidades.js'
+import { createFirestoreInicioService } from '../lib/services/firestoreInicioService.js'
+import { convertirVelocidad, etiquetaVelocidad } from '../lib/unidades.js'
 import { useIdioma } from '../../compartido/lib/idioma.jsx'
+import PelotaTitulo from '../components/layout/PelotaTitulo.jsx'
 
 const textos = {
   es: {
@@ -30,6 +35,9 @@ const textos = {
     enProcesamiento: 'En procesamiento',
     cortas: ['Jugadores', 'Partidos', 'Postulantes', 'En cola'],
     estimado: (n) => `Tiempo estimado: ${n} min`,
+    enCurso: 'En cola o analizándose',
+    analizando: 'Analizando…',
+    errorAnalisis: 'Error en el análisis',
     postulacionesRecientes: 'Postulaciones recientes',
     verTodas: 'Ver todas',
     cola: 'Cola de procesamiento',
@@ -88,7 +96,19 @@ const textos = {
       'en cola': 'En cola',
       listo: 'Listo',
       error: 'Error',
+      contactada: 'Contactada',
+      descartada: 'Descartada',
     },
+    metricas: { saque: 'velocidad de saque', primeros: '% de primeros saques' },
+    sube: (jugador, metrica) => `${jugador} subió su ${metrica}`,
+    baja: (jugador, metrica) => `${jugador} bajó su ${metrica}`,
+    cambio: (actual, antes, n) =>
+      `${actual} en el último partido (venía de ${antes} en ${n === 1 ? 'el anterior' : `los ${n} anteriores`})`,
+    fallo: (titulo) => `Falló el análisis de “${titulo}”`,
+    falloTexto: 'Revisa el video y vuelve a subirlo desde Analizar video.',
+    kpis: { saque: 'Saque medio', golpe: 'Golpe medio', partidos: 'Partidos analizados' },
+    sinUtr: 'UTR sin registrar',
+    sinCategoria: 'Sin categoría',
   },
   en: {
     locale: 'en-US',
@@ -114,6 +134,9 @@ const textos = {
     enProcesamiento: 'Processing',
     cortas: ['Players', 'Matches', 'Applicants', 'In queue'],
     estimado: (n) => `Estimated time: ${n} min`,
+    enCurso: 'Queued or being analyzed',
+    analizando: 'Analyzing…',
+    errorAnalisis: 'Analysis error',
     postulacionesRecientes: 'Recent applications',
     verTodas: 'View all',
     cola: 'Processing queue',
@@ -172,8 +195,49 @@ const textos = {
       'en cola': 'Queued',
       listo: 'Ready',
       error: 'Error',
+      contactada: 'Contacted',
+      descartada: 'Discarded',
     },
+    metricas: { saque: 'serve speed', primeros: 'first-serve %' },
+    sube: (jugador, metrica) => `${jugador} improved their ${metrica}`,
+    baja: (jugador, metrica) => `${jugador} dropped their ${metrica}`,
+    cambio: (actual, antes, n) =>
+      `${actual} in the last match (was ${antes} over the previous ${n === 1 ? 'match' : `${n} matches`})`,
+    fallo: (titulo) => `The analysis of “${titulo}” failed`,
+    falloTexto: 'Check the video and upload it again from Analyze video.',
+    kpis: { saque: 'Average serve', golpe: 'Average shot', partidos: 'Analyzed matches' },
+    sinUtr: 'UTR not recorded',
+    sinCategoria: 'No category',
   },
+}
+
+function Cifra({ valor, formato = (n) => n, retraso = 0, sufijo }) {
+  const actual = useContador(valor, { retraso })
+  const final = String(formato(valor))
+  return (
+    <>
+      <span
+        className="inline-block text-right tabular-nums"
+        style={{ minWidth: `${final.length}ch` }}
+      >
+        {typeof valor === 'number' ? formato(actual) : final}
+      </span>
+      {sufijo && ` ${sufijo}`}
+    </>
+  )
+}
+
+const cifra = (locale, valor, decimales) =>
+  new Intl.NumberFormat(locale, {
+    minimumFractionDigits: decimales ?? 0,
+    maximumFractionDigits: decimales ?? 1,
+  }).format(valor)
+
+const decimalesDe = (valor) => (Number.isInteger(Math.round(valor * 10) / 10) ? 0 : 1)
+
+function medida(t, unidades, metrica, valor) {
+  if (metrica === 'primeros') return `${cifra(t.locale, valor)}%`
+  return `${cifra(t.locale, convertirVelocidad(valor, unidades))} ${etiquetaVelocidad(unidades)}`
 }
 
 const barra = {
@@ -188,7 +252,8 @@ const colores = ['bg-series1', 'bg-electric', 'bg-series3', 'bg-accent']
 const tarjeta = 'rounded-card border border-line bg-surface p-5'
 const etiqueta = 'text-xs font-semibold tracking-[0.08em] text-muted uppercase'
 const subtitulo = 'font-display text-[22px] leading-tight font-bold tracking-[0.01em]'
-const enlace = 'text-sm font-semibold text-accent-ink hover:underline'
+const enlace =
+  '-mx-2 -my-3 inline-flex min-h-11 items-center px-2 text-sm font-semibold text-accent-ink hover:underline'
 const boton =
   'inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] border px-4 text-sm font-semibold whitespace-nowrap transition-colors'
 const botonNormal = `${boton} border-line2 bg-surface2 text-text hover:bg-line`
@@ -309,7 +374,7 @@ function Vacio({ t, tipo, to, principal = false }) {
   )
 }
 
-function Bienvenida({ t, nombre, resumen, ahora }) {
+function Bienvenida({ t, nombre, resumen, ahora, cargando = false }) {
   const fecha = capital(
     new Intl.DateTimeFormat(t.locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(
       ahora,
@@ -322,8 +387,12 @@ function Bienvenida({ t, nombre, resumen, ahora }) {
         <h1 className="my-1.5 font-display text-[44px] leading-none font-bold">
           {saludo(t, ahora.getHours())}
           {`, ${nombre || t.coach}`}
+          <PelotaTitulo />
         </h1>
-        {!resumen && <p className="text-base text-muted">{t.sinActividad}</p>}
+        {cargando && (
+          <span className="mt-2.5 block h-4 w-80 max-w-full animate-pulse rounded-md bg-line" />
+        )}
+        {!resumen && !cargando && <p className="text-base text-muted">{t.sinActividad}</p>}
         {resumen && (
           <p className="text-base text-muted">
             {t.tienes}{' '}
@@ -380,13 +449,15 @@ function Tarjetas({ t, resumen, ahora }) {
     {
       etiqueta: t.enProcesamiento,
       valor: resumen?.processing,
-      nota: resumen && t.estimado(resumen.estimatedMinutes),
+      nota:
+        resumen &&
+        (resumen.estimatedMinutes == null ? t.enCurso : t.estimado(resumen.estimatedMinutes)),
     },
   ]
   return (
     <section
       aria-label={t.resumen}
-      className="grid grid-cols-4 gap-1.5 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] md:gap-4"
+      className="grid grid-cols-4 gap-1.5 md:grid-cols-2 md:gap-4 xl:grid-cols-4"
     >
       {datos.map((dato, indice) => {
         const vacio = dato.valor == null
@@ -399,7 +470,7 @@ function Tarjetas({ t, resumen, ahora }) {
             <p
               className={`font-display text-[44px] leading-none font-bold max-md:text-[28px] ${vacio ? 'text-line3' : ''}`}
             >
-              {vacio ? 0 : dato.valor}
+              {vacio ? 0 : <Cifra valor={dato.valor} formato={Math.round} />}
             </p>
             <p className="w-full truncate text-[10.5px] font-semibold text-muted md:hidden">
               {t.cortas[indice]}
@@ -434,7 +505,13 @@ function Postulaciones({ t, filas }) {
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{postulacion.fullName}</p>
                 <p className="truncate text-[13px] text-muted">
-                  {postulacion.age} {t.años} · {postulacion.academy} · UTR {postulacion.utr}
+                  {[
+                    postulacion.age != null && `${postulacion.age} ${t.años}`,
+                    postulacion.academy,
+                    postulacion.utr != null && `UTR ${postulacion.utr}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </p>
               </div>
               <StatusBadge status={postulacion.status} label={t.estados[postulacion.status]} />
@@ -461,34 +538,47 @@ function Cola({ t, filas }) {
           {filas.map((video) => {
             const listo = video.status === 'listo'
             const estado = t.estados[video.status] ?? video.status
+            const sinPorcentaje = video.progress == null
             return (
               <li key={video.id} className="flex flex-col gap-2">
                 <div className="flex items-baseline justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{video.title}</p>
                     <p className="truncate text-[13px] text-muted">
-                      {video.source} ·{' '}
-                      {listo
-                        ? t.terminado
-                        : `${t.subido} ${haceCuanto(video.uploadedAt, t.locale)}`}
+                      {[
+                        video.source,
+                        listo
+                          ? t.terminado
+                          : video.status === 'error'
+                            ? t.errorAnalisis
+                            : video.uploadedAt &&
+                              `${t.subido} ${haceCuanto(video.uploadedAt, t.locale)}`,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
                   </div>
                   <StatusBadge
                     status={video.status}
-                    label={video.status === 'procesando' ? `${estado} ${video.progress}%` : estado}
+                    label={
+                      video.status === 'procesando' && !sinPorcentaje
+                        ? `${estado} ${video.progress}%`
+                        : estado
+                    }
                   />
                 </div>
                 <div
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={video.progress}
+                  aria-valuenow={sinPorcentaje ? undefined : video.progress}
+                  aria-valuetext={sinPorcentaje ? t.analizando : undefined}
                   aria-label={t.progresoDe(video.title)}
                   className="h-2 overflow-hidden rounded-full bg-line"
                 >
                   <div
-                    className={`h-full rounded-full ${barra[video.status] ?? 'bg-muted'}`}
-                    style={{ width: `${video.progress}%` }}
+                    className={`h-full rounded-full ${barra[video.status] ?? 'bg-muted'} ${sinPorcentaje ? 'w-full animate-pulse' : ''}`}
+                    style={sinPorcentaje ? undefined : { width: `${video.progress}%` }}
                   />
                 </div>
               </li>
@@ -547,7 +637,25 @@ function Analisis({ t, filas }) {
   )
 }
 
+function textoAlerta(t, unidades, alerta) {
+  if (alerta.title) return [alerta.title, alerta.detail]
+  if (alerta.type === 'error') {
+    const titulo = `${alerta.player} vs. ${alerta.opponent}`
+    return [t.fallo(titulo), alerta.message || t.falloTexto]
+  }
+  const nombre = t.metricas[alerta.metric]
+  return [
+    (alerta.type === 'up' ? t.sube : t.baja)(alerta.player, nombre),
+    t.cambio(
+      medida(t, unidades, alerta.metric, alerta.latest),
+      medida(t, unidades, alerta.metric, alerta.previous),
+      alerta.matches,
+    ),
+  ]
+}
+
 function Alertas({ t, filas }) {
+  const unidades = useUnidades()
   return (
     <div className={tarjeta}>
       <Encabezado titulo={t.alertas}>
@@ -561,47 +669,76 @@ function Alertas({ t, filas }) {
         <Vacio t={t} tipo="alertas" />
       ) : (
         <ul>
-          {filas.map((alerta) => (
-            <li key={alerta.id} className={`${fila} items-start`}>
-              <span
-                className={`grid size-8.5 shrink-0 place-items-center rounded-full bg-chip ${
-                  alerta.type === 'up' ? 'text-good' : 'text-bad'
-                }`}
-              >
-                <Trazo size={16} strokeWidth={2.2}>
-                  {alerta.type === 'up' && (
-                    <>
-                      <path d="M12 19V5" />
-                      <path d="M6 11l6-6 6 6" />
-                    </>
-                  )}
-                  {alerta.type === 'down' && (
-                    <>
-                      <path d="M12 5v14" />
-                      <path d="M6 13l6 6 6-6" />
-                    </>
-                  )}
-                  {alerta.type !== 'up' && alerta.type !== 'down' && (
-                    <>
-                      <path d="M12 7v6" />
-                      <path d="M12 17h.01" />
-                    </>
-                  )}
-                </Trazo>
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">{alerta.title}</p>
-                <p className="mt-0.5 text-[13px] text-muted">{alerta.detail}</p>
-              </div>
-            </li>
-          ))}
+          {filas.map((alerta) => {
+            const [titulo, detalle] = textoAlerta(t, unidades, alerta)
+            return (
+              <li key={alerta.id} className={`${fila} items-start`}>
+                <span
+                  className={`grid size-8.5 shrink-0 place-items-center rounded-full bg-chip ${
+                    alerta.type === 'up' ? 'text-good' : 'text-bad'
+                  }`}
+                >
+                  <Trazo size={16} strokeWidth={2.2}>
+                    {alerta.type === 'up' && (
+                      <>
+                        <path d="M12 19V5" />
+                        <path d="M6 11l6-6 6 6" />
+                      </>
+                    )}
+                    {alerta.type === 'down' && (
+                      <>
+                        <path d="M12 5v14" />
+                        <path d="M6 13l6 6 6-6" />
+                      </>
+                    )}
+                    {alerta.type !== 'up' && alerta.type !== 'down' && (
+                      <>
+                        <path d="M12 7v6" />
+                        <path d="M12 17h.01" />
+                      </>
+                    )}
+                  </Trazo>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{titulo}</p>
+                  <p className="mt-0.5 text-[13px] text-muted">{detalle}</p>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
   )
 }
 
+function destacado(t, unidades, jugador) {
+  if (!jugador.kpi)
+    return { etiqueta: jugador.kpiLabel, valor: jugador.kpiValue, delta: jugador.delta, sube: true }
+  const { tipo, valor, anterior } = jugador.kpi
+  if (tipo === 'partidos')
+    return {
+      etiqueta: t.kpis.partidos,
+      valor,
+      formato: (n) => cifra(t.locale, Math.round(n)),
+    }
+  const diferencia = anterior == null ? null : convertirVelocidad(valor - anterior, unidades)
+  const decimales = decimalesDe(convertirVelocidad(valor, unidades))
+  return {
+    etiqueta: t.kpis[tipo],
+    valor,
+    formato: (n) => cifra(t.locale, convertirVelocidad(n, unidades), decimales),
+    sufijo: etiquetaVelocidad(unidades),
+    delta:
+      diferencia == null || Math.abs(diferencia) < 0.05 ? null : Math.round(diferencia * 10) / 10,
+    deltaFormato: (n) =>
+      `${diferencia > 0 ? '+' : '-'}${cifra(t.locale, Math.abs(n), decimalesDe(diferencia ?? 0))}`,
+    sube: diferencia > 0,
+  }
+}
+
 function Seguimiento({ t, filas, total }) {
+  const unidades = useUnidades()
   if (filas.length === 0) {
     return (
       <section>
@@ -618,48 +755,134 @@ function Seguimiento({ t, filas, total }) {
           {t.verLos(total)}
         </Link>
       </div>
-      <ul className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
-        {filas.map((jugador, indice) => (
-          <li key={jugador.id}>
-            <Link
-              to="/dashboard"
-              className={`${tarjeta} flex h-full flex-col gap-3.5 transition-colors hover:border-line3`}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`grid size-11.5 shrink-0 place-items-center rounded-full text-[15px] font-bold text-on-accent ${
-                    colores[indice % colores.length]
-                  }`}
-                >
-                  {iniciales(jugador.fullName)}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold">{jugador.fullName}</p>
-                  <p className="text-[13px] text-muted">
-                    {jugador.category} · UTR {jugador.utr}
-                  </p>
+      <ul
+        aria-label={t.seguimiento}
+        tabIndex={0}
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden"
+      >
+        {filas.map((jugador, indice) => {
+          const kpi = destacado(t, unidades, jugador)
+          return (
+            <li key={jugador.id} className="w-[78%] shrink-0 snap-start sm:w-auto">
+              <Link
+                to={`/dashboard?jugador=${encodeURIComponent(jugador.id)}`}
+                className={`${tarjeta} flex h-full flex-col gap-3.5 transition-colors hover:border-line3`}
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`grid size-11.5 shrink-0 place-items-center rounded-full text-[15px] font-bold text-on-accent ${
+                      colores[indice % colores.length]
+                    }`}
+                  >
+                    {iniciales(jugador.fullName)}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{jugador.fullName}</p>
+                    <p className="text-[13px] text-muted">
+                      {jugador.category || t.sinCategoria} ·{' '}
+                      {jugador.utr == null ? t.sinUtr : `UTR ${jugador.utr}`}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-end justify-between gap-2 border-t border-chip pt-3">
-                <div>
-                  <p className={etiqueta}>{jugador.kpiLabel}</p>
-                  <p className="mt-1 font-display text-3xl leading-none font-bold">
-                    {jugador.kpiValue}
-                  </p>
+                <div className="flex items-end justify-between gap-2 border-t border-chip pt-3">
+                  <div>
+                    <p className={etiqueta}>{kpi.etiqueta}</p>
+                    <p className="mt-1 font-display text-3xl leading-none font-bold tabular-nums">
+                      <Cifra valor={kpi.valor} formato={kpi.formato} sufijo={kpi.sufijo} />
+                    </p>
+                  </div>
+                  {kpi.delta && (
+                    <span
+                      className={`inline-flex items-center gap-1 text-[13px] font-semibold ${kpi.sube ? 'text-good' : 'text-bad'}`}
+                    >
+                      <Trazo size={14} strokeWidth={2.4}>
+                        {kpi.sube ? (
+                          <>
+                            <path d="M12 19V5" />
+                            <path d="M6 11l6-6 6 6" />
+                          </>
+                        ) : (
+                          <>
+                            <path d="M12 5v14" />
+                            <path d="M6 13l6 6 6-6" />
+                          </>
+                        )}
+                      </Trazo>
+                      <Cifra valor={kpi.delta} formato={kpi.deltaFormato} />
+                    </span>
+                  )}
                 </div>
-                <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-good">
-                  <Trazo size={14} strokeWidth={2.4}>
-                    <path d="M12 19V5" />
-                    <path d="M6 11l6-6 6 6" />
-                  </Trazo>
-                  {jugador.delta}
-                </span>
-              </div>
-            </Link>
-          </li>
-        ))}
+              </Link>
+            </li>
+          )
+        })}
       </ul>
     </section>
+  )
+}
+
+const bloque = 'block animate-pulse rounded-md bg-line'
+const cuatro = [0, 1, 2, 3]
+const tres = [0, 1, 2]
+
+function Esqueleto({ t }) {
+  return (
+    <div role="status" aria-busy="true" className="flex flex-col gap-6">
+      <span className="sr-only">{t.cargando}</span>
+      <div className="grid grid-cols-4 gap-1.5 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+        {cuatro.map((i) => (
+          <div
+            key={i}
+            className={`${tarjeta} flex flex-col gap-3 max-md:items-center max-md:gap-2 max-md:rounded-xl max-md:px-1 max-md:py-5`}
+          >
+            <span className={`${bloque} h-3 w-28 max-md:hidden`} />
+            <span className={`${bloque} h-11 w-16 max-md:h-7 max-md:w-8`} />
+            <span className={`${bloque} h-3 w-36 max-md:w-12`} />
+          </div>
+        ))}
+      </div>
+      <div>
+        <span className={`${bloque} mb-3.5 h-6 w-56`} />
+        <div className="-mx-4 flex gap-3 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:px-0 xl:grid-cols-4">
+          {cuatro.map((i) => (
+            <div key={i} className={`${tarjeta} flex w-[78%] shrink-0 flex-col gap-3.5 sm:w-auto`}>
+              <div className="flex items-center gap-3">
+                <span className={`${bloque} size-11.5 shrink-0 rounded-full`} />
+                <div className="flex flex-1 flex-col gap-2">
+                  <span className={`${bloque} h-4 w-3/4`} />
+                  <span className={`${bloque} h-3 w-1/2`} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 border-t border-chip pt-3">
+                <span className={`${bloque} h-3 w-20`} />
+                <span className={`${bloque} h-7 w-32`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {[0, 1].map((filaBloque) => (
+        <div
+          key={filaBloque}
+          className="grid grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))] gap-4"
+        >
+          {[0, 1].map((columna) => (
+            <div key={columna} className={tarjeta}>
+              <span className={`${bloque} mb-5 h-6 w-44`} />
+              {tres.map((i) => (
+                <div key={i} className={fila}>
+                  <span className={`${bloque} size-9.5 shrink-0 rounded-full`} />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <span className={`${bloque} h-3.5 w-2/3`} />
+                    <span className={`${bloque} h-3 w-1/3`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -667,6 +890,11 @@ function Contenido({ t, data, ahora }) {
   return (
     <>
       <Tarjetas t={t} resumen={data?.summary} ahora={ahora} />
+      <Seguimiento
+        t={t}
+        filas={data?.tracked ?? []}
+        total={data?.summary?.trackedPlayers ?? data?.tracked?.length ?? 0}
+      />
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))] gap-4">
         <Postulaciones t={t} filas={data?.applications ?? []} />
         <Cola t={t} filas={data?.queue ?? []} />
@@ -675,18 +903,19 @@ function Contenido({ t, data, ahora }) {
         <Analisis t={t} filas={data?.recentMatches ?? []} />
         <Alertas t={t} filas={data?.alerts ?? []} />
       </section>
-      <Seguimiento
-        t={t}
-        filas={data?.tracked ?? []}
-        total={data?.summary?.trackedPlayers ?? data?.tracked?.length ?? 0}
-      />
     </>
   )
 }
 
 function Panel({ service, t }) {
-  const { data, error, loading, retry } = useInicio(service)
+  const { data, error, loading: cargandoDatos, retry } = useInicio(service)
   const [ahora] = useState(() => new Date())
+  const [esperando, setEsperando] = useState(true)
+  useEffect(() => {
+    const espera = setTimeout(() => setEsperando(false), 700)
+    return () => clearTimeout(espera)
+  }, [])
+  const loading = cargandoDatos || esperando
 
   return (
     <div className="mx-auto flex w-full max-w-310 flex-col gap-6">
@@ -697,12 +926,16 @@ function Panel({ service, t }) {
         </p>
       )}
 
-      <Bienvenida t={t} nombre={data?.coachName} resumen={data?.summary} ahora={ahora} />
+      <Bienvenida
+        t={t}
+        nombre={data?.coachName}
+        resumen={loading ? null : data?.summary}
+        ahora={ahora}
+        cargando={loading}
+      />
 
       {loading ? (
-        <div className={tarjeta} aria-busy="true">
-          <LoadingState title={t.cargando} />
-        </div>
+        <Esqueleto t={t} />
       ) : error || !data ? (
         <div className={tarjeta}>
           <ErrorState
@@ -719,10 +952,16 @@ function Panel({ service, t }) {
   )
 }
 
-export default function Inicio({ service }) {
+export default function Inicio({ service: inyectado, db, session, nombre }) {
   const { idioma } = useIdioma()
   const t = textos[idioma]
   const [ahora] = useState(() => new Date())
+  const { uid, orgId, role } = session ?? {}
+  const vivo = useMemo(() => {
+    if (inyectado || !db || !uid || !orgId || !['coach', 'admin'].includes(role)) return null
+    return createFirestoreInicioService({ db, orgId, actorId: uid, role, coachName: nombre })
+  }, [inyectado, db, uid, orgId, role, nombre])
+  const service = inyectado ?? vivo
 
   if (!service) {
     return (

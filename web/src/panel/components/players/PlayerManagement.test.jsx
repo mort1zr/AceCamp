@@ -9,12 +9,11 @@ const player = { id: 'p1', orgId: 'org-a', createdBy: 'coach', fullName: 'Jugado
   guardian: { name: 'Apoderado de prueba', phone: '999999999', email: 'guardian@example.test' } }
 const service = () => ({ mode: 'live', canViewProfile: () => true, subscribeAnalyzedMatches: (_p, receive) => { receive([]); return () => {} }, update: vi.fn(), remove: vi.fn() })
 
-it('muestra el apoderado, valida la edición y conserva el borrador cuando falla el guardado', async () => {
+it('valida la edición y conserva el borrador cuando falla el guardado', async () => {
   const api = service()
   api.update.mockRejectedValueOnce({ code: 'unavailable' }).mockResolvedValueOnce(player)
   const user = userEvent.setup()
   render(<PlayerProfile player={player} service={api} onBack={() => {}} />)
-  expect(screen.getByText('guardian@example.test')).toBeTruthy()
   await user.click(screen.getByRole('button', { name: 'Editar jugador' }))
   const name = screen.getByLabelText('Nombre completo *')
   await user.clear(name)
@@ -37,7 +36,7 @@ it('pide confirmación antes de retirar al jugador, permite cancelar y reintenta
   const back = vi.fn()
   const user = userEvent.setup()
   render(<PlayerProfile player={player} service={api} onBack={back} />)
-  const open = () => user.click(screen.getByRole('button', { name: 'Eliminar de la plantilla' }))
+  const open = () => user.click(screen.getByRole('button', { name: 'Eliminar de la lista' }))
   await open()
   const dialog = () => within(screen.getByRole('alertdialog'))
   expect(api.remove).not.toHaveBeenCalled()
@@ -45,7 +44,7 @@ it('pide confirmación antes de retirar al jugador, permite cancelar y reintenta
   expect(document.activeElement).toBe(dialog().getByRole('button', { name: 'Cancelar' }))
   await user.click(dialog().getByRole('button', { name: 'Cancelar' }))
   expect(screen.queryByRole('alertdialog')).toBeNull()
-  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Eliminar de la plantilla' }))
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Eliminar de la lista' }))
   await open()
   await user.click(dialog().getByRole('button', { name: 'Confirmar eliminación' }))
   expect(await screen.findByRole('alert')).toBeTruthy()

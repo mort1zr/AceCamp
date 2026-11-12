@@ -8,6 +8,7 @@ import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
 import { buildDashboardOverview } from '../lib/dashboardOverview.js'
 import { CLAVE_UNIDADES, guardarUnidades } from '../lib/unidades.js'
 import { createDemoPlayersService } from '../previews/demoPlayersService.js'
+import { MemoryRouter } from 'react-router'
 
 afterEach(() => {
   cleanup()
@@ -15,7 +16,7 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-it('completa siete KPIs y gráficos de saque/peloteos con el mismo periodo y limpia el jugador anterior', async () => {
+it('completa siete KPIs y los gráficos de saque/peloteos con el mismo periodo y limpia el jugador anterior', async () => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 10, 5, 12))
   const orgId = 'org-a'
@@ -35,18 +36,18 @@ it('completa siete KPIs y gráficos de saque/peloteos con el mismo periodo y lim
     return () => {}
   })
   const user = userEvent.setup()
-  render(<Dashboard db={{ app: { options: { projectId: 'test' } } }} session={{ uid: 'coach', orgId }} />)
-  await user.selectOptions(await screen.findByLabelText('Jugador'), playerId)
+  render(<Dashboard db={{ app: { options: { projectId: 'test' } } }} session={{ uid: 'coach', orgId }} />, { wrapper: MemoryRouter })
+  await user.click(await screen.findByRole('button', { name: /Jugador de gráficos/ }))
   const metrics = within(await screen.findByRole('region', { name: 'Resumen de rendimiento' }))
   expect(metrics.getAllByRole('article')).toHaveLength(7)
   const distance = () => within(screen.getByRole('heading', { name: 'Distancia recorrida' }).closest('article'))
   expect(distance().getByText('30')).toBeTruthy()
   await user.selectOptions(screen.getByLabelText('Periodo'), '1')
   expect(distance().getByText('20')).toBeTruthy()
-  expect(distance().getByText('+10 m vs. periodo anterior')).toBeTruthy()
+  expect(distance().getByText('vs. periodo anterior').textContent).toBe('+10 m vs. periodo anterior')
   const serves = within(screen.getByRole('region', { name: 'Saque' }))
   expect(serves.getByRole('row', { name: 'Primeros dentro 6' })).toBeTruthy()
-  expect(serves.getByRole('row', { name: 'Segundos dentro Sin datos' })).toBeTruthy()
+  expect(serves.getByRole('row', { name: 'Segundos dentro 2' })).toBeTruthy()
   expect(serves.getByRole('row', { name: 'Dobles faltas 0' })).toBeTruthy()
   const rallies = within(screen.getByRole('region', { name: 'Peloteos' }))
   expect(rallies.getByRole('row', { name: '0–4 golpes 2' })).toBeTruthy()
@@ -57,7 +58,7 @@ it('completa siete KPIs y gráficos de saque/peloteos con el mismo periodo y lim
   await user.selectOptions(screen.getByLabelText('Jugador'), 'p2')
   expect(await screen.findByText('No hay estadísticas en este periodo')).toBeTruthy()
   expect(distance().getByText('Sin datos')).toBeTruthy()
-  expect(screen.queryByText('+10 m vs. periodo anterior')).toBeNull()
+  expect(screen.queryByText('vs. periodo anterior')).toBeNull()
 })
 
 vi.mock('firebase/firestore', () => ({
@@ -88,9 +89,8 @@ it('muestra en la ruta autenticada la salida de PCIT-35 sin inventar datos de sa
     return stop
   })
   const db = { app: { options: { projectId: 'prueba' } } }
-  const { rerender } = render(<Dashboard db={db} session={{ uid: 'coach-a', orgId }} />)
-  await screen.findByRole('option', { name: 'Jugador del equipo' })
-  await userEvent.setup().selectOptions(screen.getByLabelText('Jugador'), playerId)
+  const { rerender } = render(<Dashboard db={db} session={{ uid: 'coach-a', orgId }} />, { wrapper: MemoryRouter })
+  await userEvent.setup().click(await screen.findByRole('button', { name: /Jugador del equipo/ }))
   const card = async label => within((await screen.findByRole('heading', { name: label, exact: true })).closest('article'))
   expect((await card('Golpes medidos')).getByText('1')).toBeTruthy()
   expect((await card('Velocidad media de golpe')).getByText(/62[.,]5/)).toBeTruthy()
@@ -101,7 +101,7 @@ it('muestra en la ruta autenticada la salida de PCIT-35 sin inventar datos de sa
   await userEvent.setup().click(evolution.getByText('Ver datos del gráfico'))
   expect(within(evolution.getByRole('table', { name: 'Velocidades de golpe por partido' })).getByText(/62[.,]5 km\/h/)).toBeTruthy()
   rerender(<Dashboard db={db} />)
-  expect(stop).toHaveBeenCalledTimes(2)
+  expect(stop).toHaveBeenCalledTimes(3)
   expect(screen.queryByText('Jugador del equipo')).toBeNull()
 })
 
@@ -114,9 +114,8 @@ it('avisa de resultados incompatibles y no los convierte en estadísticas de saq
       return () => {}
     },
   }
-  render(<Dashboard playersService={playersService} overviewService={overviewService} />)
-  await screen.findByRole('option', { name: 'Valeria Torres' })
-  await userEvent.setup().selectOptions(screen.getByLabelText('Jugador'), 'example-1')
+  render(<Dashboard playersService={playersService} overviewService={overviewService} />, { wrapper: MemoryRouter })
+  await userEvent.setup().click(await screen.findByRole('button', { name: /Valeria Torres/ }))
   expect(await screen.findByText('Algunos análisis terminados aún no tienen indicadores disponibles. El resumen incluye únicamente los resultados verificables.')).toBeTruthy()
   expect(screen.getByText('Todavía no hay estadísticas para este jugador')).toBeTruthy()
   expect(screen.queryByText('160')).toBeNull()
@@ -126,7 +125,7 @@ it('avisa de resultados incompatibles y no los convierte en estadísticas de saq
 it('muestra una diferencia de porcentajes en puntos porcentuales', () => {
   render(<DashboardMetrics metrics={{ firstServeInRate: 62.5 }} previousMetrics={{ firstServeInRate: 50 }} compare />)
   const card = within(screen.getByRole('heading', { name: 'Primer saque dentro' }).closest('article'))
-  expect(card.getByText(/\+12[.,]5 p\. p\. vs\. periodo anterior/)).toBeTruthy()
+  expect(card.getByText('vs. periodo anterior').textContent).toMatch(/^\+12[.,]5 p\. p\. vs\. periodo anterior$/)
 })
 
 it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo', async () => {
@@ -152,31 +151,32 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
     match('2026-08-31', 900, { status: 'procesando' }),
     match('2026-08-31', 901, { orgId: 'org-b' }),
     match('2026-08-31', 902, { playerId: 'another-player' })]
-  let publish
+  const escuchas = []
+  const publish = (valor) => escuchas.forEach((receive) => receive(valor))
   collection.mockImplementation((_, name) => name)
   query.mockImplementation(name => name)
   getDoc.mockResolvedValue({ exists: () => true, data: () => player })
   onSnapshot.mockClear().mockImplementation((name, receive) => {
-    if (name === 'matches') publish = receive
+    if (name === 'matches') escuchas.push(receive)
     receive({ docs: name === 'players' ? [{ id: playerId, data: () => player }] : dates })
     return () => {}
   })
 
   const user = userEvent.setup()
-  render(<Dashboard db={{ app: { options: { projectId: 'prueba' } } }} session={{ uid: 'coach-a', orgId }} />)
-  await screen.findByRole('option', { name: player.fullName })
-  await user.selectOptions(screen.getByLabelText('Jugador'), playerId)
+  render(<Dashboard db={{ app: { options: { projectId: 'prueba' } } }} session={{ uid: 'coach-a', orgId }} />, { wrapper: MemoryRouter })
+  await user.click(await screen.findByRole('button', { name: new RegExp(player.fullName) }))
   const kpi = name => within(screen.getByRole('heading', { name, exact: true }).closest('article'))
+  const tendencia = name => kpi(name).getByText('vs. periodo anterior').textContent
   await screen.findByRole('heading', { name: 'Partidos analizados', exact: true })
   expect(kpi('Partidos analizados').getByText('6')).toBeTruthy()
   const latest = () => within(screen.getByRole('region', { name: 'Último partido' }))
   expect(latest().getByText('31/08/2026')).toBeTruthy()
-  expect(latest().getByText('Rival · Rival 20')).toBeTruthy()
+  expect(latest().getByText('vs. Rival 20')).toBeTruthy()
   expect(latest().getByText('Copa Demo')).toBeTruthy()
   expect(latest().getByText('6-4 6-2')).toBeTruthy()
-  expect(latest().getByText('20 km/h')).toBeTruthy()
+  expect(latest().getByText('Vel. media de golpe').parentElement.textContent).toMatch(/20\s*km\/h/)
   act(() => guardarUnidades('mph'))
-  expect(latest().getByText(/12[.,]4 mph/)).toBeTruthy()
+  expect(latest().getByText('Vel. media de golpe').parentElement.textContent).toMatch(/12[.,]4\s*mph/)
   act(() => guardarUnidades('kmh'))
 
   const period = screen.getByLabelText('Periodo')
@@ -192,10 +192,10 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
     match('2026-06-29', 50),
     match('2026-07-30', 70),
   ] }))
-  expect(kpi('Partidos analizados').getByText('0 vs. periodo anterior')).toBeTruthy()
-  expect(kpi('Velocidad media de golpe').getByText(/-30 km\/h vs. periodo anterior/)).toBeTruthy()
+  expect(tendencia('Partidos analizados')).toBe('0 vs. periodo anterior')
+  expect(tendencia('Velocidad media de golpe')).toBe('-30 km/h vs. periodo anterior')
   act(() => guardarUnidades('mph'))
-  expect(kpi('Velocidad media de golpe').getByText(/-18[.,]6 mph vs. periodo anterior/)).toBeTruthy()
+  expect(tendencia('Velocidad media de golpe')).toMatch(/^-18[.,]6 mph vs. periodo anterior$/)
   act(() => guardarUnidades('kmh'))
   act(() => publish({ docs: dates }))
   const evolution = within(screen.getByRole('region', { name: 'Evolución del jugador' }))
@@ -214,7 +214,9 @@ it('recalcula indicadores y evolución del mismo snapshot al cambiar de periodo'
   expect(screen.getByText('No hay partidos analizados en este periodo')).toBeTruthy()
   await user.selectOptions(period, 'all')
   expect(kpi('Partidos analizados').getByText('2')).toBeTruthy()
-  expect(latest().getByText('Rival · Rival 110')).toBeTruthy()
-  expect(latest().getAllByText('Sin datos')).toHaveLength(2)
-  expect(onSnapshot).toHaveBeenCalledTimes(2)
+  expect(latest().getByText('vs. Rival 110')).toBeTruthy()
+  expect(['Saque máx.', '1er saque', 'Dobles faltas', 'Peloteo más largo'].map(label => latest().getByText(label).parentElement.textContent)).toEqual([
+    'Saque máx.Sin datos', '1er saqueSin datos', 'Dobles faltasSin datos', 'Peloteo más largoSin datos',
+  ])
+  expect(onSnapshot).toHaveBeenCalledTimes(3)
 })

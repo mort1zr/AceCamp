@@ -1,0 +1,38 @@
+.cmp-marco { margin-top: 0.75rem; border: 1px solid var(--line, var(--players-line)); border-radius: 1rem; background: var(--surface, var(--players-card)); overflow: hidden; }
+.cmp-barra { display: grid; grid-template-columns: repeat(var(--n), 1fr); height: 5px; }
+.cmp-cabeza { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); border-bottom: 1px solid var(--line, var(--players-line)); }
+.cmp-col { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.9rem; min-width: 0; padding: 1.5rem 1rem 1.25rem; }
+.cmp-quitar { position: absolute; top: 0.75rem; right: 0.75rem; z-index: 3; display: grid; place-items: center; width: 2rem; height: 2rem; border: 1px solid var(--players-line); border-radius: 0.5rem; background: transparent; color: var(--players-muted); font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.cmp-quitar:hover { color: var(--players-text); border-color: var(--players-ink); }
+.cmp-carta { display: flex; justify-content: center; max-width: 100%; }
+.cmp-vacia { display: grid; place-items: center; width: 8rem; aspect-ratio: 23 / 33; border: 2px dashed var(--players-line); border-radius: 1rem; color: var(--players-muted); font-size: 0.8125rem; text-align: center; padding: 1rem; }
+.cmp-col .players-field { width: min(100%, 14rem); }
+.cmp-col select { min-height: 42px; padding: 0.5rem 0.75rem; font-weight: 600; }
+.cmp-titulo { margin: 0; font-family: var(--font-display, inherit); font-size: 1.35rem; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+.cmp-estado { margin: 0; color: var(--players-muted); font-size: 0.8125rem; }
+.cmp-radar { padding: 1.5rem 1rem; border-bottom: 1px solid var(--line, var(--players-line)); text-align: center; }
+.cmp-radar h3 { margin: 0 0 0.5rem; font-family: var(--font-display, inherit); font-size: 1.35rem; }
+.cmp-radar svg { display: block; width: min(100%, 20rem); height: auto; margin-inline: auto; overflow: visible; }
+.cmp-anillo { fill: none; stroke: color-mix(in srgb, var(--text, #fff) 16%, transparent); stroke-width: 1; }
+.cmp-eje { stroke: color-mix(in srgb, var(--text, #fff) 12%, transparent); stroke-width: 1; }
+.cmp-etiqueta { fill: var(--text2, var(--players-text)); font-family: var(--font-display, inherit); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; }
+.cmp-vertice { fill: var(--text, #fff); stroke: var(--color); stroke-width: 1.6; }
+.cmp-area { fill: color-mix(in srgb, var(--color) 22%, transparent); stroke: var(--color); stroke-width: 2; stroke-linejoin: round; }
+.cmp-leyenda { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem; margin: 0.5rem 0 0; padding: 0; list-style: none; font-size: 0.8125rem; color: var(--players-muted); }
+.cmp-leyenda li { display: inline-flex; align-items: center; gap: 0.4rem; }
+.cmp-leyenda span { width: 0.9rem; height: 3px; border-radius: 2px; }
+.cmp-tabla { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.cmp-seccion th { padding: 1rem 1.25rem 0.5rem; border-bottom: 1px solid var(--line, var(--players-line)); color: var(--players-muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-align: left; text-transform: uppercase; }
+.cmp-tabla td { padding: 0.9rem 0.5rem; border-bottom: 1px solid var(--line, var(--players-line)); text-align: center; vertical-align: top; }
+.cmp-tabla tbody:last-of-type tr:last-child td { border-bottom: 0; }
+.cmp-valor { display: block; font-family: var(--font-display, inherit); font-size: 2rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.cmp-valor small { margin-left: 0.3rem; color: var(--players-muted); font-family: var(--font-body, inherit); font-size: 0.75rem; font-weight: 600; }
+.cmp-sin { display: block; padding: 0.3rem 0; color: var(--players-muted); font-size: 0.875rem; }
+.cmp-etiqueta-fila { display: block; margin-top: 0.3rem; color: var(--players-muted); font-size: 0.8125rem; }
+.cmp-mejor { display: inline-block; margin-top: 0.4rem; padding: 0.1rem 0.6rem; border-radius: 999px; background: #d7f25c; color: #12110f; font-size: 0.68rem; font-style: normal; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.cmp-nota { margin: 0; padding: 1rem 1.25rem; border-top: 1px solid var(--line, var(--players-line)); }
+.cmp-scroll { overflow-x: auto; }
+.cmp-scroll > * { min-width: calc(var(--n) * 10rem); }
+@media (max-width: 640px) { .cmp-valor { font-size: 1.5rem; } .cmp-col { padding-inline: 0.5rem; } }
+.cmp-mejor--hueco { visibility: hidden; }
+.cmp-escala { margin: 0.6rem 0 0; color: var(--players-muted); font-size: 0.75rem; }

@@ -9,6 +9,7 @@ import {
   PLAYER_CONSENT_VERSION,
 } from '../src/panel/lib/schema.js'
 import { usagePeriod } from '../src/panel/lib/usage.js'
+import { buildExpoApplications, buildExpoData } from './seedExpo.mjs'
 
 export const SEED_PASSWORD = 'acecam123'
 
@@ -23,7 +24,7 @@ function formConsent(method, iso) {
 }
 
 /** Estadísticas de un partido terminado, con la forma v1 de matches.statistics. */
-function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg, longest, distance }) {
+function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg, longest, distance, shotAvg = 98.5, moveMax = 23, moveAvg = 7.2, firstAvg, secondAvg, secondMax, heatmap }) {
   const serve = (max, avg, firstIn, doubleFaults, aces) => {
     const firstServeAttempts = 100
     const secondServes = firstServeAttempts - firstIn
@@ -41,9 +42,15 @@ function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg,
     schemaVersion: MATCH_STATS_VERSION,
     durationSeconds: 5400,
     player: {
-      shots: { count: shots, sumSpeedKmh: Math.round(shots * 98.5), maxSpeedKmh: fhMax },
-      movement: { distanceMeters: distance, maxSpeedKmh: 23, avgSpeedKmh: 7.2 },
-      serve: serve(serveMax, serveAvg, firstIn, df, Math.round(serveMax / 28)),
+      shots: { count: shots, sumSpeedKmh: Math.round(shots * shotAvg), maxSpeedKmh: fhMax },
+      movement: { distanceMeters: distance, maxSpeedKmh: moveMax, avgSpeedKmh: moveAvg, ...(heatmap && { heatmap }) },
+      serve: {
+        ...serve(serveMax, serveAvg, firstIn, df, Math.round(serveMax / 28)),
+        ...(firstAvg != null && {
+          firstServe: { sampleCount: firstIn, sumSpeedKmh: Math.round(firstAvg * firstIn * 10) / 10, maxSpeedKmh: serveMax },
+          secondServe: { sampleCount: 100 - firstIn, sumSpeedKmh: Math.round(secondAvg * (100 - firstIn) * 10) / 10, maxSpeedKmh: secondMax },
+        }),
+      },
       forehand: { count: Math.round(shots * 0.55), maxSpeedKmh: fhMax },
       backhand: { count: Math.round(shots * 0.4), maxSpeedKmh: bhMax },
     },
@@ -78,12 +85,16 @@ export function buildSeedData() {
   const orgClub = 'org-club'
   const coach = 'coach-demo'
   const coach2 = 'coach-club'
+  const orgExpo = 'org-expo'
+  const expo = 'coach-expo'
 
   const users = [
     { uid: coach, email: 'coach@acecam.test', password: SEED_PASSWORD,
       doc: { email: 'coach@acecam.test', displayName: 'Coach Ramírez', orgId: orgDemo, role: 'coach', jobTitle: 'Entrenador principal', createdAt: day('2026-10-01') } },
     { uid: coach2, email: 'coach2@acecam.test', password: SEED_PASSWORD,
       doc: { email: 'coach2@acecam.test', displayName: 'Coach Paredes', orgId: orgClub, role: 'coach', jobTitle: null, createdAt: day('2026-10-05') } },
+    { uid: expo, email: 'test@test.com', password: 'test123',
+      doc: { email: 'test@test.com', displayName: 'Coach', orgId: orgExpo, role: 'coach', jobTitle: 'Entrenador principal', createdAt: day('2026-10-01') } },
   ]
 
   // Universidad Demo ya contrató Ultra en el checkout (PCIT-158): panel completo y Equipo.
@@ -94,6 +105,8 @@ export function buildSeedData() {
       billingCycle: 'anual', planSince: day('2026-10-01'), createdAt: day('2026-10-01') } },
     { id: orgClub, doc: { name: 'Club Ejemplo', ownerId: coach2, program: null, plan: 'prueba',
       billingCycle: 'mensual', planSince: day('2026-10-05'), createdAt: day('2026-10-05') } },
+    { id: orgExpo, doc: { name: 'Academia AceCam', ownerId: expo, program: 'Tenis', plan: 'ultra',
+      billingCycle: 'anual', planSince: day('2026-10-01'), createdAt: day('2026-10-01') } },
   ]
 
   // Invitación pendiente en Universidad Demo (PCIT-40): regístrate con ese correo
@@ -183,6 +196,10 @@ export function buildSeedData() {
       statistics: stats({ serveMax: 139, serveAvg: 121, firstIn: 61, df: 3, fhMax: 110, bhMax: 98, shots: 380, rallyAvg: 5.1, longest: 19, distance: 3500 }) }),
   )
 
+  const demo = buildExpoData({ orgId: orgExpo, createdBy: expo, player, match, stats, day })
+  players.push(...demo.players)
+  matches.push(...demo.matches)
+
   const application = (id, orgId, fields) => ({
     id,
     doc: {
@@ -209,6 +226,8 @@ export function buildSeedData() {
     application('app-club-1', orgClub, { status: A.new, fullName: 'Iván Salas', birthDate: '2007-04-04', city: 'Piura',
       email: 'postulante5@ejemplo.test', graduationYear: 2025, sentOn: '2026-11-01' }),
   ]
+
+  applications.push(...buildExpoApplications({ orgId: orgExpo, reviewer: expo, application }))
 
   // sentOn solo arma createdAt; no es un campo del esquema.
   for (const app of applications) delete app.doc.sentOn

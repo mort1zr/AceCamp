@@ -12,6 +12,13 @@ import { createFirestoreAnalysisService } from '../lib/services/firestoreAnalysi
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
 import './analizar.css'
+import PaginacionTabla, { tamanosPagina } from '../components/ui/PaginacionTabla.jsx'
+import { EsqueletoTabla } from '../components/dashboard/EsqueletoDashboard.jsx'
+import '../components/dashboard/esqueleto.css'
+import PelotaTitulo from '../components/layout/PelotaTitulo.jsx'
+
+const fechaCorta = (value) =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.split('-').reverse().join('/') : (value ?? '—')
 
 const sinConexion = { mode: 'offline', supportsLinks: false, supportsYouTube: false }
 
@@ -20,7 +27,7 @@ function Cabecera() {
     <header className="analysis-head">
       <p className="players-eyebrow">Del partido a los datos</p>
       <h1 id="analysis-title">
-        Analizar video<span className="players-title-dot">.</span>
+        Analizar video<PelotaTitulo />
       </h1>
       <p>
         Sube un partido o pega un enlace. El análisis tarda entre 30 y 40 minutos según la duración.
@@ -45,6 +52,12 @@ function Guia() {
 }
 
 function Cola({ columns, rows, loading, error, onRetry }) {
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(tamanosPagina[0])
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize))
+  const currentPage = Math.min(page, pages)
+  const visibleRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const ready = !loading && !error
   return (
     <section className="analysis-queue" aria-labelledby="analysis-queue-title">
       <div className="analysis-queue-heading">
@@ -58,19 +71,36 @@ function Cola({ columns, rows, loading, error, onRetry }) {
           {loading ? 'Cargando…' : `${rows.length} ${rows.length === 1 ? 'partido' : 'partidos'}`}
         </span>
       </div>
-      {!loading && !error && rows.length > 0 && (
+      {ready && rows.length > 0 && (
         <p className="players-table-hint">Desliza la tabla para ver todas las columnas.</p>
       )}
-      <DataTable
-        caption="Partidos y estado del análisis"
-        columns={columns}
-        rows={rows}
-        loading={loading}
-        error={error}
-        onRetry={onRetry}
-        emptyTitle="El próximo análisis empieza aquí"
-        emptyDescription="Carga un video y vincúlalo a un jugador. Su estado aparecerá en esta lista."
-      />
+      {loading ? (
+        <EsqueletoTabla etiqueta="partidos" />
+      ) : (
+        <DataTable
+          resizable
+          caption="Partidos y estado del análisis"
+          columns={columns}
+          rows={visibleRows}
+          error={error}
+          onRetry={onRetry}
+          emptyTitle="El próximo análisis empieza aquí"
+          emptyDescription="Carga un video y vincúlalo a un jugador. Su estado aparecerá en esta lista."
+        />
+      )}
+      {ready && (
+        <PaginacionTabla
+          total={rows.length}
+          page={currentPage}
+          pageSize={pageSize}
+          etiqueta="partidos"
+          onPage={setPage}
+          onPageSize={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+        />
+      )}
     </section>
   )
 }
@@ -125,7 +155,7 @@ function AnalysisWorkspace({ service, playersService }) {
       render: playerName,
     },
     { key: 'opponent', label: 'Rival' },
-    { key: 'matchDate', label: 'Fecha' },
+    { key: 'matchDate', label: 'Fecha', render: fechaCorta },
     {
       key: 'status',
       label: 'Estado',

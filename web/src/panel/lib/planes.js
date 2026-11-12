@@ -7,7 +7,7 @@ export const PLANES = {
   prueba: { id: 'basico', prueba: true, limite: 15 },
   basico: { id: 'basico', prueba: false, limite: 30 },
   pro: { id: 'pro', prueba: false, limite: 150 },
-  ultra: { id: 'ultra', prueba: false, limite: null },
+  ultra: { id: 'ultra', prueba: false, limite: 500 },
 }
 
 /** La prueba de Básico dura 30 días desde planSince (igual que en firestore.rules). */

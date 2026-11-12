@@ -1,4 +1,4 @@
-import { doc, runTransaction, serverTimestamp } from 'firebase/firestore'
+import { doc, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { APPLICATION_STATUS as STATUS, COLLECTIONS } from './schema.js'
 
 const transitions = new Map([
@@ -23,5 +23,12 @@ export function updateApplicationStatus(db, { uid, orgId }, { id, status }, next
       throw new Error('application/status-transition')
     }
     transaction.update(application, { status: nextStatus, reviewedBy: uid, updatedAt: serverTimestamp() })
+  })
+}
+
+export function updateApplicationNotes(db, { id }, internalNotes) {
+  return updateDoc(doc(db, COLLECTIONS.applications, id), {
+    internalNotes: String(internalNotes ?? '').slice(0, 2000),
+    updatedAt: serverTimestamp(),
   })
 }

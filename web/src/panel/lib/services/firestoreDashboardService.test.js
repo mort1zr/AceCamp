@@ -108,7 +108,11 @@ describe('Consulta Dashboard (SDK simulado)', () => {
     make().subscribePlayer('p1', receive, vi.fn())
     await vi.waitFor(() => expect(onSnapshot).toHaveBeenCalledTimes(1))
     onSnapshot.mock.calls[0][1]({ docs: [] })
-    expect(receive.mock.calls[0][0].metrics).toEqual({ analyzedMatches: 0, averageServeSpeed: null, firstServeInRate: null, doubleFaults: null, distanceMeters: null })
+    expect(receive.mock.calls[0][0].metrics).toEqual({
+      analyzedMatches: 0, averageServeSpeed: null, firstServeInRate: null, doubleFaults: null, distanceMeters: null,
+      maxShotSpeed: null, firstServeAverageSpeed: null, firstServeMaxSpeed: null, secondServeAverageSpeed: null,
+      secondServeMaxSpeed: null, averageRallyShots: null, longestRally: null,
+    })
   })
 
   it('publica resumen y evolución del mismo snapshot y decodifica una vez cada partido', async () => {

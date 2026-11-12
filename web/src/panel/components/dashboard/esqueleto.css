@@ -1,0 +1,89 @@
+.esqueleto {
+  display: block;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--text) 10%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 120% 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .esqueleto {
+    animation: esqueleto-brillo 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes esqueleto-brillo {
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.esqueleto-jugadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 1rem;
+}
+
+.esqueleto-carta {
+  aspect-ratio: 23 / 33;
+}
+
+.esqueleto-resumen {
+  display: grid;
+  gap: 1rem;
+}
+
+.esqueleto-titulo {
+  width: 14rem;
+  height: 1.6rem;
+}
+
+.esqueleto-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+
+.esqueleto-kpi {
+  height: 5.5rem;
+}
+
+.esqueleto-graficos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+
+.esqueleto-grafico {
+  height: 14rem;
+}
+
+.esqueleto-tabla {
+  display: grid;
+  gap: 0.6rem;
+  padding: 1rem;
+  border: 1px solid var(--line, #3a352e);
+  border-radius: 0.75rem;
+}
+
+.esqueleto-fila {
+  height: 2.6rem;
+}
+
+.esqueleto-fila--cabeza {
+  height: 1.2rem;
+  width: 40%;
+}
+
+.esqueleto-bandeja { display: grid; grid-template-columns: minmax(0, 20rem) minmax(0, 1fr); gap: 1rem; }
+.esqueleto-lista { display: grid; gap: 0.6rem; align-content: start; }
+.esqueleto-postulante { height: 5.5rem; }
+.esqueleto-detalle { height: 32rem; }
+@media (max-width: 899px) { .esqueleto-bandeja { grid-template-columns: minmax(0, 1fr); } }

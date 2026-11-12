@@ -2,12 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { collection, doc, getDocFromServer, onSnapshot, query, runTransaction, where } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocFromServer, onSnapshot, query, runTransaction, where } from 'firebase/firestore'
 import Partidos from './Partidos.jsx'
 import { CLAVE_UNIDADES, guardarUnidades } from '../lib/unidades.js'
 
 vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(), doc: vi.fn(), getDocFromServer: vi.fn(), onSnapshot: vi.fn(), query: vi.fn(),
+  collection: vi.fn(), doc: vi.fn(), getDoc: vi.fn(), getDocFromServer: vi.fn(), onSnapshot: vi.fn(), query: vi.fn(),
   runTransaction: vi.fn(), serverTimestamp: vi.fn(), where: vi.fn(),
 }))
 
@@ -23,6 +23,7 @@ beforeEach(() => {
   collection.mockImplementation((_, name) => name)
   query.mockImplementation(name => name)
   getDocFromServer.mockResolvedValue({ exists: () => false })
+  getDoc.mockResolvedValue({ data: () => ({ name: 'Club de prueba' }) })
 })
 afterEach(() => {
   cleanup()

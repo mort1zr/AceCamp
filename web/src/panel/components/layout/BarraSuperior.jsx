@@ -328,6 +328,21 @@ export default function BarraSuperior({
   const [buscando, setBuscando] = useState(false)
   const nombre = usuario?.nombre || t.usuario
   const organizacion = usuario?.organizacion || t.organizacion
+  const barra = useRef(null)
+
+  useEffect(() => {
+    const elemento = barra.current
+    if (!elemento || typeof ResizeObserver !== 'function') return undefined
+    const raiz = document.documentElement
+    const medir = () => raiz.style.setProperty('--barra-alto', `${elemento.offsetHeight}px`)
+    medir()
+    const observador = new ResizeObserver(medir)
+    observador.observe(elemento)
+    return () => {
+      observador.disconnect()
+      raiz.style.removeProperty('--barra-alto')
+    }
+  }, [])
 
   const buscar = (evento) => {
     evento.preventDefault()
@@ -337,6 +352,7 @@ export default function BarraSuperior({
 
   return (
     <header
+      ref={barra}
       aria-label={t.barra}
       className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-chip bg-bg/90 px-3 pt-[max(0.625rem,env(safe-area-inset-top))] pb-2.5 backdrop-blur-md md:gap-3 md:px-6 md:py-3.5"
     >
@@ -391,7 +407,7 @@ export default function BarraSuperior({
           value={busqueda}
           onChange={(evento) => setBusqueda(evento.target.value)}
           placeholder={t.placeholder}
-          className="h-11 w-full rounded-[10px] border border-line2 bg-surface pr-3.5 pl-10 text-[15px] text-text transition-colors placeholder:text-placeholder hover:border-line3 focus:border-accent-line focus:outline-none"
+          className="h-11 w-full rounded-[10px] border border-line2 bg-surface pr-3.5 pl-10 text-[15px] text-text transition-colors placeholder:text-placeholder hover:border-line3 focus:border-accent-ink focus:ring-1 focus:ring-accent-ink focus:outline-none"
         />
       </form>
 

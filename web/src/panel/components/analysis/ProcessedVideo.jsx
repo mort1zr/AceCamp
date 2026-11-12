@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BloqueVacio from '../layout/BloqueVacio.jsx'
 
 export default function ProcessedVideo({ matchId, path, service }) {
   const [attempt, setAttempt] = useState(0)
@@ -19,7 +20,14 @@ export default function ProcessedVideo({ matchId, path, service }) {
     }
   }, [matchId, path, service, attempt])
 
-  if (!path) return <p className="mt-2 text-sm text-muted">Video procesado no disponible.</p>
+  if (!path) return (
+    <BloqueVacio
+      className="mt-3 flex-1"
+      icono={<><rect x="3" y="5" width="13" height="14" rx="2" /><path d="M16 10l5-3v10l-5-3" /></>}
+      titulo="Video procesado no disponible."
+      texto="Aparecerá aquí cuando el análisis genere el video del partido."
+    />
+  )
   if (!service) return <p className="mt-2 text-sm text-muted">Inicia sesión para cargar el video procesado.</p>
   const current = state.service === service && state.path === path && state.matchId === matchId && state.attempt === attempt
   if (!current || state.status === 'loading') return <p className="mt-2 text-sm text-muted" role="status">Cargando video procesado…</p>

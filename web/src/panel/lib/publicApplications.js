@@ -24,6 +24,21 @@ export async function publicFormExists(db, orgId, formId) {
   return (await getDocFromServer(doc(applicationForms(db, orgId), formId))).exists()
 }
 
+const VIDEO_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'])
+
+export function parseVideoLinks(text) {
+  const lines = String(text ?? '').split(/[\n,]+/).map(line => line.trim()).filter(Boolean)
+  if (lines.length > 5) throw Object.assign(new Error('applications/invalid-contact'), { fields: { videoLinks: 'Agrega hasta 5 enlaces.' } })
+  return lines.map(line => {
+    let url
+    try { url = new URL(/^https?:\/\//i.test(line) ? line : `https://${line}`) } catch { url = null }
+    if (!url || url.protocol !== 'https:' || !VIDEO_HOSTS.has(url.hostname) || url.href.length > 300) {
+      throw Object.assign(new Error('applications/invalid-contact'), { fields: { videoLinks: 'Usa enlaces de YouTube válidos, uno por línea.' } })
+    }
+    return url.href
+  })
+}
+
 const text = (value) => (typeof value === 'string' ? value.trim() : '')
 
 /**
@@ -72,12 +87,16 @@ export function normalizeApplicationContact(input, today = new Date().toISOStrin
 
 export function submitPublicApplication(db, { orgId, formId }, input) {
   const contact = normalizeApplicationContact(input)
+  const player = normalizePlayer(input, new Date().toISOString().slice(0, 10))
+  const videoLinks = parseVideoLinks(input.videoLinks)
   const now = serverTimestamp()
   return addDoc(collection(db, COLLECTIONS.applications), {
     orgId,
     formId,
     status: APPLICATION_STATUS.new,
     ...contact,
+    ...Object.fromEntries(['utr', 'nationalRanking', 'dominantHand', 'backhand'].filter(key => player[key] != null).map(key => [key, player[key]])),
+    ...(videoLinks.length ? { videoLinks } : {}),
     consent: {
       accepted: true,
       version: input.attachVideo ? APPLICATION_VIDEO_CONSENT_VERSION : APPLICATION_CONSENT_VERSION,

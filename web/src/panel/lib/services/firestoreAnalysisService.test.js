@@ -116,14 +116,14 @@ describe('Cola Firestore (SDK y transferencias simulados)', () => {
     expect(upload).not.toHaveBeenCalled()
   })
 
-  it('sin plan no se analiza; Ultra no tiene tope', async () => {
+  it('sin plan no se analiza; Ultra llega hasta 500', async () => {
     getDoc.mockImplementation(ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'free' }) : absent))
     await expect(make().enqueue(input, { requestId: 'r-free' })).rejects.toMatchObject({ code: 'analysis/limit', limit: 0 })
-    const ultra = ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'ultra' }) : ref.kind === 'usage' ? found({ analyses: 900 }) : absent)
+    const ultra = ref => Promise.resolve(ref.kind === 'players' ? found({ orgId: 'org-a', createdBy: 'coach-a' }) : ref.kind === 'orgs' ? found({ plan: 'ultra' }) : ref.kind === 'usage' ? found({ analyses: 499 }) : absent)
     getDoc.mockImplementation(ultra)
     tx.get.mockImplementation(ultra)
     await make().enqueue(input, { requestId: 'r-ultra' })
-    expect(usageWrites()[0][1]).toMatchObject({ analyses: 901 })
+    expect(usageWrites()[0][1]).toMatchObject({ analyses: 500 })
   })
 
   it('si otro entrenador agotó el límite durante la subida, la transacción no crea el partido', async () => {

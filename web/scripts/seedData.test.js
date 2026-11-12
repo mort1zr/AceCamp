@@ -25,8 +25,8 @@ const ageOn = (birthDate, today = '2026-11-03') => {
 }
 
 describe('datos de ejemplo de Firestore', () => {
-  it('cubren dos organizaciones y todos los estados', () => {
-    expect(orgIds.size).toBe(2)
+  it('cubren tres organizaciones y todos los estados', () => {
+    expect(orgIds.size).toBe(3)
     expect(new Set(data.matches.map(m => m.doc.status))).toEqual(new Set(Object.values(MATCH_STATUS)))
   })
 
@@ -69,7 +69,7 @@ describe('datos de ejemplo de Firestore', () => {
         expect(serve.firstServeIn).toBeLessThanOrEqual(serve.firstServeAttempts)
         expect(serve.fromRight + serve.fromLeft).toBe(serve.count)
         expect(opponent.serve.aces).toBeGreaterThanOrEqual(0)
-        expect(score.sets.map(set => `${set.playerGames}-${set.opponentGames}`).join(' ')).toBe(doc.result)
+        expect(score.sets.map(set => `${set.playerGames}-${set.opponentGames}`).join(' ')).toBe(doc.result.replace(/\(\d+\)/g, ''))
         expect(points.playerWon + points.opponentWon).toBe(points.count)
         expect(rallies.sumShots).toBeGreaterThan(rallies.count)
       } else {
