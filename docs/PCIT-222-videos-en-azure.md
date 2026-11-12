@@ -24,6 +24,8 @@ Navegador ──► Firebase Hosting, Auth y Firestore                    (Spark
 | Almacenamiento | `acecamvideosfba600`, contenedor `videos` | Privado, solo HTTPS y TLS 1.2. CORS solo para la web y `localhost:5173`. Borrados recuperables 7 días |
 | Entorno de contenedores | `acecam-env` | Para la API y el worker |
 | Logs | `acecam-logs` | 30 días |
+| Identidad de la API | `acecam-videos-api` (identidad administrada) | Storage Blob Data Contributor solo sobre `acecamvideosfba600`: firma los enlaces sin clave |
+| API de videos | `https://acecam-videos-api.nicefield-b05d8187.chilecentral.azurecontainerapps.io` | Container App en `acecam-env`; ya permitida en la CSP de `firebase.json` |
 | Identidad para GitHub | `acecam-github` (identidad administrada) | Sin contraseña (OIDC). Contributor solo en `acecam-rg`, y solo desde `main` o el entorno `production` |
 
 La suscripción de estudiante solo permite las regiones `chilecentral`,
@@ -131,7 +133,7 @@ az containerapp env show -n acecam-env -g acecam-rg --query properties.defaultDo
 | Variable | `AZURE_VIDEOS_API_IDENTITY_ID` | El `id` del paso 1 |
 | Variable | `AZURE_VIDEOS_API_IDENTITY_CLIENT_ID` | El `clientId` del paso 1 |
 | **Secreto** | `FIREBASE_SERVICE_ACCOUNT_AZURE` | JSON de una cuenta de servicio de Firebase **nueva**, solo con el rol *Lector de Cloud Datastore* (`roles/datastore.viewer`): la API solo lee Firestore. El worker (PCIT-226) tendrá su propia cuenta, con escritura |
-| Variable | `VITE_VIDEO_API_URL` | `https://acecam-videos-api.<dominio del paso 1>`. **Se crea al final** (paso 4) |
+| Variable | `VITE_VIDEO_API_URL` | `https://acecam-videos-api.nicefield-b05d8187.chilecentral.azurecontainerapps.io`. **Se crea al final** (paso 4), cuando `/healthz` responda `ok` |
 
 **3. Primer despliegue.** Al fusionar en `main`, `deploy-azure.yml` publica la imagen y
 crea la API. La primera vez, el paquete `acecam-videos-api` de GitHub Packages queda
@@ -139,8 +141,9 @@ privado y Azure no puede descargarlo: en GitHub → Packages → `acecam-videos-
 Package settings, cambiarlo a **Public** (la imagen no contiene secretos) y volver a
 ejecutar el workflow.
 
-**4. Activar en la web.** Añadir el dominio de la API a `connect-src` de la CSP en
-`firebase.json` (el del almacenamiento ya está) y crear la variable `VITE_VIDEO_API_URL`.
+**4. Activar en la web.** La CSP de `firebase.json` ya permite la API y el almacenamiento.
+Cuando `https://acecam-videos-api.nicefield-b05d8187.chilecentral.azurecontainerapps.io/healthz`
+responda `ok`, crear la variable `VITE_VIDEO_API_URL` y volver a ejecutar "Deploy web".
 El siguiente despliegue de la web sube los videos a Azure.
 
 Si falta algo, `deploy-azure.yml` no despliega y deja un aviso, como `deploy-web.yml`.
