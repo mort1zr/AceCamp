@@ -9,6 +9,7 @@ import {
   PLAYER_CONSENT_VERSION,
 } from '../src/panel/lib/schema.js'
 import { usagePeriod } from '../src/panel/lib/usage.js'
+import { buildExpoData } from './seedExpo.mjs'
 
 export const SEED_PASSWORD = 'acecam123'
 
@@ -23,14 +24,14 @@ function formConsent(method, iso) {
 }
 
 /** Estadísticas de un partido terminado, con la forma v1 de matches.statistics. */
-function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg, longest, distance }) {
+function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg, longest, distance, shotAvg = 98.5, moveMax = 23, moveAvg = 7.2 }) {
   const serveSamples = 100
   return {
     schemaVersion: MATCH_STATS_VERSION,
     durationSeconds: 5400,
     player: {
-      shots: { count: shots, sumSpeedKmh: Math.round(shots * 98.5), maxSpeedKmh: fhMax },
-      movement: { distanceMeters: distance, maxSpeedKmh: 23, avgSpeedKmh: 7.2 },
+      shots: { count: shots, sumSpeedKmh: Math.round(shots * shotAvg), maxSpeedKmh: fhMax },
+      movement: { distanceMeters: distance, maxSpeedKmh: moveMax, avgSpeedKmh: moveAvg },
       serve: {
         sumSpeedKmh: serveAvg * serveSamples,
         sampleCount: serveSamples,
@@ -161,6 +162,10 @@ export function buildSeedData() {
       opponent: 'C. Díaz', matchDate: '2026-10-25', status: M.ready,
       statistics: stats({ serveMax: 139, serveAvg: 121, firstIn: 61, df: 3, fhMax: 110, bhMax: 98, shots: 380, rallyAvg: 5.1, longest: 19, distance: 3500 }) }),
   )
+
+  const demo = buildExpoData({ orgId: orgExpo, createdBy: expo, player, match, stats, day })
+  players.push(...demo.players)
+  matches.push(...demo.matches)
 
   const application = (id, orgId, fields) => ({
     id,
