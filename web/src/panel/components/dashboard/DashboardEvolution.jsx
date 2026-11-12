@@ -9,6 +9,14 @@ import './evolution.css'
 const speedFormat = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
 const speedText = (value, unidades = 'kmh') => value == null ? 'Sin datos' : `${speedFormat.format(convertirVelocidad(value, unidades))} ${etiquetaVelocidad(unidades)}`
 
+function speedDomain(values) {
+  if (values.length === 0) return [0, 'auto']
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const pad = Math.max(2, (max - min) * 0.25)
+  return [Math.max(0, Math.floor((min - pad) / 5) * 5), Math.ceil((max + pad) / 5) * 5]
+}
+
 function EvolutionTooltip({ active, payload, unidades, metric }) {
   const point = payload?.[0]?.payload
   if (!active || !point) return null
@@ -28,6 +36,7 @@ export default function DashboardEvolution({ playerId, evolution, loading = fals
   if (points.length === 0) return <EmptyState title="Aún no hay partidos con fecha válida" description="La evolución aparecerá cuando haya análisis con la fecha del partido registrada." />
   const measured = points.filter(point => point[metric] != null)
   const byId = new Map(points.map(point => [point.matchId, point]))
+  const domain = speedDomain(chartPoints.map(point => point.speed).filter(value => value != null))
 
   return (
     <div className="evolution-content">
@@ -38,7 +47,7 @@ export default function DashboardEvolution({ playerId, evolution, loading = fals
           <LineChart data={chartPoints} accessibilityLayer title={`Evolución de velocidad media de ${kind}`} margin={{ top: 20, right: 20, bottom: 10, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--players-line)" strokeDasharray="3 3" />
             <XAxis dataKey="matchId" tickFormatter={key => formatMatchDate(byId.get(key)?.date, true)} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} axisLine={{ stroke: 'var(--players-line)' }} tickLine={false} minTickGap={24} />
-            <YAxis width={48} domain={[0, 'auto']} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis width={48} domain={domain} allowDecimals={false} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
             <Tooltip content={<EvolutionTooltip unidades={unidades} metric={metric} />} filterNull={false} cursor={{ stroke: 'var(--players-line)' }} />
             <Line dataKey="speed" name={label} unit={` ${etiquetaVelocidad(unidades)}`} type="linear" stroke="var(--electric, #4FE3FF)" strokeWidth={2.5} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: 'var(--electric, #4FE3FF)', strokeWidth: 0 }} activeDot={{ r: 6 }} />
           </LineChart>
