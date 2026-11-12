@@ -130,7 +130,7 @@ az containerapp env show -n acecam-env -g acecam-rg --query properties.defaultDo
 | Variables | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_STORAGE_ACCOUNT`, `AZURE_CONTAINERAPPS_ENV` | Ver "Infraestructura creada" |
 | Variable | `AZURE_VIDEOS_API_IDENTITY_ID` | El `id` del paso 1 |
 | Variable | `AZURE_VIDEOS_API_IDENTITY_CLIENT_ID` | El `clientId` del paso 1 |
-| **Secreto** | `FIREBASE_SERVICE_ACCOUNT_AZURE` | JSON de una cuenta de servicio de Firebase **nueva**, solo con el rol *Usuario de Cloud Datastore* |
+| **Secreto** | `FIREBASE_SERVICE_ACCOUNT_AZURE` | JSON de una cuenta de servicio de Firebase **nueva**, solo con el rol *Lector de Cloud Datastore* (`roles/datastore.viewer`): la API solo lee Firestore. El worker (PCIT-226) tendrá su propia cuenta, con escritura |
 | Variable | `VITE_VIDEO_API_URL` | `https://acecam-videos-api.<dominio del paso 1>`. **Se crea al final** (paso 4) |
 
 **3. Primer despliegue.** Al fusionar en `main`, `deploy-azure.yml` publica la imagen y
