@@ -55,12 +55,16 @@ export function buildSeedData() {
   const orgClub = 'org-club'
   const coach = 'coach-demo'
   const coach2 = 'coach-club'
+  const orgExpo = 'org-expo'
+  const expo = 'coach-expo'
 
   const users = [
     { uid: coach, email: 'coach@acecam.test', password: SEED_PASSWORD,
       doc: { email: 'coach@acecam.test', displayName: 'Coach Ramírez', orgId: orgDemo, role: 'coach', jobTitle: 'Entrenador principal', createdAt: day('2026-10-01') } },
     { uid: coach2, email: 'coach2@acecam.test', password: SEED_PASSWORD,
       doc: { email: 'coach2@acecam.test', displayName: 'Coach Paredes', orgId: orgClub, role: 'coach', jobTitle: null, createdAt: day('2026-10-05') } },
+    { uid: expo, email: 'test@test.com', password: 'test123',
+      doc: { email: 'test@test.com', displayName: 'Coach Demo', orgId: orgExpo, role: 'coach', jobTitle: 'Entrenador principal', createdAt: day('2026-10-01') } },
   ]
 
   // Universidad Demo ya contrató Ultra en el checkout (PCIT-158): panel completo y Equipo.
@@ -71,6 +75,8 @@ export function buildSeedData() {
       billingCycle: 'anual', planSince: day('2026-10-01'), createdAt: day('2026-10-01') } },
     { id: orgClub, doc: { name: 'Club Ejemplo', ownerId: coach2, program: null, plan: 'prueba',
       billingCycle: 'mensual', planSince: day('2026-10-05'), createdAt: day('2026-10-05') } },
+    { id: orgExpo, doc: { name: 'Academia AceCam', ownerId: expo, program: 'Tenis', plan: 'ultra',
+      billingCycle: 'anual', planSince: day('2026-10-01'), createdAt: day('2026-10-01') } },
   ]
 
   // Invitación pendiente en Universidad Demo (PCIT-40): regístrate con ese correo

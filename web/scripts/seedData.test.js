@@ -25,8 +25,8 @@ const ageOn = (birthDate, today = '2026-11-03') => {
 }
 
 describe('datos de ejemplo de Firestore', () => {
-  it('cubren dos organizaciones y todos los estados', () => {
-    expect(orgIds.size).toBe(2)
+  it('cubren tres organizaciones y todos los estados', () => {
+    expect(orgIds.size).toBe(3)
     expect(new Set(data.matches.map(m => m.doc.status))).toEqual(new Set(Object.values(MATCH_STATUS)))
   })
 
