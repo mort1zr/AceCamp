@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router'
 import { db } from '../../panel/lib/firebase.js'
 import { formatBytes, validateVideoFile } from '../../panel/lib/analysis.js'
 import { requiresPlayerGuardian } from '../../panel/lib/players.js'
-import { publicFormExists, submitPublicApplication } from '../../panel/lib/publicApplications.js'
+import { applicationReference, publicFormExists, submitPublicApplication } from '../../panel/lib/publicApplications.js'
 import { validateLocalVideo } from '../../panel/lib/validateLocalVideo.js'
 import { MAX_VIDEO_FPS, MAX_VIDEO_SECONDS, MIN_VIDEO_FPS, MIN_VIDEO_HEIGHT, MIN_VIDEO_WIDTH } from '../../panel/lib/videoRequirements.js'
 import { MAX_VIDEO_BYTES } from '../../panel/lib/videoUpload.js'
@@ -33,6 +33,18 @@ const labelClass = 'mb-1.5 block text-xs font-semibold uppercase tracking-wider'
 const inputClass = 'min-h-[46px] w-full rounded-lg border border-line bg-bg px-3 py-2 text-text placeholder:text-muted'
 const sectionClass = 'grid gap-4 border-t border-line pt-6 sm:grid-cols-2'
 const legendClass = 'mb-4 w-full font-display text-xl font-bold'
+// PCIT-185: campo trampa (honeypot). Las personas no lo ven ni llegan a él con el
+// teclado ni con lector de pantalla; los bots que llenan todo lo completan.
+const TRAMPA = 'website'
+
+function CampoTrampa() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute -left-[9999px] h-px w-px overflow-hidden">
+      <label htmlFor={TRAMPA}>Sitio web</label>
+      <input id={TRAMPA} name={TRAMPA} type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+    </div>
+  )
+}
 
 function Field({ definition: [name, label, type, options, span = ''], error, onChange }) {
   return (
@@ -102,6 +114,8 @@ function Formulario({ orgId, formId }) {
   const [guardian, setGuardian] = useState(false)
   const [sending, setSending] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  // PCIT-186: número de referencia que ve el postulante y también la bandeja.
+  const [reference, setReference] = useState('')
   const [error, setError] = useState('')
   const [errors, setErrors] = useState({})
   const [attachment, setAttachment] = useState(null)
@@ -124,6 +138,14 @@ function Formulario({ orgId, formId }) {
     const file = videoEnabled ? form.elements.namedItem('video')?.files?.[0] : null
     const data = new FormData(form)
     data.delete('video')
+    // Un bot llenó el campo trampa: no se guarda nada y se muestra el mismo
+    // "recibido" que a una persona, para no darle pistas.
+    const trampa = String(data.get(TRAMPA) ?? '').trim()
+    data.delete(TRAMPA)
+    if (trampa) {
+      setSubmitted(true)
+      return
+    }
     const input = { ...Object.fromEntries(data), attachVideo: Boolean(file), consentAccepted: data.has('consent') }
     locked.current = true
     setSending(true)
@@ -134,6 +156,7 @@ function Formulario({ orgId, formId }) {
     try {
       if (file) await checkAttachment(file, controller.signal)
       const application = await submitPublicApplication(db, { orgId, formId }, input)
+      setReference(applicationReference(application.id))
       if (file) {
         setAttachment({ applicationId: application.id, file })
         await attachVideo({ orgId, formId, applicationId: application.id, file, signal: controller.signal })
@@ -143,7 +166,7 @@ function Formulario({ orgId, formId }) {
       setErrors(failure.fields ?? {})
       setError(failure.code === 'applications/video' ? failure.message :
         failure.fields || failure.message === 'applications/invalid-contact'
-        ? 'Revisa tus datos de contacto y confirma la autorización.'
+        ? 'Revisa los campos marcados y confirma la autorización.'
         : file && failure instanceof TypeError ? 'Comprueba tu conexión e inténtalo de nuevo.'
           : 'No pudimos enviar la postulación. Comprueba tu conexión y que el enlace siga activo.')
     } finally {
@@ -174,7 +197,16 @@ function Formulario({ orgId, formId }) {
 
   if (available == null) return <p role="status">Comprobando el enlace de postulación…</p>
   if (!available) return <p role="alert">Este enlace de postulación no está disponible. Pide un enlace activo a la organización.</p>
-  if (submitted) return <p role="status">Recibimos tu postulación. La organización podrá revisarla y contactarte.</p>
+  if (submitted) return (
+    <div role="status">
+      <p>Recibimos tu postulación. La organización podrá revisarla y contactarte.</p>
+      {reference && (
+        <p className="mt-2">
+          Tu número de referencia es <strong>{reference}</strong>. Guárdalo por si escribes a la organización.
+        </p>
+      )}
+    </div>
+  )
   if (attachment) return (
     <form onSubmit={retryVideo} aria-label="Adjuntar video a la postulación" aria-busy={sending}>
       <p className="mb-3" role="status">{sending ? 'Postulación guardada. Verificando y adjuntando el video…' :
@@ -194,7 +226,8 @@ function Formulario({ orgId, formId }) {
     </form>
   )
   return (
-    <form onSubmit={submit} aria-label="Formulario de postulación" aria-busy={sending}>
+    <form onSubmit={submit} aria-label="Formulario de postulación" aria-busy={sending} className="relative">
+      <CampoTrampa />
       <fieldset disabled={sending} className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <h2 className={`${legendClass} sm:col-span-2`}>Datos personales</h2>
@@ -227,7 +260,9 @@ function Formulario({ orgId, formId }) {
           {videoEnabled && <VideoField />}
           <div className="sm:col-span-2">
             <label className={labelClass} htmlFor="message">Mensaje (opcional)</label>
-            <textarea className={inputClass} id="message" name="message" maxLength={1000} rows={4} placeholder="Cuéntale a la organización por qué te interesa." />
+            <textarea className={inputClass} id="message" name="message" maxLength={1000} rows={4} placeholder="Cuéntale a la organización por qué te interesa."
+              aria-invalid={Boolean(errors.message)} aria-describedby={errors.message ? 'message-error' : undefined} />
+            {errors.message && <p id="message-error" className="mt-1 text-sm text-bad">{errors.message}</p>}
           </div>
         </div>
         <div className="border-t border-line pt-6">

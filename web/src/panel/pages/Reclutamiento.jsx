@@ -4,12 +4,14 @@ import { Link } from 'react-router'
 import { EmptyState, ErrorState, StatusBadge } from '../components/ui'
 import DetallePostulacion, { fechaCorta, iniciales } from '../components/recruitment/DetallePostulacion.jsx'
 import PlayerProfile from '../components/players/PlayerProfile.jsx'
+import AnalisisPostulacion from '../components/recruitment/AnalisisPostulacion.jsx'
 import AsignarJugador from '../components/recruitment/AsignarJugador.jsx'
 import EnlacesPostulacion from '../components/recruitment/EnlacesPostulacion.jsx'
 import { incluyeSeccion, usePlanVista } from '../context/PlanVistaContext.js'
 import { usePlayers } from '../hooks/usePlayers.js'
 import { updateApplicationNotes, updateApplicationStatus } from '../lib/applicationStatus.js'
 import { playerAge } from '../lib/players.js'
+import { applicationReference } from '../lib/publicApplications.js'
 import { APPLICATION_STATUS, COLLECTIONS } from '../lib/schema.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import './jugadores.css'
@@ -57,6 +59,7 @@ function Bandeja({ db, orgId, uid, role, children }) {
   const [page, setPage] = useState(1)
   const [assignmentId, setAssignmentId] = useState('')
   const [profileId, setProfileId] = useState('')
+  const [videoApplicationId, setVideoApplicationId] = useState('')
   const playerService = useMemo(() => createFirestorePlayersService({ db, orgId, actorId: uid, role }), [db, orgId, uid, role])
   const roster = usePlayers(playerService)
 
@@ -71,12 +74,14 @@ function Bandeja({ db, orgId, uid, role, children }) {
             const { orgId, fullName, city, graduationYear, status, createdAt, playerId,
               birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking,
               email, message, videoLinks, videoPaths, internalNotes } = doc.data()
+            const paths = Array.isArray(videoPaths) ? [...new Set(videoPaths.filter(path => typeof path === 'string'))] : []
             return { id: doc.id, orgId, fullName, city, graduationYear, status, createdAt, playerId,
               birthDate, academy, guardian, dominantHand, backhand, utr, nationalRanking,
               email, message, internalNotes,
               videoLinks: Array.isArray(videoLinks) ? videoLinks.filter((link) => typeof link === 'string') : [],
-              videoCount: Array.isArray(videoPaths) ? videoPaths.length : 0,
-              hasVideo: Array.isArray(videoPaths) && videoPaths.length > 0 }
+              videoPaths: paths,
+              videoCount: paths.length,
+              hasVideo: paths.length > 0 }
           })
           .filter((row) => row.orgId === orgId)
           .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0))
@@ -95,9 +100,10 @@ function Bandeja({ db, orgId, uid, role, children }) {
   const term = normalize(search.trim())
   const rows = result?.rows ?? []
   const profile = roster.rows.find(({ id }) => id === profileId)
+  const videoApplication = rows.find(({ id }) => id === videoApplicationId)
   const filtered = rows.filter((row) =>
     (!status || row.status === status) &&
-    [row.fullName, row.city].some((value) => normalize(value).includes(term)),
+    [row.fullName, row.city, applicationReference(row.id)].some((value) => normalize(value).includes(term)),
   )
   const selected = filtered.find(({ id }) => id === selectedId) ?? filtered[0]
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -118,6 +124,9 @@ function Bandeja({ db, orgId, uid, role, children }) {
   }
 
   if (profile) return <PlayerProfile key={profile.id} player={profile} service={playerService} onBack={() => setProfileId('')} />
+  if (videoApplication) return <AnalisisPostulacion key={videoApplication.id} db={db} orgId={orgId} uid={uid} role={role}
+    application={videoApplication} canAnalyze={roster.rows.some(({ id }) => id === videoApplication.playerId)}
+    onBack={() => setVideoApplicationId('')} />
 
   const tabs = [{ value: '', label: 'Todas', count: rows.length }, ...states.map((state) => ({ value: state, label: statusLabel(state), count: countByStatus(state) }))]
 
@@ -137,8 +146,8 @@ function Bandeja({ db, orgId, uid, role, children }) {
             ))}
           </div>
           <div className="players-field rec-buscar">
-            <label className="sr-only" htmlFor="application-search">Buscar por nombre o ciudad</label>
-            <input id="application-search" type="search" placeholder="Buscar por nombre o ciudad" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
+            <label className="sr-only" htmlFor="application-search">Buscar por nombre, ciudad o referencia</label>
+            <input id="application-search" type="search" placeholder="Nombre, ciudad o referencia" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
           </div>
         </div>
       )}
@@ -197,6 +206,7 @@ function Bandeja({ db, orgId, uid, role, children }) {
             onSaveStatus={saveStatus}
             onSaveNotes={(application, text) => updateApplicationNotes(db, application, text)}
             onAssign={() => setAssignmentId(selected.id)}
+            onVideos={() => setVideoApplicationId(selected.id)}
             onProfile={() => setProfileId(selected.playerId)}
           >
             {assignment && (assignment.playerId ? (

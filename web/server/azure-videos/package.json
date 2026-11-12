@@ -1,0 +1,13 @@
+{
+  "name": "acecam-videos-api",
+  "private": true,
+  "description": "API de enlaces temporales para los videos de AceCam en Azure Blob (PCIT-222)",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "@azure/identity": "4.14.1",
+    "@azure/storage-blob": "12.34.0",
+    "firebase-admin": "14.5.0"
+  }
+}

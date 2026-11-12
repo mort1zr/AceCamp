@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { DataTable } from '../ui'
+import MatchStatistics from '../analysis/MatchStatistics.jsx'
 import { playerAge, playersErrorMessage } from '../../lib/players.js'
 import PaginacionTabla, { tamanosPagina } from '../ui/PaginacionTabla.jsx'
 import { EsqueletoTabla } from '../dashboard/EsqueletoDashboard.jsx'
@@ -76,6 +77,7 @@ export default function PlayerProfile({ service, player, onBack, roster = [], ra
 
   const age = playerAge(player.birthDate)
   const allowed = service.canViewProfile?.(player)
+  const latestMatch = history?.rows?.[0]
   function closeDelete() {
     setConfirmDelete(false)
     deleteButton.current?.focus()
@@ -144,6 +146,15 @@ export default function PlayerProfile({ service, player, onBack, roster = [], ra
       </div>
       </div>
       {editing && <PlayerForm service={service} initialPlayer={player} onCancel={() => setEditing(false)} onCreated={() => setEditing(false)} />}
+      {latestMatch && (
+        <section className="players-profile-history" aria-labelledby="player-statistics-title">
+          <h2 id="player-statistics-title">Estadísticas del último partido analizado</h2>
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-muted">{dateLabel(latestMatch.matchDate)} · {latestMatch.opponent || 'Rival sin registrar'}</p>
+            <MatchStatistics match={latestMatch} />
+          </div>
+        </section>
+      )}
       <section className="players-profile-history">
         <h2>Partidos analizados</h2>
         {history === null ? <EsqueletoTabla etiqueta="partidos" /> : <DataTable

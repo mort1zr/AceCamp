@@ -25,7 +25,19 @@ function formConsent(method, iso) {
 
 /** Estadísticas de un partido terminado, con la forma v1 de matches.statistics. */
 function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg, longest, distance, shotAvg = 98.5, moveMax = 23, moveAvg = 7.2, firstAvg, secondAvg, secondMax, heatmap }) {
-  const serveSamples = 100
+  const serve = (max, avg, firstIn, doubleFaults, aces) => {
+    const firstServeAttempts = 100
+    const secondServes = firstServeAttempts - firstIn
+    const count = firstServeAttempts + secondServes
+    const sampleCount = 85
+    const fromRight = Math.ceil(count / 2)
+    return {
+      count, fromRight, fromLeft: count - fromRight,
+      sumSpeedKmh: avg * sampleCount, sampleCount, maxSpeedKmh: max,
+      firstServeIn: firstIn, firstServeAttempts, doubleFaults,
+      faults: secondServes + doubleFaults, aces,
+    }
+  }
   return {
     schemaVersion: MATCH_STATS_VERSION,
     durationSeconds: 5400,
@@ -33,15 +45,10 @@ function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg,
       shots: { count: shots, sumSpeedKmh: Math.round(shots * shotAvg), maxSpeedKmh: fhMax },
       movement: { distanceMeters: distance, maxSpeedKmh: moveMax, avgSpeedKmh: moveAvg, ...(heatmap && { heatmap }) },
       serve: {
-        sumSpeedKmh: serveAvg * serveSamples,
-        sampleCount: serveSamples,
-        maxSpeedKmh: serveMax,
-        firstServeIn: firstIn,
-        firstServeAttempts: serveSamples,
-        doubleFaults: df,
+        ...serve(serveMax, serveAvg, firstIn, df, Math.round(serveMax / 28)),
         ...(firstAvg != null && {
           firstServe: { sampleCount: firstIn, sumSpeedKmh: Math.round(firstAvg * firstIn * 10) / 10, maxSpeedKmh: serveMax },
-          secondServe: { sampleCount: serveSamples - firstIn, sumSpeedKmh: Math.round(secondAvg * (serveSamples - firstIn) * 10) / 10, maxSpeedKmh: secondMax },
+          secondServe: { sampleCount: 100 - firstIn, sumSpeedKmh: Math.round(secondAvg * (100 - firstIn) * 10) / 10, maxSpeedKmh: secondMax },
         }),
       },
       forehand: { count: Math.round(shots * 0.55), maxSpeedKmh: fhMax },
@@ -50,15 +57,26 @@ function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg,
     opponent: {
       shots: { count: shots - 20, sumSpeedKmh: Math.round((shots - 20) * 92), maxSpeedKmh: fhMax - 6 },
       movement: { distanceMeters: distance - 200, maxSpeedKmh: 21, avgSpeedKmh: 6.8 },
+      serve: serve(serveMax - 8, serveAvg - 9, firstIn + 2, df + 1, 3),
     },
-    rallies: {
-      count: 96,
-      sumShots: Math.round(rallyAvg * 96),
-      longestShots: longest,
-      short: 96 - Math.round(96 * 0.34) - Math.round(96 * 0.14),
-      medium: Math.round(96 * 0.34),
-      long: Math.round(96 * 0.14),
-    },
+    rallies: { count: 96, sumShots: Math.round(96 * rallyAvg), longestShots: longest, short: 49, medium: 34, long: 13 },
+  }
+}
+
+function completedMatchStatistics(statistics, result) {
+  const sets = result.split(' ').map(set => {
+    const [playerGames, opponentGames] = set.split('-').map(games => Number.parseInt(games, 10))
+    return { playerGames, opponentGames }
+  })
+  const games = sets.reduce((total, set) => total + set.playerGames + set.opponentGames, 0)
+  const count = Math.round(games * 6.2)
+  const playerWonSets = sets.filter(set => set.playerGames > set.opponentGames).length
+  const playerWins = playerWonSets > sets.length / 2
+  const playerWon = Math.round(count * (playerWins ? 0.54 : 0.46))
+  return {
+    ...statistics,
+    score: { sets, games: [0, 0], points: ['0', '0'], winner: playerWins ? 'player' : 'opponent' },
+    points: { count, playerWon, opponentWon: count - playerWon, lowConfidence: 3, toReview: 3 },
   }
 }
 
@@ -141,6 +159,10 @@ export function buildSeedData() {
         finishedAt: status === M.ready || status === M.error ? day(fields.matchDate) : null,
         errorMessage: null, workerVersion: status === M.ready ? 'seed' : null, statistics: null,
         ...fields,
+        ...(status === M.ready ? {
+          processedVideoPath: `orgs/${orgId}/matches/${id}/processed.mp4`,
+          statistics: completedMatchStatistics(fields.statistics, fields.result),
+        } : {}),
       },
     }
   }
@@ -170,7 +192,7 @@ export function buildSeedData() {
       opponent: 'S. León', matchDate: '2026-10-20', status: M.error,
       errorMessage: 'No se pudo detectar la cancha completa. Prueba con un video grabado desde atrás y en alto.' }),
     match('match-club-1', orgClub, coach2, 'player-club-sofia-vega', {
-      opponent: 'C. Díaz', matchDate: '2026-10-25', status: M.ready,
+      opponent: 'C. Díaz', matchDate: '2026-10-25', result: '4-6 5-7', status: M.ready,
       statistics: stats({ serveMax: 139, serveAvg: 121, firstIn: 61, df: 3, fhMax: 110, bhMax: 98, shots: 380, rallyAvg: 5.1, longest: 19, distance: 3500 }) }),
   )
 

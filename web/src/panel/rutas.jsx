@@ -3,9 +3,16 @@ import { useAuth } from './context/AuthContext.js'
 import { contratarPlan } from './lib/contratarPlan.js'
 import { auth, db, storage } from './lib/firebase.js'
 import { createHttpVideoImporter } from './lib/services/httpVideoImportService.js'
+import { createAzureVideoClient, createAzureVideoUploadService } from './lib/azureVideos.js'
 import { createVideoUploadService, MAX_VIDEO_BYTES } from './lib/videoUpload.js'
 
-const { uploadVideo } = createVideoUploadService({ storage })
+// PCIT-225: con VITE_VIDEO_API_URL los videos se guardan en Azure Blob (PCIT-222);
+// sin ella, en Firebase Storage (emuladores y desarrollo local).
+const videoApiUrl = import.meta.env.VITE_VIDEO_API_URL
+const videoApi = videoApiUrl
+  ? createAzureVideoClient({ apiUrl: videoApiUrl, getToken: () => auth.currentUser?.getIdToken() })
+  : null
+const { uploadVideo } = videoApi ? createAzureVideoUploadService({ client: videoApi }) : createVideoUploadService({ storage })
 
 function usePropsPanel() {
   const { user, profile } = useAuth()
@@ -36,6 +43,7 @@ function usePropsPanel() {
     auth,
     session,
     nombre: profile?.displayName ?? '',
+    videoApi,
     uploadVideo,
     importVideo,
     maxBytes: MAX_VIDEO_BYTES,

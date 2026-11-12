@@ -10,6 +10,7 @@ const textos = {
   es: {
     titulo: 'Iniciar sesión',
     subtitulo: 'Entra para ver a tus jugadores y sus análisis.',
+    subtituloAdmin: 'Inicia sesión para acceder a la administración de AceCam.',
     correo: 'Correo',
     clave: 'Contraseña',
     boton: 'Iniciar sesión',
@@ -18,6 +19,7 @@ const textos = {
   en: {
     titulo: 'Log in',
     subtitulo: 'Sign in to see your players and their analyses.',
+    subtituloAdmin: 'Sign in to access AceCam administration.',
     correo: 'Email',
     clave: 'Password',
     boton: 'Log in',
@@ -44,8 +46,9 @@ export default function Login() {
   // Vuelve a la página privada que pidió, o al Inicio.
   const from = location.state?.from
   const destination = from ? `${from.pathname}${from.search ?? ''}` : '/inicio'
+  const adminDestination = from?.pathname === '/admin' || from?.pathname?.startsWith('/admin/')
 
-  if (user && profile && !submitting) return <Navigate to={destination} replace />
+  if (user && (profile || adminDestination) && !submitting) return <Navigate to={destination} replace />
 
   const change = event => setValues(current => ({ ...current, [event.target.name]: event.target.value }))
 
@@ -70,7 +73,7 @@ export default function Login() {
     <>
       <AuthHeader
         title={t.titulo}
-        subtitle={t.subtitulo}
+        subtitle={adminDestination ? t.subtituloAdmin : t.subtitulo}
       />
       <form id="acceso-form" className="grid gap-4" onSubmit={submit} noValidate>
         <FormError message={formError} />

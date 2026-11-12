@@ -47,6 +47,14 @@ beforeEach(async () => {
 const coachStorage = () => env.authenticatedContext(COACH, { email: 'coach@acecam.test' }).storage()
 
 describe('reglas de Storage', () => {
+  it('el permiso de plataforma no da acceso a videos de un equipo', async () => {
+    const uid = 'admin-plataforma'
+    await env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'platformAdmins', uid), {}))
+    const storage = env.authenticatedContext(uid).storage()
+    await assertFails(getBytes(ref(storage, path(OTHER_ORG, 'video.mp4', 'm-club'))))
+    await assertFails(uploadBytes(ref(storage, path(OTHER_ORG)), bytes(), mp4(uid)))
+  })
+
   it('el resultado del worker es privado por organización y no se puede falsificar ni borrar desde la web', async () => {
     const output = path(ORG, 'processed.mp4')
     await env.withSecurityRulesDisabled(async context => {

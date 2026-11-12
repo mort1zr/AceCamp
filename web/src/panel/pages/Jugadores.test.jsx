@@ -35,6 +35,59 @@ async function fillPlayer(user, name = 'Jugador de prueba') {
   await user.type(screen.getByLabelText(/Academia.*opcional/), 'Club de prueba')
 }
 
+it('muestra las tarjetas del último partido analizado de la ficha y conserva el historial', async () => {
+  const record = (id, fields) => ({ id, data: () => ({ orgId: 'org-a', createdBy: 'coach-a', ...fields }) })
+  const player = record('p1', { fullName: 'Camila Ríos' })
+  const match = (id, fields) => record(id, { playerId: 'p1', status: 'listo', ...fields })
+  const statistics = {
+    schemaVersion: 'acecam.match-stats.v1',
+    player: { shots: { count: 2, sumSpeedKmh: 120, maxSpeedKmh: 70 }, movement: { distanceMeters: 31 },
+      serve: { sampleCount: 1, sumSpeedKmh: 120, doubleFaults: 0 } },
+    rallies: { count: 1, sumShots: 7, longestShots: 7 },
+  }
+  let publish
+  onSnapshot
+    .mockImplementationOnce((_, receive) => {
+      receive({ docs: [player] })
+      return () => {}
+    })
+    .mockImplementationOnce((_, receive) => {
+      receive({ docs: [] })
+      return () => {}
+    })
+    .mockImplementationOnce((_, receive) => {
+      publish = receive
+      receive({ docs: [] })
+      return () => {}
+    })
+  const user = userEvent.setup()
+  render(<Jugadores db={{ app: { options: { projectId: 'prueba' } } }} session={{ uid: 'coach-a', orgId: 'org-a', role: 'coach' }} />)
+  await user.click(await screen.findByRole('button', { name: 'Ver perfil de Camila Ríos' }))
+  expect(screen.getByText('Aún no hay partidos analizados')).toBeTruthy()
+  const region = () => screen.getByRole('region', { name: 'Estadísticas del último partido analizado' })
+  const previous = match('old', { opponent: 'Rival anterior', matchDate: '2026-09-01', statistics })
+  const latest = fields => match('latest', { opponent: 'Rival reciente', matchDate: '2026-10-02', ...fields })
+  const outsideScope = match('outside', { opponent: 'Rival ajeno', matchDate: '2026-11-01', createdBy: 'coach-b', statistics })
+
+  act(() => publish({ docs: [previous, latest({ statistics }), outsideScope] }))
+  const complete = within(region())
+  expect(complete.getByText('02/10/2026 · Rival reciente')).toBeTruthy()
+  for (const label of ['Velocidad media de golpe', 'Velocidad media de saque', 'Distancia recorrida', 'Peloteos detectados']) {
+    expect(complete.getByRole('heading', { name: label })).toBeTruthy()
+  }
+  expect(screen.queryByText('Rival ajeno')).toBeNull()
+
+  act(() => publish({ docs: [previous, latest({ statistics: { ...statistics, player: { serve: { doubleFaults: 0 } }, rallies: undefined } })] }))
+  expect(within(region()).getAllByRole('article')).toHaveLength(1)
+  expect(within(region()).getByRole('heading', { name: 'Dobles faltas' })).toBeTruthy()
+  expect(within(region()).getByText('0')).toBeTruthy()
+  expect(within(screen.getByRole('table', { name: 'Historial de partidos analizados' })).getByText('Rival anterior')).toBeTruthy()
+
+  act(() => publish({ docs: [previous, latest({})] }))
+  expect(within(region()).getByText('Sin datos de estadísticas.')).toBeTruthy()
+  expect(within(region()).queryByRole('article')).toBeNull()
+})
+
 describe('Jugadores v1', () => {
   it('pide datos del apoderado para menores y no muestra su contacto en la plantilla', async () => {
     const service = createDemoPlayersService({ initialPlayers: [] })

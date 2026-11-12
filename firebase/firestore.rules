@@ -40,6 +40,38 @@ service cloud.firestore {
       return signedIn() && get(userPath(request.auth.uid)).data.role == 'admin';
     }
 
+    function isPlatformAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+    }
+
+    function platformAuditState(entity, data) {
+      return entity == 'orgs'
+        ? { 'name': data.name, 'plan': data.plan, 'archived': data.get('archived', false) }
+        : entity == 'users'
+          ? { 'role': data.role, 'suspended': data.get('suspended', false) }
+          : { 'orgId': data.orgId, 'role': data.role, 'status': data.status };
+    }
+
+    function validPlatformAudit(id, entry) {
+      let target = /databases/$(database)/documents/$(entry.entity)/$(entry.targetId);
+      let next = getAfter(target).data;
+      return entry.keys().hasOnly(['actorId', 'createdAt', 'entity', 'targetId', 'before', 'after'])
+        && entry.actorId == request.auth.uid && entry.createdAt == request.time
+        && entry.entity in ['orgs', 'users', 'invites']
+        && entry.targetId is string && entry.targetId.matches('^[^/]+$')
+        && next.platformAuditId == id
+        && (!exists(target) || get(target).data.get('platformAuditId', null) != id)
+        && entry.before == (exists(target) ? platformAuditState(entry.entity, get(target).data) : null)
+        && entry.after == platformAuditState(entry.entity, next)
+        && entry.before != entry.after;
+    }
+
+    match /platformAudit/{id} {
+      allow read: if isPlatformAdmin();
+      allow create: if isPlatformAdmin() && validPlatformAudit(id, request.resource.data);
+      allow update, delete: if false;
+    }
+
     function canManage(data) {
       return inOrg(data.orgId) && (isAdmin() || data.createdBy == request.auth.uid);
     }
@@ -135,13 +167,19 @@ service cloud.firestore {
         && consent.recordedBy == recordedBy;
     }
 
+    // PCIT-188. Solo un operador con acceso al proyecto puede conceder o revocar este permiso.
+    match /platformAdmins/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
     // ---------- users/{uid} ----------
     // Se crea en el registro (PCIT-21), en el mismo lote que su organización.
 
     match /users/{uid} {
       allow get: if signedIn()
-        && (uid == request.auth.uid || (resource != null && inOrg(resource.data.orgId)));
-      allow list: if inOrg(resource.data.orgId);
+        && (uid == request.auth.uid || isPlatformAdmin() || (resource != null && inOrg(resource.data.orgId)));
+      allow list: if isPlatformAdmin() || inOrg(resource.data.orgId);
 
       allow create: if signedIn()
         && uid == request.auth.uid
@@ -183,8 +221,8 @@ service cloud.firestore {
     // ---------- orgs/{orgId} ----------
 
     match /orgs/{orgId} {
-      allow get: if inOrg(orgId);
-      allow list: if false;
+      allow get: if isPlatformAdmin() || inOrg(orgId);
+      allow list: if isPlatformAdmin();
 
       // Se crea en el registro, junto con la ficha del usuario que la crea.
       allow create: if signedIn()
@@ -221,7 +259,7 @@ service cloud.firestore {
       // Contador de análisis del mes (PCIT-41). Solo sube de uno en uno y junto con
       // el alta de un partido nuevo; borrar un partido no devuelve el análisis.
       match /usage/{period} {
-        allow get, list: if inOrg(orgId);
+        allow get, list: if isPlatformAdmin() || inOrg(orgId);
 
         allow create, update: if inOrg(orgId)
           && period == currentPeriod()
@@ -363,6 +401,13 @@ service cloud.firestore {
     // ---------- matches/{matchId} ----------
     // La web crea el partido 'en cola'; el worker (Admin SDK) lo procesa.
 
+    function validApplicationMatch(data) {
+      let application = get(/databases/$(database)/documents/applications/$(data.applicationId)).data;
+      return application.orgId == data.orgId && application.playerId == data.playerId
+        && data.videoPath in application.videoPaths
+        && data.videoPath.matches('^orgs/' + data.orgId + '/applications/' + data.applicationId + '/video[.](mp4|mov)$');
+    }
+
     match /matches/{matchId} {
       allow get: if signedIn() && (resource == null || canManage(resource.data));
       allow list: if canManage(resource.data);
@@ -373,7 +418,7 @@ service cloud.firestore {
              'createdBy', 'createdAt', 'status'])
         && request.resource.data.keys().hasOnly([
              'orgId', 'playerId', 'playerPosition', 'opponent', 'tournament', 'matchDate', 'result',
-             'surface', 'videoPath', 'inputFingerprint', 'createdBy', 'createdAt', 'status',
+             'surface', 'videoPath', 'inputFingerprint', 'applicationId', 'createdBy', 'createdAt', 'status',
              'startedAt', 'finishedAt', 'errorMessage', 'workerVersion', 'statistics'])
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time
@@ -395,10 +440,13 @@ service cloud.firestore {
         && optionalText(request.resource.data, 'tournament', 120)
         && optionalText(request.resource.data, 'result', 120)
         && optionalIn(request.resource.data, 'surface', ['arcilla', 'dura', 'césped', 'otra'])
-        // El video tiene que estar en la carpeta de este partido y de esta organización (PCIT-24).
         && request.resource.data.videoPath is string
-        && request.resource.data.videoPath.matches(
-             '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$')
+        && (('applicationId' in request.resource.data)
+          ? request.resource.data.applicationId is string
+            && request.resource.data.applicationId.matches('^[A-Za-z0-9_-]{1,128}$')
+            && validApplicationMatch(request.resource.data)
+          : request.resource.data.videoPath.matches(
+            '^orgs/' + request.resource.data.orgId + '/matches/' + matchId + '/video[.](mp4|mov)$'))
         // Cada partido nuevo cuenta como un análisis del mes (PCIT-41).
         && countsAsAnalysis(request.resource.data.orgId, matchId);
 
@@ -451,6 +499,19 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time;
     }
 
+    // PCIT-69. La configuración de Google nunca está en un documento público.
+    match /orgs/{orgId}/recruitmentIntegrations/googleForms {
+      allow get: if canInvite(orgId);
+      allow create, update: if canInvite(orgId)
+        && request.resource.data.keys().hasOnly(['formUrl', 'spreadsheetId', 'sheetId'])
+        && isText(request.resource.data.formUrl, 18, 200)
+        && request.resource.data.formUrl.matches('^https://(forms[.]gle/[A-Za-z0-9_-]+|docs[.]google[.]com/forms/d/(e/)?[A-Za-z0-9_-]+/viewform)$')
+        && isText(request.resource.data.spreadsheetId, 1, 128)
+        && request.resource.data.spreadsheetId.matches('^[A-Za-z0-9_-]+$')
+        && request.resource.data.sheetId is int
+        && request.resource.data.sheetId >= 0 && request.resource.data.sheetId <= 2147483647;
+    }
+
     function publicApplicationEmail(value) {
       return isText(value, 5, 254) && value.matches('^[^@\\s]+@[^@\\s]+[.][^@\\s]+$');
     }
@@ -462,7 +523,7 @@ service cloud.firestore {
         && publicApplicationEmail(guardian.email);
     }
 
-    function validPublicApplicationConsent(data) {
+    function validApplicationConsent(data, recordedBy, versions) {
       let parts = data.birthDate.split('-');
       let year = int(parts[0]);
       let month = int(parts[1]);
@@ -473,9 +534,9 @@ service cloud.firestore {
         (today.month() < month || (today.month() == month && today.day() < day) ? 1 : 0);
       let consent = data.consent;
       return year >= 1900 && birth.year() == year && birth.month() == month && birth.day() == day && birth <= today
-        && validConsent(consent, 'public-form')
+        && validConsent(consent, recordedBy)
         && consent.keys().hasOnly(['accepted', 'version', 'method', 'recordedBy', 'recordedAt'])
-        && consent.version in ['applications-v1', 'applications-video-v1'] && consent.recordedAt == request.time
+        && consent.version in versions && consent.recordedAt == request.time
         && (age < 18
           ? consent.method == 'guardian' && publicApplicationGuardian(data.guardian)
           : consent.method == 'self' && data.guardian == null);
@@ -495,10 +556,22 @@ service cloud.firestore {
         && (links.size() < 5 || publicVideoLink(links[4]));
     }
 
+    function validApplicationContactFields(data) {
+      return isText(data.orgId, 1, 128) && data.orgId.matches('^[A-Za-z0-9_-]+$')
+        && data.status == 'nueva' && data.createdAt == request.time
+        && isText(data.fullName, 2, 120) && data.fullName.trim().size() >= 2
+        && isText(data.city, 2, 100) && data.city.trim().size() >= 2
+        && publicApplicationEmail(data.email)
+        && data.graduationYear is int && data.graduationYear >= 1900 && data.graduationYear <= 2100
+        && optionalText(data, 'academy', 120) && optionalText(data, 'message', 1000)
+        && isIsoDate(data.birthDate);
+    }
+
     function validPublicApplication(data) {
       return data.keys().hasOnly(['orgId', 'formId', 'status', 'fullName', 'birthDate', 'city',
           'email', 'graduationYear', 'academy', 'guardian', 'message', 'consent', 'createdAt',
           'utr', 'nationalRanking', 'dominantHand', 'backhand', 'videoLinks'])
+        && validApplicationContactFields(data)
         && optionalIn(data, 'dominantHand', ['diestro', 'zurdo'])
         && optionalIn(data, 'backhand', ['dos manos', 'una mano'])
         && optionalNumber(data, 'utr')
@@ -506,16 +579,23 @@ service cloud.firestore {
         && optionalNumber(data, 'nationalRanking')
         && (data.get('nationalRanking', null) == null || (data.nationalRanking is int && data.nationalRanking > 0 && data.nationalRanking <= 100000))
         && publicVideoLinks(data)
-        && isText(data.orgId, 1, 128) && data.orgId.matches('^[A-Za-z0-9_-]+$')
         && data.formId is string && data.formId.matches('^[A-Za-z0-9]{20}$')
-        && data.status == 'nueva' && data.createdAt == request.time
-        && isText(data.fullName, 2, 120) && data.fullName.trim().size() >= 2
-        && isText(data.city, 2, 100) && data.city.trim().size() >= 2
-        && publicApplicationEmail(data.email)
-        && data.graduationYear is int && data.graduationYear >= 1900 && data.graduationYear <= 2100
-        && optionalText(data, 'academy', 120) && optionalText(data, 'message', 1000)
-        && isIsoDate(data.birthDate) && validPublicApplicationConsent(data)
+        && validApplicationConsent(data, 'public-form', ['applications-v1', 'applications-video-v1'])
         && exists(/databases/$(database)/documents/orgs/$(data.orgId)/applicationForms/$(data.formId));
+    }
+
+    function isGoogleApplicationId(applicationId) {
+      return applicationId.matches('^[a-f0-9]{64}_gf$');
+    }
+
+    function validGoogleApplication(data) {
+      return canInvite(data.orgId)
+        && data.keys().hasOnly(['orgId', 'source', 'status', 'fullName', 'birthDate', 'city',
+            'email', 'graduationYear', 'academy', 'guardian', 'message', 'consent', 'createdAt'])
+        && data.source == 'google-forms'
+        && validApplicationContactFields(data)
+        && validApplicationConsent(data, request.auth.uid, ['applications-v1'])
+        && exists(/databases/$(database)/documents/orgs/$(data.orgId)/recruitmentIntegrations/googleForms);
     }
 
     function validApplicationTransition(from, to) {
@@ -541,24 +621,25 @@ service cloud.firestore {
       allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
       allow list: if inOrg(resource.data.orgId);
 
-      allow create: if inOrg(request.resource.data.orgId)
-        && !('formId' in request.resource.data)
-        && !request.resource.data.keys().hasAny(['videoPaths', 'videoUpload'])
-        && request.resource.data.get('playerId', null) == null
-        && request.resource.data.status == 'nueva'
-        && request.resource.data.createdAt == request.time
-        && isText(request.resource.data.fullName, 2, 120)
-        && isIsoDate(request.resource.data.birthDate)
-        && request.resource.data.consent is map
-        && request.resource.data.consent.accepted == true;
+      // Alta manual del equipo. PCIT-217: mismos campos y validaciones que una
+      // postulación importada, con la autorización registrada por quien la crea.
+      allow create: if !isGoogleApplicationId(applicationId) && inOrg(request.resource.data.orgId)
+        && request.resource.data.keys().hasOnly(['orgId', 'status', 'fullName', 'birthDate', 'city',
+             'email', 'graduationYear', 'academy', 'guardian', 'message', 'consent', 'createdAt'])
+        && validApplicationContactFields(request.resource.data)
+        && validApplicationConsent(request.resource.data, request.auth.uid, ['applications-v1']);
 
-      allow create: if validPublicApplication(request.resource.data);
+      allow create: if !isGoogleApplicationId(applicationId) && validPublicApplication(request.resource.data);
+      allow create: if isGoogleApplicationId(applicationId) && validGoogleApplication(request.resource.data);
 
+      // PCIT-217: el equipo solo cambia el estado y sus notas. Los datos que envió la
+      // persona (contacto, apoderado, videos, autorización) no se reescriben.
       allow update: if inOrg(resource.data.orgId)
-        && unchanged(['orgId', 'formId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email',
-             'playerId', 'videoPaths', 'videoUpload'])
+        && onlyChanges(['status', 'internalNotes', 'reviewedBy', 'updatedAt'])
         && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada']
-        && validApplicationTransition(resource.data.status, request.resource.data.status);
+        && validApplicationTransition(resource.data.status, request.resource.data.status)
+        && optionalText(request.resource.data, 'internalNotes', 2000)
+        && request.resource.data.get('reviewedBy', null) in [resource.data.get('reviewedBy', null), request.auth.uid];
 
       allow update: if inOrg(resource.data.orgId) && canLinkApplicationPlayer();
 

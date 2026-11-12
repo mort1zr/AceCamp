@@ -1,0 +1,160 @@
+# Despliegue de la API de videos en Azure (PCIT-227, historia PCIT-222).
+# - En cada PR: construye la imagen y comprueba que arranca (no publica nada).
+# - En main: publica la imagen en GitHub Packages y la despliega en Azure Container Apps
+#   con la identidad sin contraseña acecam-github (OIDC). Ver docs/PCIT-222-videos-en-azure.md.
+name: Despliegue Azure (videos)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/server/azure-videos/**"
+      - ".github/workflows/deploy-azure.yml"
+  pull_request:
+    paths:
+      - "web/server/azure-videos/**"
+      - ".github/workflows/deploy-azure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-azure-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/mort1zr/acecam-videos-api
+  APP_NAME: acecam-videos-api
+
+jobs:
+  imagen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write # publicar la imagen en GitHub Packages (solo en main)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Construir la imagen
+        working-directory: web/server/azure-videos
+        # La etiqueta vincula la imagen al repositorio: sin ella, GitHub Packages
+        # rechaza la publicación con GITHUB_TOKEN ("denied").
+        run: |
+          docker build --pull -t "$IMAGE:$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.description=API de videos de AceCam (PCIT-222)" .
+
+      # Sin configuración, la API debe negarse a arrancar con un mensaje claro.
+      - name: Comprobar que la imagen arranca
+        run: |
+          if docker run --rm "$IMAGE:$GITHUB_SHA" > arranque.log 2>&1; then
+            echo "::error::La API arrancó sin configuración."; exit 1
+          fi
+          grep -q "Falta la variable de entorno" arranque.log || { cat arranque.log; exit 1; }
+
+      - name: Publicar en GitHub Packages
+        if: github.event_name != 'pull_request'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker logout ghcr.io
+
+  desplegar:
+    needs: imagen
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # inicio de sesión en Azure sin contraseña (OIDC)
+    steps:
+      - name: Comprobar configuración
+        id: config
+        env:
+          CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          API_IDENTITY: ${{ vars.AZURE_VIDEOS_API_IDENTITY_ID }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AZURE }}
+        run: |
+          if [ -z "$CLIENT_ID" ] || [ -z "$API_IDENTITY" ] || [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::Faltan variables AZURE_* o el secreto FIREBASE_SERVICE_ACCOUNT_AZURE: no se despliega (ver docs/PCIT-222-videos-en-azure.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Iniciar sesión en Azure
+        if: steps.config.outputs.ok == 'true'
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Desplegar en Azure Container Apps
+        id: deploy
+        if: steps.config.outputs.ok == 'true'
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          ENVIRONMENT: ${{ vars.AZURE_CONTAINERAPPS_ENV }}
+          STORAGE: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          API_IDENTITY: ${{ vars.AZURE_VIDEOS_API_IDENTITY_ID }}
+          API_CLIENT_ID: ${{ vars.AZURE_VIDEOS_API_IDENTITY_CLIENT_ID }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AZURE }}
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          ENV_VARS=(
+            "AZURE_STORAGE_ACCOUNT=$STORAGE" "AZURE_STORAGE_CONTAINER=videos" "AZURE_CLIENT_ID=$API_CLIENT_ID"
+            "FIREBASE_PROJECT_ID=acecam-e93a2" "ALLOWED_ORIGIN=https://acecam-e93a2.web.app"
+            "FIREBASE_SERVICE_ACCOUNT=secretref:firebase-sa"
+          )
+          if az containerapp show -n "$APP_NAME" -g "$RG" -o none 2>/dev/null; then
+            az containerapp secret set -n "$APP_NAME" -g "$RG" --secrets "firebase-sa=$FIREBASE_SA" -o none
+            az containerapp update -n "$APP_NAME" -g "$RG" --image "$IMAGE:$GITHUB_SHA" --set-env-vars "${ENV_VARS[@]}" -o none
+          else
+            az containerapp create -n "$APP_NAME" -g "$RG" --environment "$ENVIRONMENT" \
+              --image "$IMAGE:$GITHUB_SHA" --ingress external --target-port 8080 \
+              --min-replicas 0 --max-replicas 2 --cpu 0.25 --memory 0.5Gi \
+              --user-assigned "$API_IDENTITY" --secrets "firebase-sa=$FIREBASE_SA" \
+              --env-vars "${ENV_VARS[@]}" --tags proyecto=acecam -o none
+          fi
+          FQDN=$(az containerapp show -n "$APP_NAME" -g "$RG" --query properties.configuration.ingress.fqdn -o tsv)
+          echo "url=https://$FQDN" >> "$GITHUB_OUTPUT"
+
+      - name: Comprobar la API publicada
+        if: steps.config.outputs.ok == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if [ "$(curl -s --max-time 15 "$URL/healthz")" = "ok" ]; then
+              status=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://acecam-e93a2.web.app' "$URL/api/videos/sign")
+              [ "$status" = "401" ] || { echo "::error::Sin sesión debería responder 401 y respondió $status."; exit 1; }
+              echo "API de videos en línea: $URL"; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::La API no respondió en $URL/healthz."; exit 1
+
+      - name: Resumen del despliegue
+        if: always() && steps.config.outputs.ok == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+          OUTCOME: ${{ steps.deploy.outcome }}
+        run: |
+          {
+            echo "### Despliegue de la API de videos (Azure)"
+            echo ""
+            echo "| Paso | Resultado |"
+            echo "| --- | --- |"
+            echo "| Imagen | \`$IMAGE:${GITHUB_SHA:0:12}\` |"
+            echo "| Despliegue | $OUTCOME |"
+            echo "| URL | ${URL:-sin URL} |"
+          } >> "$GITHUB_STEP_SUMMARY"

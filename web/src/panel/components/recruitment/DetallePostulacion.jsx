@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { StatusBadge } from '../ui'
 import { nextApplicationStates } from '../../lib/applicationStatus.js'
 import { playerAge } from '../../lib/players.js'
+import { applicationReference } from '../../lib/publicApplications.js'
 import { APPLICATION_STATUS } from '../../lib/schema.js'
 import './bandeja.css'
 
@@ -151,7 +152,7 @@ function Notas({ application, onSaveNotes }) {
   )
 }
 
-export default function DetallePostulacion({ application, enFicha, bloqueado, onSaveStatus, onSaveNotes, onAssign, onProfile, children }) {
+export default function DetallePostulacion({ application, enFicha, bloqueado, onSaveStatus, onSaveNotes, onAssign, onProfile, onVideos, children }) {
   const edad = playerAge(application.birthDate)
   const enlaces = (application.videoLinks ?? []).map((valor) => ({ valor, url: enlaceSeguro(valor) })).filter((enlace) => enlace.url)
   const archivos = application.videoCount ?? 0
@@ -168,7 +169,7 @@ export default function DetallePostulacion({ application, enFicha, bloqueado, on
         <span className="rec-avatar" aria-hidden="true">{iniciales(application.fullName)}</span>
         <div>
           <h2>{application.fullName}</h2>
-          <p>{[postulo && `Postuló el ${postulo}`, application.city].filter(Boolean).join(' · ')}</p>
+          <p>{[postulo && `Postuló el ${postulo}`, application.city, `Ref. ${applicationReference(application.id)}`].filter(Boolean).join(' · ')}</p>
         </div>
         <StatusBadge status={application.status} />
       </header>
@@ -182,6 +183,11 @@ export default function DetallePostulacion({ application, enFicha, bloqueado, on
           <button type="button" className="players-button-primary" aria-label={`Crear o vincular jugador para ${application.fullName}`} disabled={bloqueado} onClick={onAssign}>Crear jugador</button>
         )}
         {application.playerId && !enFicha && <span className="rec-vinculado">Jugador vinculado</span>}
+        {enlaces.length + archivos > 0 && onVideos && (
+          <button type="button" className="players-button-secondary" aria-label={`Ver videos de ${application.fullName}`} onClick={onVideos}>
+            Ver videos ({enlaces.length + archivos})
+          </button>
+        )}
       </div>
 
       {children}

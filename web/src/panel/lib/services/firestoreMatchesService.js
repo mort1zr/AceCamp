@@ -1,36 +1,9 @@
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { buildDashboardDetails } from '../dashboardDetails.js'
-import { normalizeDashboardStatistics } from '../dashboardOverview.js'
 import { isValidBirthDate } from '../players.js'
-import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
+import { reportMetrics } from '../workerDashboardStatistics.js'
 
-function reportMetrics(match) {
-  const { playerId } = match
-  const statistics = normalizeDashboardStatistics(decodeWorkerDashboardStatistics(match, { playerId }), playerId)
-  const shots = statistics?.shots
-  const max = shots && match.statistics.player.shots.maxSpeedKmh
-  const available = match.statistics?.schemaVersion === 'acecam.match-stats.v1'
-  const movement = available ? match.statistics.player?.movement : null
-  const serve = available ? match.statistics.player?.serve : null
-  const rallies = available ? match.statistics.rallies : null
-  const value = raw => typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null
-  const count = raw => Number.isSafeInteger(raw) && raw >= 0 ? raw : null
-  return {
-    measuredShots: shots?.sampleCount ?? null,
-    averageShotSpeed: shots?.sampleCount > 0 ? shots.sumKmh / shots.sampleCount : null,
-    maxShotSpeed: shots?.sampleCount > 0 && Number.isFinite(max) && max >= 0 ? max : null,
-    distanceMeters: value(movement?.distanceMeters),
-    avgMovementSpeed: value(movement?.avgSpeedKmh),
-    maxMovementSpeed: value(movement?.maxSpeedKmh),
-    serveCount: count(serve?.count),
-    averageServeSpeed: statistics?.serveSpeed?.sampleCount > 0 ? statistics.serveSpeed.sumKmh / statistics.serveSpeed.sampleCount : null,
-    firstServeInRate: statistics?.firstServe?.attempts > 0 ? 100 * statistics.firstServe.in / statistics.firstServe.attempts : null,
-    doubleFaults: statistics?.doubleFaults ?? null,
-    ralliesCount: count(rallies?.count),
-    averageRallyShots: count(rallies?.count) > 0 && count(rallies?.sumShots) != null ? rallies.sumShots / rallies.count : null,
-    longestRally: count(rallies?.longestShots),
-  }
-}
+export { reportMetrics } from '../workerDashboardStatistics.js'
 
 export function createFirestoreMatchesService({ db, orgId, actorId, role }) {
   if (!db || typeof orgId !== 'string' || !orgId.trim() || typeof actorId !== 'string'

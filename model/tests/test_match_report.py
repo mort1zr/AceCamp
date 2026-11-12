@@ -73,10 +73,14 @@ def test_worker_statistics_get_the_score_from_the_player_side():
     stats["score"] = {"sets": [[6, 4]], "games": [2, 1], "points": ["30", "15"], "winner": None}
     stats["points"] = {"count": 3, "won": {"1": 2, "2": 1}, "lowConfidence": 1, "toReview": [3]}
     near = to_match_statistics(stats, "abajo")  # el jugador registrado es el 2 (cerca)
-    assert near["score"] == {"sets": [[4, 6]], "games": [1, 2], "points": ["15", "30"], "winner": None}
+    assert near["score"] == {
+        "sets": [{"playerGames": 4, "opponentGames": 6}],
+        "games": [1, 2], "points": ["15", "30"], "winner": None,
+    }
     assert near["points"] == {"count": 3, "playerWon": 1, "opponentWon": 2, "lowConfidence": 1, "toReview": 1}
     far = to_match_statistics({**stats, "score": {**stats["score"], "winner": 1}}, "arriba")
-    assert far["score"]["sets"] == [[6, 4]] and far["score"]["winner"] == "player"
+    assert far["score"]["sets"] == [{"playerGames": 6, "opponentGames": 4}]
+    assert far["score"]["winner"] == "player"
 
 
 def test_serve_summary_and_overlay_counts():
