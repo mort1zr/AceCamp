@@ -9,7 +9,7 @@ import {
   PLAYER_CONSENT_VERSION,
 } from '../src/panel/lib/schema.js'
 import { usagePeriod } from '../src/panel/lib/usage.js'
-import { buildExpoData } from './seedExpo.mjs'
+import { buildExpoApplications, buildExpoData } from './seedExpo.mjs'
 
 export const SEED_PASSWORD = 'acecam123'
 
@@ -65,7 +65,7 @@ export function buildSeedData() {
     { uid: coach2, email: 'coach2@acecam.test', password: SEED_PASSWORD,
       doc: { email: 'coach2@acecam.test', displayName: 'Coach Paredes', orgId: orgClub, role: 'coach', jobTitle: null, createdAt: day('2026-10-05') } },
     { uid: expo, email: 'test@test.com', password: 'test123',
-      doc: { email: 'test@test.com', displayName: 'Coach Demo', orgId: orgExpo, role: 'coach', jobTitle: 'Entrenador principal', createdAt: day('2026-10-01') } },
+      doc: { email: 'test@test.com', displayName: 'Coach', orgId: orgExpo, role: 'coach', jobTitle: 'Entrenador principal', createdAt: day('2026-10-01') } },
   ]
 
   // Universidad Demo ya contrató Ultra en el checkout (PCIT-158): panel completo y Equipo.
@@ -193,6 +193,8 @@ export function buildSeedData() {
     application('app-club-1', orgClub, { status: A.new, fullName: 'Iván Salas', birthDate: '2007-04-04', city: 'Piura',
       email: 'postulante5@ejemplo.test', graduationYear: 2025, sentOn: '2026-11-01' }),
   ]
+
+  applications.push(...buildExpoApplications({ orgId: orgExpo, reviewer: expo, application }))
 
   // sentOn solo arma createdAt; no es un campo del esquema.
   for (const app of applications) delete app.doc.sentOn
