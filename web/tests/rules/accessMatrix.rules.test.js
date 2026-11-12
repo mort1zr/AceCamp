@@ -187,8 +187,9 @@ const OPERATIONS = {
     consent: { accepted: true, version: 'applications-v1', method: 'self', recordedBy: 'public-form', recordedAt: serverTimestamp() },
   }),
   'applications.createEquipo': (db, role) => setDoc(doc(db, 'applications', `equipo-${idOf(role)}`), {
-    orgId: ORG, status: 'nueva', fullName: 'Postulante Manual', birthDate: '2001-02-02', createdAt: serverTimestamp(),
-    consent: { accepted: true },
+    orgId: ORG, status: 'nueva', fullName: 'Postulante Manual', birthDate: '2001-02-02', city: 'Lima',
+    email: 'manual@example.test', graduationYear: 2019, guardian: null, createdAt: serverTimestamp(),
+    consent: { accepted: true, version: 'applications-v1', method: 'self', recordedBy: idOf(role), recordedAt: serverTimestamp() },
   }),
   'applications.update': (db, role) => updateDoc(doc(db, 'applications/app-a'), {
     status: 'en revisión', reviewedBy: idOf(role), updatedAt: serverTimestamp(),

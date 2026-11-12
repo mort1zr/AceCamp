@@ -8,6 +8,7 @@ Ley N.° 29733 de Protección de Datos Personales del Perú y su reglamento.
 | 1 | [Inventario de datos personales](#1-inventario-de-datos-personales) | PCIT-209 |
 | 2 | [Matriz de acceso por rol y organización](#2-matriz-de-acceso-por-rol-y-organización) | PCIT-210, PCIT-211 |
 | 3 | [Cobertura de las reglas](#3-cobertura-de-las-reglas) | PCIT-212 |
+| 4 | [Revisión de reglas y hallazgos](#4-revisión-de-reglas-y-hallazgos) | PCIT-217 |
 
 Fuentes revisadas: `firebase/firestore.rules`, `firebase/storage.rules`,
 [`docs/firestore-schema.md`](firestore-schema.md), el servidor de videos
@@ -220,3 +221,59 @@ y el comando termina con código 1.
 
 Storage no tiene informe de cobertura en el emulador. Sus 5 rutas están cubiertas
 por las filas `storage.*` de la matriz.
+
+## 4. Revisión de reglas y hallazgos
+
+Revisión completa de `firebase/firestore.rules` y `firebase/storage.rules`, junto
+con los hallazgos del inventario (sección 1). Cada hallazgo tiene una decisión:
+**corregido** (con prueba), **pendiente** (con tarea) o **aceptado** (con motivo).
+
+### Hallazgos
+
+| # | Hallazgo | Riesgo | Decisión |
+| --- | --- | --- | --- |
+| R1 | **Invitaciones sin verificar el correo.** El registro con correo y contraseña no verifica el correo. Quien conozca el correo invitado puede registrarse antes que la persona, leer `invites/{correo}` y aceptar la invitación, aunque sea de administrador | **Alto** | **Pendiente: PCIT-220** (Sprint 5). Exige cambiar el registro en la web y las reglas a la vez. Mientras tanto: invitar solo correos de confianza y revisar `acceptedBy` |
+| R2 | **El equipo podía reescribir cualquier campo de una postulación**: ciudad, mensaje, videos, el apoderado de un menor… La regla solo impedía cambiar unos pocos campos | Medio | **Corregido.** El equipo solo cambia `status`, `internalNotes` (hasta 2000 caracteres), `reviewedBy` (solo con su propio UID) y `updatedAt`. La vinculación de jugador sigue en su regla aparte |
+| R3 | **El alta manual de postulaciones casi no validaba**: admitía cualquier campo y un menor sin apoderado | Medio | **Corregido.** Mismos campos y validaciones que una postulación importada de Google, con la autorización firmada por quien la registra y apoderado obligatorio para menores. La web no usa esta vía; queda cerrada a datos válidos |
+| R4 | **No hay borrado real ni plazos de conservación** (inventario 1, 2, 3 y 7). La política de privacidad promete borrar en 30 días y reconoce los derechos ARCO | Medio | **Pendiente: PCIT-221** (Sprint 5). Mientras tanto, procedimiento manual (abajo) |
+| R5 | **El administrador de plataforma lee usuarios y organizaciones de todos los clubes** (PCIT-188) | Medio | **Aceptado.** La administración (PCIT-189) lo necesita. Solo lee `users`, `orgs` y `usage`; la matriz prueba que **no** lee jugadores, partidos, postulaciones, notas ni videos. El permiso solo se concede desde la consola y los cambios quedan en la bitácora (PCIT-203) |
+| R6 | **Formulario público sin sesión**: posible spam de postulaciones | Medio | **Mitigado.** Enlace activo obligatorio, validación estricta de cada campo, campo trampa (PCIT-185). Se completa con App Check (PCIT-219) |
+| R7 | **Todos los entrenadores del club ven las postulaciones**, también las de menores | Bajo | **Aceptado.** Reclutamiento es una tarea del equipo. Ningún otro club ni la plataforma las ven (matriz) |
+| R8 | **`matches.opponent` guarda el nombre del rival**, que no dio su autorización | Bajo | **Aceptado.** Es el dato mínimo para identificar el partido y solo lo ven quienes gestionan el partido. Se puede escribir solo un apellido o iniciales |
+| R9 | **Leer un ID que no existe se permite** en `players`, `matches` y `applications`, lo que revela si un ID existe en otro club | Bajo | **Aceptado.** Los IDs son aleatorios de 20 caracteres y el alta de partidos lo necesita. Nunca se devuelven datos ajenos |
+| R10 | **Cualquiera con el ID lee un enlace de postulación** | Bajo | **Aceptado por diseño** (PCIT-54). El documento solo tiene `createdAt`; el ID es aleatorio y listar los enlaces exige ser dueño o administrador |
+| R11 | **La bitácora administrativa no tiene plazo** | Bajo | **Aceptado.** Es de solo añadir; el plazo se define con R4 en PCIT-221 |
+
+### Puntos revisados sin hallazgos
+
+| Punto | Resultado |
+| --- | --- |
+| Lecturas con `get()` de documentos o campos que pueden faltar | **Fallan cerradas.** Si falta la ficha o el campo, la regla da error y Firestore deniega. La matriz lo comprueba con los roles sin ficha ("Sin club" y "Plataforma"), que son denegados en todo lo del club |
+| Aislamiento entre clubes | Ningún miembro del club B accede a nada del club A (matriz, 59 filas) |
+| Alcance por rol (PCIT-39) | Otro entrenador del mismo club no ve jugadores, partidos ni videos ajenos (matriz) |
+| Notas privadas | Solo su autor las lee; ni el administrador (matriz) |
+| Campos del worker | La web no escribe `statistics`, los estados del worker ni `processed.mp4` |
+| Storage | Todo cerrado salvo los videos de partidos; los videos de postulaciones solo se sirven por el servidor, que comprueba la sesión y el club |
+| Reglas sin condición | Ninguna (control de cobertura, sección 3) |
+
+### Procedimiento manual de borrado (hasta PCIT-221)
+
+Para una solicitud ARCO o el cierre de una organización, recibida en el correo de
+la política de privacidad, un operador del proyecto, en un máximo de 30 días:
+
+1. Identifica en la consola de Firebase la organización (`orgs`) o la persona
+   (`players`, `applications`, `users`).
+2. Borra sus documentos en Firestore, incluidas las subcolecciones (`usage`,
+   `applicationForms`, `recruitmentIntegrations`, `coachNotes`) y las invitaciones.
+3. Borra en Storage la carpeta `orgs/{orgId}/…` o los videos de esa persona
+   (originales, `processed.mp4` y videos de postulaciones).
+4. Borra la cuenta en Authentication.
+5. Responde a la solicitud indicando la fecha del borrado.
+
+### Pruebas
+
+`tests/rules/securityReview.rules.test.js` fija las correcciones R2 y R3: el equipo
+cambia estado y notas, pero no los datos de la persona ni su apoderado; no firma por
+otra persona; las notas tienen límite; el alta manual exige datos válidos y apoderado
+para menores. La matriz sigue en verde y el control de cobertura no deja reglas sin
+probar.

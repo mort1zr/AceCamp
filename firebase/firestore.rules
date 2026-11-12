@@ -600,25 +600,25 @@ service cloud.firestore {
       allow get: if signedIn() && (resource == null || inOrg(resource.data.orgId));
       allow list: if inOrg(resource.data.orgId);
 
+      // Alta manual del equipo. PCIT-217: mismos campos y validaciones que una
+      // postulación importada, con la autorización registrada por quien la crea.
       allow create: if !isGoogleApplicationId(applicationId) && inOrg(request.resource.data.orgId)
-        && !('formId' in request.resource.data)
-        && !request.resource.data.keys().hasAny(['videoPaths', 'videoUpload', 'source'])
-        && request.resource.data.get('playerId', null) == null
-        && request.resource.data.status == 'nueva'
-        && request.resource.data.createdAt == request.time
-        && isText(request.resource.data.fullName, 2, 120)
-        && isIsoDate(request.resource.data.birthDate)
-        && request.resource.data.consent is map
-        && request.resource.data.consent.accepted == true;
+        && request.resource.data.keys().hasOnly(['orgId', 'status', 'fullName', 'birthDate', 'city',
+             'email', 'graduationYear', 'academy', 'guardian', 'message', 'consent', 'createdAt'])
+        && validApplicationContactFields(request.resource.data)
+        && validApplicationConsent(request.resource.data, request.auth.uid, ['applications-v1']);
 
       allow create: if !isGoogleApplicationId(applicationId) && validPublicApplication(request.resource.data);
       allow create: if isGoogleApplicationId(applicationId) && validGoogleApplication(request.resource.data);
 
+      // PCIT-217: el equipo solo cambia el estado y sus notas. Los datos que envió la
+      // persona (contacto, apoderado, videos, autorización) no se reescriben.
       allow update: if inOrg(resource.data.orgId)
-        && unchanged(['orgId', 'formId', 'createdAt', 'consent', 'fullName', 'birthDate', 'email',
-             'playerId', 'videoPaths', 'videoUpload', 'source'])
+        && onlyChanges(['status', 'internalNotes', 'reviewedBy', 'updatedAt'])
         && request.resource.data.status in ['nueva', 'en revisión', 'analizada', 'contactada', 'descartada']
-        && validApplicationTransition(resource.data.status, request.resource.data.status);
+        && validApplicationTransition(resource.data.status, request.resource.data.status)
+        && optionalText(request.resource.data, 'internalNotes', 2000)
+        && request.resource.data.get('reviewedBy', null) in [resource.data.get('reviewedBy', null), request.auth.uid];
 
       allow update: if inOrg(resource.data.orgId) && canLinkApplicationPlayer();
 
