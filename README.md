@@ -43,6 +43,7 @@ entorno Python se descargan en cada PC; no están incluidos en Git.
 - [Frontend e integración con Firebase](web/README.md).
 - [Contrato de datos](docs/firestore-schema.md).
 - [Publicación en Firebase Hosting](docs/PCIT-55-publicacion-en-hosting.md) y [DevSecOps](docs/devsecops.md).
+- [Seguridad de los datos y pruebas de acceso](docs/PCIT-67-seguridad-de-datos.md).
 - [Permisos por rol](docs/PCIT-39-permisos-por-rol.md).
 - [Contador y límites de análisis por plan](docs/PCIT-41-limite-de-analisis.md).
 - [Gestión de jugadores](docs/PCIT-42-gestion-completa-jugadores.md).
