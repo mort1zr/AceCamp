@@ -100,3 +100,47 @@ en la calculadora de Azure):
   optimizar el modelo para CPU (exportarlo a ONNX u OpenVINO, bajar la resolución,
   analizar uno de cada dos fotogramas). Sin medir todavía; queda como mejora futura.
 * La web debe avisar que el análisis tarda unos 30 minutos.
+
+## Puesta en marcha (PCIT-224, PCIT-225, PCIT-227)
+
+| Pieza | Dónde | Qué hace |
+| --- | --- | --- |
+| API de videos | `web/server/azure-videos/` (`server.js`, `Dockerfile`) | Container App `acecam-videos-api` en `acecam-env`: 0,25 vCPU y 0,5 GiB, se apaga sin tráfico (0–2 réplicas). `GET /healthz` responde `ok` |
+| Web | `web/src/panel/lib/azureVideos.js` | Con `VITE_VIDEO_API_URL`, sube y reproduce desde Azure. Sin ella, usa Firebase Storage (emuladores) |
+| Despliegue | `.github/workflows/deploy-azure.yml` | En cada PR construye la imagen y comprueba que arranca. En `main` la publica en GitHub Packages (`ghcr.io/mort1zr/acecam-videos-api`), la despliega con la identidad `acecam-github` y comprueba la API en línea |
+
+### Pasos de una sola vez
+
+**1. Identidad de la API (Azure Cloud Shell, dueño de la suscripción).** Permite firmar
+los enlaces sin ninguna clave del almacenamiento:
+
+```bash
+az identity create -g acecam-rg -n acecam-videos-api -o none
+PID=$(az identity show -g acecam-rg -n acecam-videos-api --query principalId -o tsv)
+SID=$(az storage account show -n acecamvideosfba600 -g acecam-rg --query id -o tsv)
+az role assignment create --assignee-object-id $PID --assignee-principal-type ServicePrincipal --role "Storage Blob Data Contributor" --scope $SID -o none
+az identity show -g acecam-rg -n acecam-videos-api --query "{id:id, clientId:clientId}" -o json
+az containerapp env show -n acecam-env -g acecam-rg --query properties.defaultDomain -o tsv
+```
+
+**2. GitHub (mort1zr): Settings → Secrets and variables → Actions.**
+
+| Tipo | Nombre | Valor |
+| --- | --- | --- |
+| Variables | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `AZURE_STORAGE_ACCOUNT`, `AZURE_CONTAINERAPPS_ENV` | Ver "Infraestructura creada" |
+| Variable | `AZURE_VIDEOS_API_IDENTITY_ID` | El `id` del paso 1 |
+| Variable | `AZURE_VIDEOS_API_IDENTITY_CLIENT_ID` | El `clientId` del paso 1 |
+| **Secreto** | `FIREBASE_SERVICE_ACCOUNT_AZURE` | JSON de una cuenta de servicio de Firebase **nueva**, solo con el rol *Usuario de Cloud Datastore* |
+| Variable | `VITE_VIDEO_API_URL` | `https://acecam-videos-api.<dominio del paso 1>`. **Se crea al final** (paso 4) |
+
+**3. Primer despliegue.** Al fusionar en `main`, `deploy-azure.yml` publica la imagen y
+crea la API. La primera vez, el paquete `acecam-videos-api` de GitHub Packages queda
+privado y Azure no puede descargarlo: en GitHub → Packages → `acecam-videos-api` →
+Package settings, cambiarlo a **Public** (la imagen no contiene secretos) y volver a
+ejecutar el workflow.
+
+**4. Activar en la web.** Añadir el dominio de la API a `connect-src` de la CSP en
+`firebase.json` (el del almacenamiento ya está) y crear la variable `VITE_VIDEO_API_URL`.
+El siguiente despliegue de la web sube los videos a Azure.
+
+Si falta algo, `deploy-azure.yml` no despliega y deja un aviso, como `deploy-web.yml`.
