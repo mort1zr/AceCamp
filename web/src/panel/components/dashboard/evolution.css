@@ -3,7 +3,7 @@
 .evolution-figure figcaption { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.875rem; margin-bottom: 0.75rem; }
 .evolution-figure figcaption span { color: var(--players-muted); font-size: 0.75rem; }
 .evolution-sample { margin: 0 0 1rem; color: var(--players-info); font-size: 0.75rem; }
-.evolution-note { color: var(--players-muted); font-size: 0.75rem; line-height: 1.6; margin: 1rem 0; }
+.evolution-note { color: var(--players-muted); font-size: 0.75rem; line-height: 1.6; margin: 0.5rem 0; }
 .evolution-tooltip { padding: 0.8rem 1rem; background: var(--players-card); border: 1px solid var(--players-line); border-radius: 0.6rem; color: var(--players-text); font-size: 0.8125rem; max-width: 240px; overflow-wrap: anywhere; }
 .evolution-tooltip p { margin: 0.4rem 0 0; }
 .evolution-details { border-top: 1px solid var(--players-line); margin-top: 1rem; padding-top: 1rem; }

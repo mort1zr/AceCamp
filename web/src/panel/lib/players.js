@@ -99,6 +99,6 @@ export function playersErrorMessage(error, action = 'load') {
     return 'Tu sesión no permite acceder a estos jugadores. Vuelve a iniciar sesión o consulta con el administrador.'
   }
   if (error?.code === 'unavailable') return 'No hay conexión con el servicio. Revisa tu conexión y vuelve a intentarlo.'
-  if (action === 'remove') return 'No pudimos eliminar al jugador de la plantilla. Vuelve a intentarlo.'
+  if (action === 'remove') return 'No pudimos eliminar al jugador de la lista. Vuelve a intentarlo.'
   return ['create', 'update'].includes(action) ? 'No pudimos guardar al jugador. Tus datos siguen en el formulario; vuelve a intentarlo.' : 'No pudimos cargar los jugadores. Vuelve a intentarlo.'
 }

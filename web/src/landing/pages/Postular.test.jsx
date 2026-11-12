@@ -58,6 +58,38 @@ describe('Formulario público de postulación', () => {
     }))
   })
 
+  it('envía el perfil deportivo y los enlaces de video opcionales', async () => {
+    const user = userEvent.setup()
+    getDocFromServer.mockResolvedValueOnce({ exists: () => true })
+    addDoc.mockResolvedValueOnce({ id: 'application-demo' })
+    renderForm()
+    await fill(user, '2000-02-15')
+    await user.type(screen.getByLabelText('UTR (opcional)'), '9.5')
+    await user.type(screen.getByLabelText('Ranking nacional (opcional)'), '12')
+    await user.click(screen.getByRole('button', { name: 'zurdo' }))
+    await user.click(screen.getByRole('button', { name: 'dos manos' }))
+    await user.type(screen.getByLabelText('Enlaces de video (opcional)'), 'https://youtu.be/abc123{enter}www.youtube.com/watch?v=xyz')
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Enviar postulación' }))
+    expect(await screen.findByText(/Recibimos tu postulación/)).toBeTruthy()
+    expect(addDoc).toHaveBeenCalledExactlyOnceWith('applications', expect.objectContaining({
+      utr: 9.5, nationalRanking: 12, dominantHand: 'zurdo', backhand: 'dos manos',
+      videoLinks: ['https://youtu.be/abc123', 'https://www.youtube.com/watch?v=xyz'],
+    }))
+  })
+
+  it('rechaza enlaces que no son de YouTube antes de guardar', async () => {
+    const user = userEvent.setup()
+    getDocFromServer.mockResolvedValueOnce({ exists: () => true })
+    renderForm()
+    await fill(user, '2000-02-15')
+    await user.type(screen.getByLabelText('Enlaces de video (opcional)'), 'https://ejemplo.com/video')
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Enviar postulación' }))
+    expect(await screen.findByText('Usa enlaces de YouTube válidos, uno por línea.')).toBeTruthy()
+    expect(addDoc).not.toHaveBeenCalled()
+  })
+
   it('pide los datos del apoderado y bloquea un envío sin consentimiento', async () => {
     const user = userEvent.setup()
     getDocFromServer.mockResolvedValueOnce({ exists: () => true })

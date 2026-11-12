@@ -613,6 +613,13 @@ describe('applications', () => {
       { email: 'correo-invalido' },
       { playerId: 'p-demo' },
       { message: 'a'.repeat(1001) },
+      { utr: -1 },
+      { utr: 99 },
+      { nationalRanking: 0 },
+      { dominantHand: 'ambidiestro' },
+      { videoLinks: ['http://inseguro.test/video'] },
+      { videoLinks: Array(6).fill('https://youtu.be/abc') },
+      { sorpresa: 'campo no permitido' },
     ]
     for (const [index, overrides] of candidates.entries()) {
       await assertFails(setDoc(doc(visitor, 'applications', `invalid-${index}`), newPublicApplication(overrides)))
@@ -623,5 +630,9 @@ describe('applications', () => {
       consent: { ...newPublicApplication().consent, method: 'guardian' },
     })
     await assertSucceeds(setDoc(doc(visitor, 'applications', 'minor'), validGuardian))
+    await assertSucceeds(setDoc(doc(visitor, 'applications', 'perfil'), newPublicApplication({
+      utr: 9.5, nationalRanking: 12, dominantHand: 'zurdo', backhand: 'dos manos',
+      videoLinks: ['https://youtu.be/abc', 'https://www.youtube.com/watch?v=xyz'],
+    })))
   })
 })

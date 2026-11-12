@@ -24,14 +24,14 @@ function formConsent(method, iso) {
 }
 
 /** Estadísticas de un partido terminado, con la forma v1 de matches.statistics. */
-function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg, longest, distance, shotAvg = 98.5, moveMax = 23, moveAvg = 7.2 }) {
+function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg, longest, distance, shotAvg = 98.5, moveMax = 23, moveAvg = 7.2, firstAvg, secondAvg, secondMax, heatmap }) {
   const serveSamples = 100
   return {
     schemaVersion: MATCH_STATS_VERSION,
     durationSeconds: 5400,
     player: {
       shots: { count: shots, sumSpeedKmh: Math.round(shots * shotAvg), maxSpeedKmh: fhMax },
-      movement: { distanceMeters: distance, maxSpeedKmh: moveMax, avgSpeedKmh: moveAvg },
+      movement: { distanceMeters: distance, maxSpeedKmh: moveMax, avgSpeedKmh: moveAvg, ...(heatmap && { heatmap }) },
       serve: {
         sumSpeedKmh: serveAvg * serveSamples,
         sampleCount: serveSamples,
@@ -39,6 +39,10 @@ function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg,
         firstServeIn: firstIn,
         firstServeAttempts: serveSamples,
         doubleFaults: df,
+        ...(firstAvg != null && {
+          firstServe: { sampleCount: firstIn, sumSpeedKmh: Math.round(firstAvg * firstIn * 10) / 10, maxSpeedKmh: serveMax },
+          secondServe: { sampleCount: serveSamples - firstIn, sumSpeedKmh: Math.round(secondAvg * (serveSamples - firstIn) * 10) / 10, maxSpeedKmh: secondMax },
+        }),
       },
       forehand: { count: Math.round(shots * 0.55), maxSpeedKmh: fhMax },
       backhand: { count: Math.round(shots * 0.4), maxSpeedKmh: bhMax },
@@ -47,7 +51,14 @@ function stats({ serveMax, serveAvg, firstIn, df, fhMax, bhMax, shots, rallyAvg,
       shots: { count: shots - 20, sumSpeedKmh: Math.round((shots - 20) * 92), maxSpeedKmh: fhMax - 6 },
       movement: { distanceMeters: distance - 200, maxSpeedKmh: 21, avgSpeedKmh: 6.8 },
     },
-    rallies: { count: 96, avgShots: rallyAvg, longestShots: longest },
+    rallies: {
+      count: 96,
+      sumShots: Math.round(rallyAvg * 96),
+      longestShots: longest,
+      short: 96 - Math.round(96 * 0.34) - Math.round(96 * 0.14),
+      medium: Math.round(96 * 0.34),
+      long: Math.round(96 * 0.14),
+    },
   }
 }
 

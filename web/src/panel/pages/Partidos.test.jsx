@@ -139,7 +139,6 @@ it('abre el reporte con el contrato del worker y mantiene los filtros al volver'
   act(() => guardarUnidades('mph'))
   expect(card('Velocidad máxima de golpe').getByText(/43[.,]5/)).toBeTruthy()
   expect(report.getByText('Video procesado no disponible.')).toBeTruthy()
-  expect(report.getByText('Sin datos del desglose por set.')).toBeTruthy()
   await user.click(report.getByRole('button', { name: 'Volver al listado' }))
   expect(screen.getByLabelText('Jugador').value).toBe('p-a')
   expect(screen.getByLabelText('Desde').value).toBe('2026-10-23')

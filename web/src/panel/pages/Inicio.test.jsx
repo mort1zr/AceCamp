@@ -61,6 +61,16 @@ describe('Inicio', () => {
     expect(screen.getByText('Aún no sigues a ningún jugador')).toBeTruthy()
   })
 
+  it('muestra el esqueleto mientras llegan los datos', () => {
+    montar({ scopeKey: 'esperando', mode: 'live', subscribe: () => () => {} })
+    const esqueleto = screen.getByRole('status')
+    expect(esqueleto.getAttribute('aria-busy')).toBe('true')
+    expect(within(esqueleto).getByText('Cargando tu resumen…')).toBeTruthy()
+    expect(
+      screen.queryByText('Todavía no hay actividad. Empieza subiendo el video de un partido.'),
+    ).toBeNull()
+  })
+
   it('muestra el error y permite reintentar', async () => {
     const user = userEvent.setup()
     montar(createDemoInicioService({ scenario: 'error' }))

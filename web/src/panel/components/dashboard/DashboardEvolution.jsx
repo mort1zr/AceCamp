@@ -43,17 +43,18 @@ export default function DashboardEvolution({ playerId, evolution, loading = fals
       {sample && <p className="evolution-sample">Gráfico de demostración · valores ficticios</p>}
       {measured.length === 0 ? <EmptyState title={`Todavía no hay velocidades de ${kind} disponibles`} description={`Sin datos: los partidos registrados no tienen mediciones de ${kind} utilizables.`} /> : <figure className="evolution-figure" aria-labelledby={`${id}-caption`}>
         <figcaption id={`${id}-caption`}>{label} <span>{etiquetaVelocidad(unidades)}</span></figcaption>
-        <ResponsiveContainer width="100%" height={280} minWidth={0} initialDimension={{ width: 600, height: 280 }}>
-          <LineChart data={chartPoints} accessibilityLayer title={`Evolución de velocidad media de ${kind}`} margin={{ top: 20, right: 20, bottom: 10, left: 0 }}>
+        <ResponsiveContainer width="100%" height={190} minWidth={0} initialDimension={{ width: 600, height: 190 }}>
+          <LineChart data={chartPoints} accessibilityLayer title={`Evolución de velocidad media de ${kind}`} margin={{ top: 14, right: 20, bottom: 6, left: 0 }}>
             <CartesianGrid vertical={false} stroke="var(--players-line)" strokeDasharray="3 3" />
             <XAxis dataKey="matchId" tickFormatter={key => formatMatchDate(byId.get(key)?.date, true)} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} axisLine={{ stroke: 'var(--players-line)' }} tickLine={false} minTickGap={24} />
             <YAxis width={48} domain={domain} allowDecimals={false} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
             <Tooltip content={<EvolutionTooltip unidades={unidades} metric={metric} />} filterNull={false} cursor={{ stroke: 'var(--players-line)' }} />
-            <Line dataKey="speed" name={label} unit={` ${etiquetaVelocidad(unidades)}`} type="linear" stroke="var(--electric, #4FE3FF)" strokeWidth={2.5} connectNulls={false} isAnimationActive={false} dot={{ r: 4, fill: 'var(--electric, #4FE3FF)', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+            <Line key={playerId} dataKey="speed" name={label} unit={` ${etiquetaVelocidad(unidades)}`} type="linear" stroke="var(--electric, #4FE3FF)" strokeWidth={2.5} connectNulls={false} isAnimationActive animationBegin={600} animationDuration={700} animationEasing="ease-out" dot={false} activeDot={false} />
+            <Line dataKey="speed" type="linear" stroke="transparent" strokeWidth={0} connectNulls={false} legendType="none" tooltipType="none" isAnimationActive animationDuration={600} animationEasing="ease-in-out" dot={{ r: 4, fill: 'var(--electric, #4FE3FF)', strokeWidth: 0 }} activeDot={{ r: 6, fill: 'var(--electric, #4FE3FF)' }} />
           </LineChart>
         </ResponsiveContainer>
       </figure>}
-      <p className="evolution-note">{measured.length === 1 ? 'Solo hay una medición disponible; todavía no permite inferir una tendencia. ' : ''}Cada posición representa un partido, ordenado por fecha. Los valores ausentes no se sustituyen por cero ni se unen con una línea.</p>
+      <p className="evolution-note">{measured.length === 1 ? 'Solo hay una medición disponible; todavía no permite inferir una tendencia. ' : ''}Cada posición representa un partido, ordenado por fecha.</p>
       <details className="evolution-details"><summary>Ver datos del gráfico</summary><div className="evolution-table-scroll" tabIndex={0} role="region" aria-label={`Datos de evolución de ${kind}`}><table><caption>Velocidades de {kind} por partido{sample ? ' · ejemplos' : ''}</caption><thead><tr><th scope="col">Fecha</th><th scope="col">Rival</th><th scope="col">Velocidad media</th></tr></thead><tbody>{points.map(point => <tr key={point.matchId}><td>{formatMatchDate(point.date)}</td><td>{point.opponent || 'Sin registrar'}</td><td>{speedText(point[metric], unidades)}</td></tr>)}</tbody></table></div></details>
     </div>
   )

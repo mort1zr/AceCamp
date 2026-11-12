@@ -10,14 +10,14 @@ const fechaLarga = new Intl.DateTimeFormat('es-PE', {
 })
 const cifra = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
 
-export function BotonPdf({ onClick, disabled, children = 'Exportar PDF' }) {
+export function BotonPdf({
+  onClick,
+  disabled,
+  children = 'Exportar PDF',
+  className = 'players-button-secondary',
+}) {
   return (
-    <button
-      type="button"
-      className="players-button-secondary"
-      onClick={onClick}
-      disabled={disabled}
-    >
+    <button type="button" className={className} onClick={onClick} disabled={disabled}>
       <svg
         aria-hidden="true"
         width="16"
@@ -85,7 +85,7 @@ export function PdfKpis({ items }) {
   )
 }
 
-export function PdfBarras({ filas, vacio = 'Sin datos para este periodo.' }) {
+export function PdfBarras({ filas, sufijo = '', vacio = 'Sin datos para este periodo.' }) {
   if (filas.every((fila) => fila.valor == null)) return <PdfVacio>{vacio}</PdfVacio>
   const maximo = Math.max(1, ...filas.map((fila) => fila.valor ?? 0))
   return (
@@ -99,34 +99,35 @@ export function PdfBarras({ filas, vacio = 'Sin datos para este periodo.' }) {
               style={{ width: `${((valor ?? 0) / maximo) * 100}%` }}
             />
           </dd>
-          <dd className="rp-barra-cifra">{valor == null ? '—' : cifra.format(valor)}</dd>
+          <dd className="rp-barra-cifra">{valor == null ? '—' : `${cifra.format(valor)}${sufijo}`}</dd>
         </div>
       ))}
     </dl>
   )
 }
 
-function techo(valor) {
-  if (valor <= 0) return 10
-  const paso = 10 ** Math.floor(Math.log10(valor))
-  return Math.ceil((valor * 1.15) / paso) * paso
+function dominio(valores) {
+  if (valores.length === 0) return [0, 10]
+  const minimo = Math.min(...valores)
+  const maximo = Math.max(...valores)
+  const margen = Math.max(2, (maximo - minimo) * 0.25)
+  return [Math.max(0, Math.floor((minimo - margen) / 5) * 5), Math.ceil((maximo + margen) / 5) * 5]
 }
 
-export function PdfLinea({ puntos, color = '#00708f', titulo }) {
-  const ancho = 640
+export function PdfLinea({ puntos, color = '#00708f', titulo, ancho = 640 }) {
   const alto = 170
   const izq = 52
   const der = 20
   const arriba = 18
   const abajo = 24
   const medidos = puntos.filter((punto) => punto.valor != null)
-  const maximo = techo(Math.max(0, ...medidos.map((punto) => punto.valor)))
+  const [minimo, maximo] = dominio(medidos.map((punto) => punto.valor))
   const x = (i) =>
     izq +
     (puntos.length === 1
       ? (ancho - izq - der) / 2
       : (i * (ancho - izq - der)) / (puntos.length - 1))
-  const y = (valor) => arriba + (1 - valor / maximo) * (alto - arriba - abajo)
+  const y = (valor) => arriba + (1 - (valor - minimo) / (maximo - minimo)) * (alto - arriba - abajo)
   const tramos = []
   let tramo = []
   puntos.forEach((punto, i) => {
@@ -136,7 +137,7 @@ export function PdfLinea({ puntos, color = '#00708f', titulo }) {
     } else tramo.push(`${x(i)},${y(punto.valor)}`)
   })
   if (tramo.length) tramos.push(tramo)
-  const marcas = [0, 0.25, 0.5, 0.75, 1].map((parte) => parte * maximo)
+  const marcas = [0, 0.25, 0.5, 0.75, 1].map((parte) => minimo + parte * (maximo - minimo))
   const conValores = puntos.length <= 12
 
   return (
@@ -149,7 +150,7 @@ export function PdfLinea({ puntos, color = '#00708f', titulo }) {
             y1={y(marca)}
             y2={y(marca)}
             stroke="#e4ded4"
-            strokeDasharray={marca ? '3 3' : undefined}
+            strokeDasharray={marca !== minimo ? '3 3' : undefined}
           />
           <text x={30} y={y(marca) + 3} textAnchor="end">
             {cifra.format(marca)}

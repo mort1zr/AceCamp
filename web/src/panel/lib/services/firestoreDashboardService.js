@@ -5,6 +5,24 @@ import { buildDashboardPeriods } from '../dashboardPeriods.js'
 import { buildDashboardDetails } from '../dashboardDetails.js'
 import { decodeWorkerDashboardStatistics } from '../workerDashboardStatistics.js'
 
+export function combinarMetricas(overview, details) {
+  return {
+    ...overview.metrics,
+    maxShotSpeed: details.shots.maxSpeedKmh,
+    firstServeAverageSpeed: details.serve.first.averageSpeedKmh,
+    firstServeMaxSpeed: details.serve.first.maxSpeedKmh,
+    secondServeAverageSpeed: details.serve.second.averageSpeedKmh,
+    secondServeMaxSpeed: details.serve.second.maxSpeedKmh,
+    averageRallyShots: details.rallies.averageShots,
+    longestRally: details.rallies.longestShots,
+    distanceMeters: details.movement.distanceMeters,
+  }
+}
+
+export function metricasDeJugador(rows, context) {
+  return combinarMetricas(buildDashboardOverview(rows, context), buildDashboardDetails(rows, context))
+}
+
 function summarizeDashboard(rows, context) {
   const { orgId, playerId, decodeStatistics } = context
   const summarize = matches => {
@@ -16,13 +34,21 @@ function summarizeDashboard(rows, context) {
     const row = point && matches.find(match => match.id === point.matchId
       && match.orgId === orgId && match.playerId === playerId
       && match.status === 'listo' && match.matchDate === point.date)
+    const own = row?.statistics?.schemaVersion === 'acecam.match-stats.v1' ? row.statistics : null
+    const number = value => Number.isFinite(value) && value >= 0 ? value : null
+    const serve = own?.player?.serve
     const latestMatch = row ? {
       ...point,
       tournament: row.tournament,
       result: row.result,
+      serveMaxSpeed: number(serve?.maxSpeedKmh),
+      firstServeRate: Number.isSafeInteger(serve?.firstServeAttempts) && serve.firstServeAttempts > 0 && Number.isSafeInteger(serve?.firstServeIn) && serve.firstServeIn <= serve.firstServeAttempts
+        ? serve.firstServeIn / serve.firstServeAttempts * 100 : null,
+      doubleFaults: Number.isSafeInteger(serve?.doubleFaults) && serve.doubleFaults >= 0 ? serve.doubleFaults : null,
+      longestRally: Number.isSafeInteger(own?.rallies?.longestShots) && own.rallies.longestShots >= 0 ? own.rallies.longestShots : null,
       measuredShots: normalizeDashboardStatistics(decodeStatistics(row, { playerId }), playerId)?.shots?.sampleCount,
     } : null
-    return { ...overview, metrics: { ...overview.metrics, distanceMeters: details.movement.distanceMeters }, evolution, serveEvolution, details, latestMatch }
+    return { ...overview, metrics: combinarMetricas(overview, details), evolution, serveEvolution, details, latestMatch }
   }
   return {
     ...summarize(rows),

@@ -481,9 +481,31 @@ service cloud.firestore {
           : consent.method == 'self' && data.guardian == null);
     }
 
+    function publicVideoLink(link) {
+      return link is string && link.size() <= 300 && link.matches('^https://.+');
+    }
+
+    function publicVideoLinks(data) {
+      let links = data.get('videoLinks', []);
+      return links is list && links.size() <= 5
+        && (links.size() < 1 || publicVideoLink(links[0]))
+        && (links.size() < 2 || publicVideoLink(links[1]))
+        && (links.size() < 3 || publicVideoLink(links[2]))
+        && (links.size() < 4 || publicVideoLink(links[3]))
+        && (links.size() < 5 || publicVideoLink(links[4]));
+    }
+
     function validPublicApplication(data) {
       return data.keys().hasOnly(['orgId', 'formId', 'status', 'fullName', 'birthDate', 'city',
-          'email', 'graduationYear', 'academy', 'guardian', 'message', 'consent', 'createdAt'])
+          'email', 'graduationYear', 'academy', 'guardian', 'message', 'consent', 'createdAt',
+          'utr', 'nationalRanking', 'dominantHand', 'backhand', 'videoLinks'])
+        && optionalIn(data, 'dominantHand', ['diestro', 'zurdo'])
+        && optionalIn(data, 'backhand', ['dos manos', 'una mano'])
+        && optionalNumber(data, 'utr')
+        && (data.get('utr', null) == null || (data.utr >= 0 && data.utr <= 20 && data.utr - data.utr == 0))
+        && optionalNumber(data, 'nationalRanking')
+        && (data.get('nationalRanking', null) == null || (data.nationalRanking is int && data.nationalRanking > 0 && data.nationalRanking <= 100000))
+        && publicVideoLinks(data)
         && isText(data.orgId, 1, 128) && data.orgId.matches('^[A-Za-z0-9_-]+$')
         && data.formId is string && data.formId.matches('^[A-Za-z0-9]{20}$')
         && data.status == 'nueva' && data.createdAt == request.time

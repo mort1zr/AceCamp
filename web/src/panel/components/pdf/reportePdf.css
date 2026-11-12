@@ -374,3 +374,286 @@
 .rp-pie p {
   margin: 0;
 }
+
+.rp-apilada {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.rp-apilada span {
+  display: block;
+  height: 100%;
+}
+
+.rp-leyenda {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rp-leyenda li {
+  padding: 6px 8px;
+  background: var(--rp-fondo);
+  border-radius: 6px;
+}
+
+.rp-leyenda li span {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
+.rp-leyenda p {
+  display: inline;
+  margin: 0;
+  color: var(--rp-gris);
+  font-size: 7.5pt;
+}
+
+.rp-leyenda strong {
+  display: block;
+  margin-top: 2px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15pt;
+  line-height: 1;
+}
+
+.rp-subtitulo {
+  margin: 10px 0 5px;
+  color: var(--rp-gris);
+  font-size: 7.5pt;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rp-perfil {
+  display: grid;
+  grid-template-columns: 1fr 190px;
+  align-items: center;
+  gap: 16px;
+}
+
+.rp-valoracion {
+  margin: 0 0 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 34pt;
+  font-weight: 700;
+  line-height: 0.9;
+}
+
+.rp-valoracion small {
+  margin-left: 6px;
+  color: var(--rp-gris);
+  font-family: 'Barlow', sans-serif;
+  font-size: 8pt;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rp-radar {
+  max-width: 190px;
+  margin-left: auto;
+}
+
+.rp-mapa {
+  max-width: 170px;
+  margin: 0 auto;
+}
+
+.rp-insignia {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--rp-fondo);
+  font-size: 8pt;
+  font-weight: 700;
+}
+
+.rp-marcador {
+  margin: 4px 0 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 24pt;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rp-movimiento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.rp-rival {
+  margin: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14pt;
+  font-weight: 700;
+}
+
+.reporte-pdf:has(.rp-una) .rp-portada {
+  gap: 12px;
+  margin: 10px 0 8px;
+}
+
+.reporte-pdf:has(.rp-una) .rp-avatar {
+  width: 44px;
+  height: 44px;
+  font-size: 16pt;
+}
+
+.reporte-pdf:has(.rp-una) .rp-portada h1 {
+  font-size: 22pt;
+}
+
+.reporte-pdf:has(.rp-una) .rp-chips {
+  margin-top: 4px;
+}
+
+.reporte-pdf:has(.rp-una) .rp-pie {
+  margin-top: 8px;
+}
+
+.rp-una .rp-seccion {
+  margin-top: 9px;
+}
+
+.rp-una .rp-seccion-cabeza {
+  margin-bottom: 4px;
+}
+
+.rp-una .rp-seccion h2 {
+  font-size: 12pt;
+}
+
+.rp-una .rp-columnas,
+.rp-una .rp-columnas + .rp-columnas,
+.rp-una .rp-seccion + .rp-columnas {
+  gap: 10px;
+  margin-top: 9px;
+}
+
+.rp-una > .rp-seccion:first-child .rp-kpis {
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.rp-una .rp-kpis {
+  gap: 5px;
+}
+
+.rp-una .rp-kpi {
+  padding: 5px 6px;
+}
+
+.rp-una .rp-kpi-etiqueta {
+  font-size: 6.2pt;
+  letter-spacing: 0.03em;
+}
+
+.rp-una .rp-kpi-valor {
+  margin-top: 2px;
+  font-size: 14pt;
+}
+
+.rp-una .rp-kpi-valor small {
+  font-size: 6.5pt;
+}
+
+.rp-una .rp-kpi-tendencia {
+  margin-top: 2px;
+  font-size: 6pt;
+  line-height: 1.2;
+}
+
+.rp-una .rp-tarjeta {
+  padding: 7px 8px;
+}
+
+.rp-una .rp-subtitulo {
+  margin: 6px 0 3px;
+}
+
+.rp-una .rp-barras {
+  gap: 4px;
+}
+
+.rp-una .rp-valoracion {
+  margin-bottom: 4px;
+  font-size: 26pt;
+}
+
+.rp-una .rp-perfil {
+  grid-template-columns: 1fr 140px;
+  gap: 10px;
+}
+
+.rp-una .rp-radar {
+  max-width: 140px;
+}
+
+.rp-una .rp-mapa {
+  max-width: 110px;
+}
+
+.rp-una .rp-marcador {
+  margin: 2px 0 4px;
+  font-size: 18pt;
+}
+
+.rp-una .rp-leyenda {
+  margin-top: 5px;
+}
+
+.rp-una .rp-columnas .rp-kpis {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.rp-una .rp-kpi-valor {
+  font-size: 13pt;
+}
+
+.rp-una .rp-columnas > .rp-seccion:last-child .rp-tarjeta:has(.rp-mapa) {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.rp-una .rp-columnas > .rp-seccion:last-child .rp-tarjeta:has(.rp-mapa) .rp-kpis {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.rp-una .rp-perfil {
+  gap: 8px;
+}
+
+.rp-una .rp-barras {
+  gap: 3px;
+}
+
+.rp-una .rp-seccion {
+  margin-top: 7px;
+}
+
+.rp-una .rp-columnas,
+.rp-una .rp-columnas + .rp-columnas,
+.rp-una .rp-seccion + .rp-columnas {
+  margin-top: 7px;
+}
+
+.reporte-pdf:has(.rp-una) .rp-pie {
+  margin-top: 6px;
+  padding-top: 5px;
+}

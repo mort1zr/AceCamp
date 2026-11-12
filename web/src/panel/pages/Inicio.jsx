@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import BloqueVacio from '../components/layout/BloqueVacio.jsx'
-import { ErrorState, LoadingState, StatusBadge } from '../components/ui'
+import { ErrorState, StatusBadge } from '../components/ui'
+import { useContador } from '../hooks/useContador.js'
 import { useInicio } from '../hooks/useInicio.js'
 import { useUnidades } from '../hooks/useUnidades.js'
 import { createFirestoreInicioService } from '../lib/services/firestoreInicioService.js'
 import { convertirVelocidad, etiquetaVelocidad } from '../lib/unidades.js'
 import { useIdioma } from '../../compartido/lib/idioma.jsx'
+import PelotaTitulo from '../components/layout/PelotaTitulo.jsx'
 
 const textos = {
   es: {
@@ -209,8 +211,29 @@ const textos = {
   },
 }
 
-const cifra = (locale, valor) =>
-  new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(valor)
+function Cifra({ valor, formato = (n) => n, retraso = 0, sufijo }) {
+  const actual = useContador(valor, { retraso })
+  const final = String(formato(valor))
+  return (
+    <>
+      <span
+        className="inline-block text-right tabular-nums"
+        style={{ minWidth: `${final.length}ch` }}
+      >
+        {typeof valor === 'number' ? formato(actual) : final}
+      </span>
+      {sufijo && ` ${sufijo}`}
+    </>
+  )
+}
+
+const cifra = (locale, valor, decimales) =>
+  new Intl.NumberFormat(locale, {
+    minimumFractionDigits: decimales ?? 0,
+    maximumFractionDigits: decimales ?? 1,
+  }).format(valor)
+
+const decimalesDe = (valor) => (Number.isInteger(Math.round(valor * 10) / 10) ? 0 : 1)
 
 function medida(t, unidades, metrica, valor) {
   if (metrica === 'primeros') return `${cifra(t.locale, valor)}%`
@@ -351,7 +374,7 @@ function Vacio({ t, tipo, to, principal = false }) {
   )
 }
 
-function Bienvenida({ t, nombre, resumen, ahora }) {
+function Bienvenida({ t, nombre, resumen, ahora, cargando = false }) {
   const fecha = capital(
     new Intl.DateTimeFormat(t.locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(
       ahora,
@@ -364,8 +387,12 @@ function Bienvenida({ t, nombre, resumen, ahora }) {
         <h1 className="my-1.5 font-display text-[44px] leading-none font-bold">
           {saludo(t, ahora.getHours())}
           {`, ${nombre || t.coach}`}
+          <PelotaTitulo />
         </h1>
-        {!resumen && <p className="text-base text-muted">{t.sinActividad}</p>}
+        {cargando && (
+          <span className="mt-2.5 block h-4 w-80 max-w-full animate-pulse rounded-md bg-line" />
+        )}
+        {!resumen && !cargando && <p className="text-base text-muted">{t.sinActividad}</p>}
         {resumen && (
           <p className="text-base text-muted">
             {t.tienes}{' '}
@@ -430,7 +457,7 @@ function Tarjetas({ t, resumen, ahora }) {
   return (
     <section
       aria-label={t.resumen}
-      className="grid grid-cols-4 gap-1.5 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] md:gap-4"
+      className="grid grid-cols-4 gap-1.5 md:grid-cols-2 md:gap-4 xl:grid-cols-4"
     >
       {datos.map((dato, indice) => {
         const vacio = dato.valor == null
@@ -443,7 +470,7 @@ function Tarjetas({ t, resumen, ahora }) {
             <p
               className={`font-display text-[44px] leading-none font-bold max-md:text-[28px] ${vacio ? 'text-line3' : ''}`}
             >
-              {vacio ? 0 : dato.valor}
+              {vacio ? 0 : <Cifra valor={dato.valor} formato={Math.round} />}
             </p>
             <p className="w-full truncate text-[10.5px] font-semibold text-muted md:hidden">
               {t.cortas[indice]}
@@ -689,18 +716,23 @@ function destacado(t, unidades, jugador) {
   if (!jugador.kpi)
     return { etiqueta: jugador.kpiLabel, valor: jugador.kpiValue, delta: jugador.delta, sube: true }
   const { tipo, valor, anterior } = jugador.kpi
-  if (tipo === 'partidos') return { etiqueta: t.kpis.partidos, valor: cifra(t.locale, valor) }
+  if (tipo === 'partidos')
+    return {
+      etiqueta: t.kpis.partidos,
+      valor,
+      formato: (n) => cifra(t.locale, Math.round(n)),
+    }
   const diferencia = anterior == null ? null : convertirVelocidad(valor - anterior, unidades)
+  const decimales = decimalesDe(convertirVelocidad(valor, unidades))
   return {
     etiqueta: t.kpis[tipo],
-    valor: medida(t, unidades, tipo, valor),
+    valor,
+    formato: (n) => cifra(t.locale, convertirVelocidad(n, unidades), decimales),
+    sufijo: etiquetaVelocidad(unidades),
     delta:
-      diferencia == null || Math.abs(diferencia) < 0.05
-        ? null
-        : new Intl.NumberFormat(t.locale, {
-            maximumFractionDigits: 1,
-            signDisplay: 'always',
-          }).format(diferencia),
+      diferencia == null || Math.abs(diferencia) < 0.05 ? null : Math.round(diferencia * 10) / 10,
+    deltaFormato: (n) =>
+      `${diferencia > 0 ? '+' : '-'}${cifra(t.locale, Math.abs(n), decimalesDe(diferencia ?? 0))}`,
     sube: diferencia > 0,
   }
 }
@@ -723,11 +755,15 @@ function Seguimiento({ t, filas, total }) {
           {t.verLos(total)}
         </Link>
       </div>
-      <ul className="grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
+      <ul
+        aria-label={t.seguimiento}
+        tabIndex={0}
+        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-4 [&::-webkit-scrollbar]:hidden"
+      >
         {filas.map((jugador, indice) => {
           const kpi = destacado(t, unidades, jugador)
           return (
-            <li key={jugador.id}>
+            <li key={jugador.id} className="w-[78%] shrink-0 snap-start sm:w-auto">
               <Link
                 to={`/dashboard?jugador=${encodeURIComponent(jugador.id)}`}
                 className={`${tarjeta} flex h-full flex-col gap-3.5 transition-colors hover:border-line3`}
@@ -751,7 +787,9 @@ function Seguimiento({ t, filas, total }) {
                 <div className="flex items-end justify-between gap-2 border-t border-chip pt-3">
                   <div>
                     <p className={etiqueta}>{kpi.etiqueta}</p>
-                    <p className="mt-1 font-display text-3xl leading-none font-bold">{kpi.valor}</p>
+                    <p className="mt-1 font-display text-3xl leading-none font-bold tabular-nums">
+                      <Cifra valor={kpi.valor} formato={kpi.formato} sufijo={kpi.sufijo} />
+                    </p>
                   </div>
                   {kpi.delta && (
                     <span
@@ -770,7 +808,7 @@ function Seguimiento({ t, filas, total }) {
                           </>
                         )}
                       </Trazo>
-                      {kpi.delta}
+                      <Cifra valor={kpi.delta} formato={kpi.deltaFormato} />
                     </span>
                   )}
                 </div>
@@ -783,10 +821,80 @@ function Seguimiento({ t, filas, total }) {
   )
 }
 
+const bloque = 'block animate-pulse rounded-md bg-line'
+const cuatro = [0, 1, 2, 3]
+const tres = [0, 1, 2]
+
+function Esqueleto({ t }) {
+  return (
+    <div role="status" aria-busy="true" className="flex flex-col gap-6">
+      <span className="sr-only">{t.cargando}</span>
+      <div className="grid grid-cols-4 gap-1.5 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+        {cuatro.map((i) => (
+          <div
+            key={i}
+            className={`${tarjeta} flex flex-col gap-3 max-md:items-center max-md:gap-2 max-md:rounded-xl max-md:px-1 max-md:py-5`}
+          >
+            <span className={`${bloque} h-3 w-28 max-md:hidden`} />
+            <span className={`${bloque} h-11 w-16 max-md:h-7 max-md:w-8`} />
+            <span className={`${bloque} h-3 w-36 max-md:w-12`} />
+          </div>
+        ))}
+      </div>
+      <div>
+        <span className={`${bloque} mb-3.5 h-6 w-56`} />
+        <div className="-mx-4 flex gap-3 overflow-hidden px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:px-0 xl:grid-cols-4">
+          {cuatro.map((i) => (
+            <div key={i} className={`${tarjeta} flex w-[78%] shrink-0 flex-col gap-3.5 sm:w-auto`}>
+              <div className="flex items-center gap-3">
+                <span className={`${bloque} size-11.5 shrink-0 rounded-full`} />
+                <div className="flex flex-1 flex-col gap-2">
+                  <span className={`${bloque} h-4 w-3/4`} />
+                  <span className={`${bloque} h-3 w-1/2`} />
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 border-t border-chip pt-3">
+                <span className={`${bloque} h-3 w-20`} />
+                <span className={`${bloque} h-7 w-32`} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {[0, 1].map((filaBloque) => (
+        <div
+          key={filaBloque}
+          className="grid grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))] gap-4"
+        >
+          {[0, 1].map((columna) => (
+            <div key={columna} className={tarjeta}>
+              <span className={`${bloque} mb-5 h-6 w-44`} />
+              {tres.map((i) => (
+                <div key={i} className={fila}>
+                  <span className={`${bloque} size-9.5 shrink-0 rounded-full`} />
+                  <div className="flex flex-1 flex-col gap-2">
+                    <span className={`${bloque} h-3.5 w-2/3`} />
+                    <span className={`${bloque} h-3 w-1/3`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function Contenido({ t, data, ahora }) {
   return (
     <>
       <Tarjetas t={t} resumen={data?.summary} ahora={ahora} />
+      <Seguimiento
+        t={t}
+        filas={data?.tracked ?? []}
+        total={data?.summary?.trackedPlayers ?? data?.tracked?.length ?? 0}
+      />
       <section className="grid grid-cols-[repeat(auto-fit,minmax(min(380px,100%),1fr))] gap-4">
         <Postulaciones t={t} filas={data?.applications ?? []} />
         <Cola t={t} filas={data?.queue ?? []} />
@@ -795,18 +903,19 @@ function Contenido({ t, data, ahora }) {
         <Analisis t={t} filas={data?.recentMatches ?? []} />
         <Alertas t={t} filas={data?.alerts ?? []} />
       </section>
-      <Seguimiento
-        t={t}
-        filas={data?.tracked ?? []}
-        total={data?.summary?.trackedPlayers ?? data?.tracked?.length ?? 0}
-      />
     </>
   )
 }
 
 function Panel({ service, t }) {
-  const { data, error, loading, retry } = useInicio(service)
+  const { data, error, loading: cargandoDatos, retry } = useInicio(service)
   const [ahora] = useState(() => new Date())
+  const [esperando, setEsperando] = useState(true)
+  useEffect(() => {
+    const espera = setTimeout(() => setEsperando(false), 700)
+    return () => clearTimeout(espera)
+  }, [])
+  const loading = cargandoDatos || esperando
 
   return (
     <div className="mx-auto flex w-full max-w-310 flex-col gap-6">
@@ -817,12 +926,16 @@ function Panel({ service, t }) {
         </p>
       )}
 
-      <Bienvenida t={t} nombre={data?.coachName} resumen={data?.summary} ahora={ahora} />
+      <Bienvenida
+        t={t}
+        nombre={data?.coachName}
+        resumen={loading ? null : data?.summary}
+        ahora={ahora}
+        cargando={loading}
+      />
 
       {loading ? (
-        <div className={tarjeta} aria-busy="true">
-          <LoadingState title={t.cargando} />
-        </div>
+        <Esqueleto t={t} />
       ) : error || !data ? (
         <div className={tarjeta}>
           <ErrorState

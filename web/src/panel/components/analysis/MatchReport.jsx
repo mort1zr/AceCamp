@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { KpiCard as BaseKpiCard } from '../ui'
+import Marcador from '../players/Marcador.jsx'
+import MovimientoCard from '../dashboard/MovimientoCard.jsx'
+import PeloteosCard from '../dashboard/PeloteosCard.jsx'
+import SaqueCard from '../dashboard/SaqueCard.jsx'
 import MatchNotes from './MatchNotes.jsx'
 import ProcessedVideo from './ProcessedVideo.jsx'
 import PdfPartido from '../pdf/PdfPartido.jsx'
 import { BotonPdf } from '../pdf/ReportePdf.jsx'
 import { useUnidades } from '../../hooks/useUnidades.js'
 import { formatMatchDate } from '../../lib/dashboardEvolution.js'
+import { resultadoDelPartido } from '../../lib/partido.js'
 import { convertirVelocidad, etiquetaVelocidad } from '../../lib/unidades.js'
 
 const numberFormat = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
@@ -43,13 +48,20 @@ export default function MatchReport({ match, playerName, notesService, videoServ
       )}
       <header className="rounded-card border border-line bg-surface p-5">
         <p className="players-eyebrow">Reporte del partido</p>
-        <h2 id="match-report-title" ref={title} tabIndex={-1} className="font-display text-2xl font-bold">
+        <h2 id="match-report-title" ref={title} tabIndex={-1} className="font-display text-3xl font-bold">
           {playerName} · {match.opponent || 'Rival sin registrar'}
         </h2>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+          {match.result ? <span className="text-xl"><Marcador value={match.result} /></span> : <span className="text-muted">Sin marcador</span>}
+          {resultadoDelPartido(match.result) && (
+            <span className={`rounded-full px-3 py-0.5 text-xs font-bold tracking-wider uppercase ${resultadoDelPartido(match.result) === 'gano' ? 'bg-accent text-bg' : 'border border-line text-muted'}`}>
+              {resultadoDelPartido(match.result) === 'gano' ? 'Ganó' : 'Perdió'}
+            </span>
+          )}
+        </div>
         <dl className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-3">
           <div><dt className="text-sm text-muted">Fecha</dt><dd>{formatMatchDate(match.matchDate)}</dd></div>
           <div><dt className="text-sm text-muted">Torneo</dt><dd>{match.tournament || 'Sin datos'}</dd></div>
-          <div><dt className="text-sm text-muted">Marcador</dt><dd>{match.result || 'Sin datos'}</dd></div>
         </dl>
       </header>
       <section aria-labelledby="match-report-metrics">
@@ -78,14 +90,15 @@ export default function MatchReport({ match, playerName, notesService, videoServ
           <KpiCard label="Peloteo más largo" value={match.longestRally} unit="golpes" />
         </div>
       </section>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
-        <section className="rounded-card border border-line bg-surface p-5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
+        <SaqueCard serve={match.details?.serve} playerId={match.playerId} />
+        <PeloteosCard rallies={match.details?.rallies} playerId={match.playerId} />
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-4">
+        <MovimientoCard movement={match.details?.movement} />
+        <section className="flex flex-col rounded-card border border-line bg-surface p-5">
           <h3 className="font-semibold">Video procesado</h3>
           <ProcessedVideo matchId={match.id} path={match.processedVideoPath} service={videoService} />
-        </section>
-        <section className="rounded-card border border-line bg-surface p-5">
-          <h3 className="font-semibold">Desglose por set</h3>
-          <p className="mt-2 text-sm text-muted">Sin datos del desglose por set.</p>
         </section>
       </div>
       <MatchNotes matchId={match.id} service={notesService} />

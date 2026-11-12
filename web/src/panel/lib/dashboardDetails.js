@@ -21,6 +21,17 @@ export function buildDashboardDetails(matches, { orgId, playerId }) {
     return count(serve?.firstServeAttempts) && count(serve?.firstServeIn)
       && serve.firstServeIn <= serve.firstServeAttempts ? serve.firstServeIn : null
   })
+  const attempts = sum(s => {
+    const serve = s?.player?.serve
+    return count(serve?.firstServeAttempts) && count(serve?.firstServeIn) && serve.firstServeIn <= serve.firstServeAttempts
+      ? serve.firstServeAttempts : null
+  })
+  const secondIn = sum(s => {
+    const serve = s?.player?.serve
+    if (!count(serve?.firstServeAttempts) || !count(serve?.firstServeIn) || !count(serve?.doubleFaults)) return null
+    const seconds = serve.firstServeAttempts - serve.firstServeIn
+    return seconds >= 0 && serve.doubleFaults <= seconds ? seconds - serve.doubleFaults : null
+  })
   const validRallies = s => {
     const r = s?.rallies
     return r && ['count', 'sumShots', 'longestShots', 'short', 'medium', 'long'].every(key => count(r[key]))
@@ -40,11 +51,40 @@ export function buildDashboardDetails(matches, { orgId, playerId }) {
   const longest = distributions.map(r => r.longestShots)
   rallies.longestShots = longest.length && longest.every(count) ? Math.max(...longest) : null
   const speeds = stats.map(s => s?.player?.movement?.maxSpeedKmh)
+  const averageSpeeds = stats.map(s => s?.player?.movement?.avgSpeedKmh)
+  const heatmaps = stats.map(s => s?.player?.movement?.heatmap)
+  const first = heatmaps[0]
+  const heatmapValid = h => h && Number.isSafeInteger(h.columns) && Number.isSafeInteger(h.rows) && h.columns > 0 && h.rows > 0
+    && Array.isArray(h.cells) && h.cells.length === h.columns * h.rows && h.cells.every(positive)
+  const heatmap = heatmaps.length && heatmaps.every(h => heatmapValid(h) && h.columns === first.columns && h.rows === first.rows)
+    ? { columns: first.columns, rows: first.rows, cells: first.cells.map((_, i) => heatmaps.reduce((n, h) => n + h.cells[i], 0)) }
+    : null
+  const shotMax = stats.map(s => s?.player?.shots?.maxSpeedKmh)
+  const speedGroup = key => {
+    const groups = stats.map(s => s?.player?.serve?.[key])
+    const complete = groups.length > 0 && groups.every(g => count(g?.sampleCount) && positive(g?.sumSpeedKmh) && positive(g?.maxSpeedKmh))
+    const samples = complete ? sum(s => s?.player?.serve?.[key]?.sampleCount) : null
+    const total = complete ? groups.reduce((n, g) => n + g.sumSpeedKmh, 0) : null
+    return {
+      averageSpeedKmh: samples > 0 && Number.isFinite(total) ? total / samples : null,
+      maxSpeedKmh: complete && groups.some(g => g.sampleCount > 0) ? Math.max(...groups.filter(g => g.sampleCount > 0).map(g => g.maxSpeedKmh)) : null,
+    }
+  }
   return {
-    serve: { firstIn, secondIn: null, doubleFaults: sum(s => s?.player?.serve?.doubleFaults) },
+    shots: { maxSpeedKmh: shotMax.length && shotMax.every(positive) ? Math.max(...shotMax) : null },
+    serve: {
+      attempts, firstIn, secondIn, doubleFaults: sum(s => s?.player?.serve?.doubleFaults),
+      first: speedGroup('firstServe'), second: speedGroup('secondServe'),
+    },
     rallies,
     movement: {
       distanceMeters: sum(s => s?.player?.movement?.distanceMeters, positive),
+      distancePerMatch: (() => {
+        const total = sum(s => s?.player?.movement?.distanceMeters, positive)
+        return total != null && stats.length > 0 ? total / stats.length : null
+      })(),
+      averageSpeedKmh: averageSpeeds.length && averageSpeeds.every(positive) ? averageSpeeds.reduce((n, v) => n + v, 0) / averageSpeeds.length : null,
+      heatmap,
       maxSpeedKmh: speeds.length && speeds.every(positive) ? Math.max(...speeds) : null,
     },
   }

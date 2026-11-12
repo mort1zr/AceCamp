@@ -232,6 +232,8 @@ statistics: {
       count: 2, fromRight: 1, fromLeft: 1,          // saques (intentos, también los segundos)
       sumSpeedKmh: 110, sampleCount: 1, maxSpeedKmh: 110,  // velocidad media hasta el bote
       firstServeAttempts: 1, firstServeIn: 0,       // primeros saques y cuántos entraron
+      firstServe:  { sampleCount: 1, sumSpeedKmh: 110, maxSpeedKmh: 110 },  // pendiente del modelo: velocidad del primer saque
+      secondServe: { sampleCount: 0, sumSpeedKmh: 0 },                      // pendiente del modelo: velocidad del segundo saque
       doubleFaults: 0,
       faults: 1, aces: 0,                           // opcionales (PCIT-72)
     },
@@ -248,8 +250,10 @@ statistics: {
 | --- | --- | --- |
 | `shots.count`, `shots.sumSpeedKmh`, `shots.maxSpeedKmh` | Golpes medidos y su velocidad (distancia entre los jugadores / tiempo hasta el golpe del rival) | `maxSpeedKmh` falta si no hay golpes |
 | `movement.*` | Distancia recorrida y velocidad del jugador | Si no se pudo seguir al jugador |
+| `movement.heatmap` (`columns`, `rows`, `cells`) | **Pendiente del modelo.** Mapa de calor del jugador: cuadrícula de su propia mitad de la cancha con `cells.length === columns × rows` (un número por celda: fotogramas o tiempo que pasó ahí, sin normalizar). Filas desde la red (primera fila) hasta la línea de fondo (última); columnas de izquierda a derecha **desde el punto de vista del jugador**, así que para el jugador del fondo lejano hay que invertir el eje de la imagen. Todos los partidos deben usar el mismo tamaño de cuadrícula: la web los suma | Hasta que el modelo la escriba |
 | `serve.count`, `serve.fromRight`, `serve.fromLeft` | Saques detectados y desde qué lado (derecha o izquierda del sacador, mirando a la red) | Nunca: 0 si no sacó |
 | `serve.sumSpeedKmh`, `serve.sampleCount`, `serve.maxSpeedKmh` | Velocidad media del saque **hasta el bote**, solo de los saques con bote visto. Es menor que la de un radar, que mide la salida de la raqueta | `maxSpeedKmh` falta si `sampleCount` es 0 |
+| `serve.firstServe`, `serve.secondServe` (`sampleCount`, `sumSpeedKmh`, `maxSpeedKmh`) | **Pendiente del modelo.** Velocidad del primer y del segundo saque por separado, hasta el bote y solo de los saques con bote visto. El Dashboard ya las lee: muestra la media (`sumSpeedKmh / sampleCount`) y la máxima de cada uno | Hasta que el modelo las escriba; `maxSpeedKmh` falta si `sampleCount` es 0 |
 | `serve.firstServeAttempts`, `serve.firstServeIn` | Primeros saques y cuántos entraron en el cuadro cruzado | Si de algún primer saque no se supo si entró |
 | `serve.doubleFaults` | Dobles faltas | Si de algún segundo saque no se supo si entró |
 | `serve.faults` | Saques fuera (primeros y segundos) | Si de algún saque no se supo si entró |
@@ -309,12 +313,12 @@ de ser jugador del equipo.
 | `email` | string | sí | |
 | `graduationYear` | number | sí | |
 | `academy` | string | no | |
-| `utr` | number \| null | no | |
-| `nationalRanking` | number \| null | no | |
+| `utr` | number \| null | no | Entre 0 y 20. El formulario público lo pide como opcional |
+| `nationalRanking` | number \| null | no | Entero positivo. Opcional en el formulario público |
 | `dominantHand` | `'diestro'` \| `'zurdo'` \| null | no | |
 | `backhand` | `'dos manos'` \| `'una mano'` \| null | no | |
 | `guardian` | `{ name, phone, email }` \| null | sí si es menor de 18 | |
-| `videoLinks` | string[] | no | Links de YouTube, máximo 5 |
+| `videoLinks` | string[] | no | Links de YouTube, máximo 5. El formulario público los acepta solo con `https`, hasta 300 caracteres cada uno |
 | `videoPaths` | string[] | no | Rutas privadas confirmadas por el servidor. La demo guarda un archivo opcional en `orgs/{orgId}/applications/{appId}/video.mp4` o `.mov`. |
 | `videoUpload` | object | no | Reserva temporal de ruta y huella del archivo para reintentar sin sobrescribirlo. La escribe el servidor y la retira al confirmar `videoPaths`. |
 | `message` | string | no | Hasta 1000 caracteres |

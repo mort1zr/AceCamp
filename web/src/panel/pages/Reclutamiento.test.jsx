@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { collection, onSnapshot, query, runTransaction, where } from 'firebase/firestore'
+import { collection, onSnapshot, query, runTransaction, updateDoc, where } from 'firebase/firestore'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlanVistaContexto } from '../context/PlanVistaContext.js'
@@ -16,6 +16,7 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: vi.fn(() => vi.fn()),
   doc: vi.fn((_, collection, id) => `${collection}/${id}`),
   runTransaction: vi.fn(),
+  updateDoc: vi.fn(async () => {}),
   serverTimestamp: vi.fn(() => 'server-time'),
 }))
 
@@ -71,18 +72,19 @@ describe('Bandeja de reclutamiento', () => {
       application('4', 'Otra organización', 'Lima', 'nueva', 'equipo-b'),
     )
 
-    const table = within(screen.getByRole('table', { name: 'Bandeja de postulaciones' }))
-    expect(table.getAllByRole('row')).toHaveLength(4)
+    const list = within(screen.getByRole('list', { name: 'Postulaciones' }))
+    const item = (name) => list.queryByRole('button', { name: `Postulación de ${name}` })
+    expect(list.getAllByRole('button')).toHaveLength(3)
     const search = screen.getByRole('searchbox', { name: 'Buscar por nombre o ciudad' })
     await user.type(search, '  lucia ')
-    expect(table.getByRole('cell', { name: 'Lucía Pérez' })).toBeTruthy()
-    expect(table.queryByRole('cell', { name: 'Andrés Díaz' })).toBeNull()
+    expect(item('Lucía Pérez')).toBeTruthy()
+    expect(item('Andrés Díaz')).toBeNull()
     await user.clear(search)
     await user.type(search, 'lima')
-    await user.selectOptions(screen.getByLabelText('Estado de postulación'), 'en revisión')
-    expect(table.getByRole('cell', { name: 'Andrés Díaz' })).toBeTruthy()
-    expect(table.queryByRole('cell', { name: 'Lucía Pérez' })).toBeNull()
-    await user.selectOptions(screen.getByLabelText('Estado de postulación'), 'contactada')
+    await user.click(screen.getByRole('tab', { name: /^En revisión/ }))
+    expect(item('Andrés Díaz')).toBeTruthy()
+    expect(item('Lucía Pérez')).toBeNull()
+    await user.click(screen.getByRole('tab', { name: /^Contactada/ }))
     expect(screen.getByText('No hay coincidencias')).toBeTruthy()
   })
 
@@ -95,14 +97,14 @@ describe('Bandeja de reclutamiento', () => {
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
     expect(onSnapshot).toHaveBeenCalledTimes(2)
     publish(application('1', 'Lucía Pérez', 'Lima', 'nueva'))
-    expect(screen.getByText('Lucía Pérez')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Postulación de Lucía Pérez' })).toBeTruthy()
     const [, receiveOld] = onSnapshot.mock.lastCall
     const stopOld = onSnapshot.mock.results.at(-1).value
     rerender(page({ ...session, orgId: 'equipo-b' }))
     expect(stopOld).toHaveBeenCalled()
     expect(where).toHaveBeenLastCalledWith('orgId', '==', 'equipo-b')
     act(() => receiveOld({ docs: [application('1', 'Lucía Pérez', 'Lima', 'nueva')] }))
-    expect(screen.queryByText('Lucía Pérez')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Postulación de Lucía Pérez' })).toBeNull()
     publish()
     expect(screen.getByText('Aún no llegan postulaciones')).toBeTruthy()
   })
@@ -111,9 +113,9 @@ describe('Bandeja de reclutamiento', () => {
     render(page())
     const path = 'orgs/equipo-a/applications/1/video.mp4'
     publish(application('1', 'Lucía Pérez', 'Lima', 'nueva', session.orgId, { videoPaths: [path] }))
-    const row = screen.getByRole('row', { name: /Lucía Pérez/ })
+    const row = screen.getByRole('button', { name: 'Postulación de Lucía Pérez' })
     expect(within(row).getByText('Video adjunto')).toBeTruthy()
-    expect(row.textContent).not.toContain(path)
+    expect(document.body.textContent).not.toContain(path)
   })
 
   it('espera el plan y no consulta postulaciones con Básico', () => {
@@ -134,16 +136,16 @@ describe('Bandeja de reclutamiento', () => {
     render(page())
     publish(application('1', 'Lucía Pérez', 'Lima', 'nueva'))
 
-    const select = screen.getByLabelText('Nuevo estado de Lucía Pérez')
-    expect(within(select).getAllByRole('option').map((option) => option.value)).toEqual(['', 'en revisión'])
-    await user.selectOptions(select, 'en revisión')
+    const group = within(screen.getByRole('group', { name: 'Estado de Lucía Pérez' }))
+    expect(group.getAllByRole('button').filter((button) => !button.disabled).map((button) => button.textContent)).toEqual(['En revisión'])
+    await user.click(group.getByRole('button', { name: 'En revisión' }))
     await user.click(screen.getByRole('button', { name: 'Guardar estado de Lucía Pérez' }))
     expect(await screen.findByText('Se guardó el estado de Lucía Pérez: en revisión.')).toBeTruthy()
     expect(transaction.update).toHaveBeenCalledExactlyOnceWith('applications/1', {
       status: 'en revisión', reviewedBy: session.uid, updatedAt: 'server-time',
     })
     publish(application('1', 'Lucía Pérez', 'Lima', 'en revisión'))
-    expect(screen.getByRole('cell', { name: 'En revisión' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'En revisión', pressed: true })).toBeTruthy()
   })
 
   it('avisa si alguien cambió el estado mientras se editaba y evita sobrescribirlo', async () => {
@@ -155,10 +157,25 @@ describe('Bandeja de reclutamiento', () => {
     runTransaction.mockImplementationOnce((_, update) => update(transaction))
     render(page())
     publish(application('1', 'Lucía Pérez', 'Lima', 'nueva'))
-    await user.selectOptions(screen.getByLabelText('Nuevo estado de Lucía Pérez'), 'en revisión')
+    await user.click(screen.getByRole('button', { name: 'En revisión' }))
     await user.click(screen.getByRole('button', { name: 'Guardar estado de Lucía Pérez' }))
     expect((await screen.findByRole('alert')).textContent).toContain('cambió en otra sesión')
     expect(transaction.update).not.toHaveBeenCalled()
+  })
+
+  it('guarda las notas internas sin tocar el estado', async () => {
+    const user = userEvent.setup()
+    render(page())
+    publish(application('1', 'Lucía Pérez', 'Lima', 'nueva', session.orgId, { internalNotes: 'Antes' }))
+    const notes = screen.getByRole('textbox', { name: 'Notas internas' })
+    expect(notes.value).toBe('Antes')
+    const save = screen.getByRole('button', { name: 'Guardar notas' })
+    expect(save.disabled).toBe(true)
+    await user.clear(notes)
+    await user.type(notes, 'Buen saque')
+    await user.click(save)
+    expect(updateDoc).toHaveBeenCalledExactlyOnceWith('applications/1', { internalNotes: 'Buen saque', updatedAt: 'server-time' })
+    expect(await screen.findByText('Notas guardadas.')).toBeTruthy()
   })
 
   it('reutiliza la ficha de alta con los datos de la postulación y exige autorización', async () => {

@@ -15,6 +15,7 @@ import {
   PLANES,
 } from '../lib/services/firestoreConfiguracionService.js'
 import './configuracion.css'
+import PelotaTitulo from '../components/layout/PelotaTitulo.jsx'
 
 const secciones = ['cuenta', 'organizacion', 'equipo', 'preferencias', 'plan']
 const seccionesPersonales = ['cuenta', 'preferencias', 'plan']
@@ -22,6 +23,8 @@ const seccionesPersonales = ['cuenta', 'preferencias', 'plan']
 const textos = {
   es: {
     titulo: 'Configuración',
+    antetitulo: 'Tu cuenta y tu equipo',
+    subtitulo: 'Administra tu perfil, tu organización, tu equipo y tu plan.',
     menu: 'Secciones de configuración',
     pestanas: {
       cuenta: 'Cuenta',
@@ -135,6 +138,8 @@ const textos = {
   },
   en: {
     titulo: 'Settings',
+    antetitulo: 'Your account and team',
+    subtitulo: 'Manage your profile, organization, team and plan.',
     menu: 'Settings sections',
     pestanas: {
       cuenta: 'Account',
@@ -1083,8 +1088,17 @@ export default function Configuracion({ service: inyectado, db, auth, session })
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-300 flex-col gap-5">
-      <h1 className="font-display text-[40px] leading-none font-bold">{t.titulo}</h1>
+    <div className="mx-auto flex w-full max-w-310 flex-col gap-6">
+      <div>
+        <p className="text-xs font-semibold tracking-[0.08em] text-muted uppercase">
+          {t.antetitulo}
+        </p>
+        <h1 className="mt-1.5 font-display text-[44px] leading-none font-bold">
+          {t.titulo}
+          <PelotaTitulo />
+        </h1>
+        <p className="mt-1.5 text-base text-muted">{t.subtitulo}</p>
+      </div>
 
       {!service && (
         <p

@@ -15,30 +15,48 @@ const JUGADORES = [
     nationality: 'Suiza', utr: 16.3,
     rivales: ['Rafael Nadal', 'Novak Djokovic', 'Andy Murray', 'Lleyton Hewitt', 'Andy Roddick'],
     victorias: [0, 1, 0, 1, 1, 0, 1, 1, 1],
-    promedio: { saque: 174.3, saqueMax: 230, primeros: 62, dobles: 1.8, golpe: 114.4, derecha: 170, reves: 155, distancia: 2050, despMax: 25.5, peloteo: 4.1, largo: [16, 24] },
+    promedio: { saque: 174.3, saqueMax: 230, fondo: 0.7, lateral: -0.03, primero: 188, segundo: 152, primeros: 62, dobles: 1.8, golpe: 114.4, derecha: 170, reves: 155, distancia: 2050, despMax: 25.5, peloteo: 4.1, largo: [16, 24] },
   },
   {
     id: 'player-novak-djokovic', fullName: 'Novak Djokovic', birthDate: '1987-05-22', dominantHand: 'diestro', backhand: 'dos manos',
     nationality: 'Serbia', utr: 16.5,
     rivales: ['Rafael Nadal', 'Roger Federer', 'Andy Murray', 'Stan Wawrinka', 'Tomas Berdych'],
     victorias: [1, 0, 1, 1, 0, 1, 1, 1, 1],
-    promedio: { saque: 179.1, saqueMax: 219, primeros: 65, dobles: 2.5, golpe: 120.5, derecha: 165, reves: 160, distancia: 2400, despMax: 27, peloteo: 5.5, largo: [24, 34] },
+    promedio: { saque: 179.1, saqueMax: 219, fondo: 0.8, lateral: 0.02, primero: 192, segundo: 155, primeros: 65, dobles: 2.5, golpe: 120.5, derecha: 165, reves: 160, distancia: 2400, despMax: 27, peloteo: 5.5, largo: [24, 34] },
   },
   {
     id: 'player-rafael-nadal', fullName: 'Rafael Nadal', birthDate: '1986-06-03', dominantHand: 'zurdo', backhand: 'dos manos',
-    nationality: 'Española', utr: 16.4,
+    nationality: 'España', utr: 16.4,
     rivales: ['Novak Djokovic', 'Roger Federer', 'Andy Murray', 'David Ferrer', 'Tomas Berdych'],
     victorias: [0, 1, 0, 1, 1, 1, 0, 1, 1],
-    promedio: { saque: 173.8, saqueMax: 217, primeros: 68, dobles: 1.7, golpe: 118.6, derecha: 170, reves: 155, distancia: 2750, despMax: 26.8, peloteo: 6.2, largo: [25, 35] },
+    promedio: { saque: 173.8, saqueMax: 217, fondo: 0.88, lateral: 0.05, primero: 185, segundo: 150, primeros: 68, dobles: 1.7, golpe: 118.6, derecha: 170, reves: 155, distancia: 2750, despMax: 26.8, peloteo: 6.2, largo: [25, 35] },
   },
   {
     id: 'player-andy-murray', fullName: 'Andy Murray', birthDate: '1987-05-15', dominantHand: 'diestro', backhand: 'dos manos',
-    nationality: 'Británica', utr: 16,
+    nationality: 'Reino Unido', utr: 16,
     rivales: ['Novak Djokovic', 'Roger Federer', 'Rafael Nadal', 'Stan Wawrinka', 'Tomas Berdych'],
     victorias: [0, 0, 1, 0, 1, 1, 1, 0, 1],
-    promedio: { saque: 169.3, saqueMax: 233, primeros: 58, dobles: 2.5, golpe: 117.1, derecha: 162, reves: 158, distancia: 2600, despMax: 26.5, peloteo: 5.8, largo: [22, 32] },
+    promedio: { saque: 169.3, saqueMax: 233, fondo: 0.76, lateral: -0.02, primero: 189, segundo: 142, primeros: 58, dobles: 2.5, golpe: 117.1, derecha: 162, reves: 158, distancia: 2600, despMax: 26.5, peloteo: 5.8, largo: [22, 32] },
   },
 ]
+
+const COLUMNAS = 6
+const FILAS = 8
+
+function mapaDeCalor(fondo, lateral, i, desfase) {
+  const cx = 0.5 + lateral + 0.015 * Math.sin(i + desfase)
+  const cy = fondo + 0.02 * Math.cos(i * 1.7 + desfase)
+  const cells = []
+  for (let fila = 0; fila < FILAS; fila++) {
+    for (let columna = 0; columna < COLUMNAS; columna++) {
+      const dx = (columna + 0.5) / COLUMNAS - cx
+      const dy = (fila + 0.5) / FILAS - cy
+      const ruido = 1 + 0.12 * Math.sin(fila * 3 + columna * 5 + i * 2 + desfase)
+      cells.push(Math.max(0, Math.round(1000 * ruido * Math.exp(-(dx * dx) / (2 * 0.17 ** 2) - (dy * dy) / (2 * 0.2 ** 2)))))
+    }
+  }
+  return { columns: COLUMNAS, rows: FILAS, cells }
+}
 
 const redondear = (valor, decimales = 0) => Number(valor.toFixed(decimales))
 
@@ -51,6 +69,9 @@ function estadisticas(promedio, i, desfase) {
   return {
     serveMax: Math.round(sube(promedio.saqueMax, 0.07)),
     serveAvg: redondear(sube(promedio.saque, 0.09), 1),
+    firstAvg: redondear(sube(promedio.primero, 0.09), 1),
+    secondAvg: redondear(sube(promedio.segundo, 0.09), 1),
+    secondMax: Math.round(sube(promedio.segundo + 14, 0.07)),
     firstIn: Math.round(promedio.primeros - 7 * (1 - avance) + ruido * 100),
     df: Math.max(0, Math.round(promedio.dobles * (1.6 - 0.6 * avance) + ruido * 30)),
     fhMax: Math.round(sube(promedio.derecha, 0.08)),
@@ -62,6 +83,7 @@ function estadisticas(promedio, i, desfase) {
     distance: Math.round(sube(promedio.distancia, 0.08) / 10) * 10,
     moveMax: despMax,
     moveAvg: redondear(despMax * 0.28, 1),
+    heatmap: mapaDeCalor(promedio.fondo, promedio.lateral, i, desfase),
   }
 }
 

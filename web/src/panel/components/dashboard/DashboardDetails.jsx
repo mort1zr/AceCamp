@@ -8,7 +8,13 @@ const number = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
 const text = value => value == null ? 'Sin datos' : number.format(value)
 const card = 'rounded-card border border-line bg-surface p-5 min-w-0'
 
-function Bars({ title, rows, note }) {
+function BarTooltip({ active, payload }) {
+  const row = payload?.[0]?.payload
+  if (!active || !row) return null
+  return <div className="evolution-tooltip"><strong>{row.label}</strong><p>{text(row.value)}</p></div>
+}
+
+function Bars({ title, rows, note, playerId }) {
   const id = useId()
   return <section className={card} aria-labelledby={id}>
     <h2 id={id} className="font-display text-[22px] font-bold">{title}</h2>
@@ -19,8 +25,8 @@ function Bars({ title, rows, note }) {
           <CartesianGrid vertical={false} stroke="var(--players-line)" />
           <XAxis dataKey="label" tick={{ fill: 'var(--players-muted)', fontSize: 11 }} interval={0} />
           <YAxis allowDecimals={false} tick={{ fill: 'var(--players-muted)', fontSize: 11 }} />
-          <Tooltip formatter={value => [text(value), 'Cantidad']} />
-          <Bar dataKey="value" name="Cantidad" fill="var(--electric, #4FE3FF)" isAnimationActive={false} />
+          <Tooltip content={<BarTooltip />} cursor={{ fill: 'var(--players-line)', fillOpacity: 0.35 }} />
+          <Bar key={playerId} dataKey="value" name="Cantidad" fill="var(--electric, #4FE3FF)" isAnimationActive animationDuration={700} animationEasing="ease-out" />
         </BarChart>
       </ResponsiveContainer>
     </figure> : <p className="py-8 text-muted">Sin datos para este periodo.</p>}
@@ -43,9 +49,9 @@ export default function DashboardDetails({ details, serveEvolution, playerId, sa
       <DashboardEvolution playerId={playerId} evolution={serveEvolution} metric="averageServeSpeed" sample={sample} />
     </section>
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))] gap-4">
-      <Bars title="Saque" note="Resultados medidos. Los segundos saques dentro aún no están disponibles; no se deducen del total de intentos. Si un análisis carece de un contador, el total queda Sin datos."
+      <Bars playerId={playerId} title="Saque" note="Resultados medidos. Los segundos saques dentro aún no están disponibles; no se deducen del total de intentos. Si un análisis carece de un contador, el total queda Sin datos."
         rows={[{ label: 'Primeros dentro', value: serve?.firstIn }, { label: 'Segundos dentro', value: serve?.secondIn }, { label: 'Dobles faltas', value: serve?.doubleFaults }]} />
-      <Bars title="Peloteos" note={`${rallies?.coveredMatches ?? 0} de ${rallies?.totalMatches ?? 0} análisis con distribución disponible. Tramos: 0–4, 5–8 y 9 o más golpes. Media: ${text(rallies?.averageShots)}; más largo: ${text(rallies?.longestShots)}. Los golpes de un peloteo pueden incluir golpes sin velocidad medible.`}
+      <Bars playerId={playerId} title="Peloteos" note={`${rallies?.coveredMatches ?? 0} de ${rallies?.totalMatches ?? 0} análisis con distribución disponible. Tramos: 0–4, 5–8 y 9 o más golpes. Media: ${text(rallies?.averageShots)}; más largo: ${text(rallies?.longestShots)}. Los golpes de un peloteo pueden incluir golpes sin velocidad medible.`}
         rows={[{ label: '0–4 golpes', value: rallies?.short }, { label: '5–8 golpes', value: rallies?.medium }, { label: '9+ golpes', value: rallies?.long }]} />
     </div>
     <section className={card} aria-labelledby="movement-title">
