@@ -90,12 +90,15 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_USE_FIREBASE_EMULATORS: "false"
+          # PCIT-198: el commit queda en <meta name="acecam-version"> del HTML publicado.
+          ACECAM_VERSION: ${{ github.sha }}
         run: |
           npm ci --no-audit --no-fund
           npm run build
           npm run check:csp
 
       - name: Publicar en Firebase Hosting
+        id: hosting
         if: steps.config.outputs.ok == 'true'
         uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
         with:
@@ -113,6 +116,7 @@ jobs:
       # repositorio DEPLOY_STORAGE_RULES = true. Sin ella (plan Spark) se publican
       # solo las de Firestore, en vez de fallar todo el paso.
       - name: Publicar reglas e índices
+        id: rules
         if: steps.config.outputs.ok == 'true' && github.event_name != 'pull_request'
         working-directory: web
         env:
@@ -132,3 +136,30 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS="$key_file" npx --no-install firebase deploy \
             --only "$targets" \
             --project "$FIREBASE_PROJECT" --non-interactive --config ../firebase.json
+
+      # PCIT-199: comprobar que producción responde y sirve el commit recién publicado.
+      # Reintenta unos segundos por la caché del CDN; si no, el despliegue falla.
+      # Va después de las reglas: si falla, las reglas nuevas ya están publicadas
+      # y la web no queda en línea con las reglas viejas.
+      - name: Comprobar la web publicada
+        id: check
+        if: steps.config.outputs.ok == 'true' && github.event_name != 'pull_request'
+        working-directory: web
+        env:
+          EXPECTED_VERSION: ${{ github.sha }}
+        run: node scripts/checkDeploy.mjs "https://${FIREBASE_PROJECT}.web.app/" "$EXPECTED_VERSION"
+
+      # PCIT-200: tabla con lo que se publicó en la página del run, también si algo falló.
+      - name: Resumen del despliegue
+        if: always() && steps.config.outputs.ok == 'true'
+        working-directory: web
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PRODUCTION_URL: https://${{ env.FIREBASE_PROJECT }}.web.app/
+          PREVIEW_URL: ${{ steps.hosting.outputs.details_url }}
+          VERSION: ${{ github.sha }}
+          HOSTING_OUTCOME: ${{ steps.hosting.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          RULES_OUTCOME: ${{ steps.rules.outcome }}
+          DEPLOY_STORAGE_RULES: ${{ vars.DEPLOY_STORAGE_RULES }}
+        run: node scripts/deploySummary.mjs

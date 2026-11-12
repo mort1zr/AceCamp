@@ -7,6 +7,8 @@ function Enlaces({ db, orgId }) {
   const [forms, setForms] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // PCIT-184: qué enlace se copió (para el aviso) o si el navegador no dejó copiar.
+  const [copiado, setCopiado] = useState(null)
   useEffect(() => onSnapshot(
     applicationForms(db, orgId),
     (snapshot) => setForms(snapshot.docs.map(({ id }) => id)),
@@ -27,6 +29,17 @@ function Enlaces({ db, orgId }) {
     }
   }
 
+  async function copiar(formId, url) {
+    setError('')
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiado(formId)
+    } catch {
+      setCopiado(null)
+      setError('No pudimos copiar el enlace. Selecciónalo y cópialo a mano.')
+    }
+  }
+
   return (
     <section className="rounded-lg border border-line p-4" aria-label="Enlaces de postulación">
       <h2 className="font-semibold">Enlaces de postulación</h2>
@@ -39,6 +52,9 @@ function Enlaces({ db, orgId }) {
             return (
               <li key={formId} className="flex flex-wrap items-center gap-2">
                 <a className="break-all text-sm underline" href={url} target="_blank" rel="noopener">{url}</a>
+                <button type="button" className="players-button-secondary" onClick={() => copiar(formId, url)}>
+                  {copiado === formId ? 'Enlace copiado' : 'Copiar enlace'}
+                </button>
                 <button type="button" className="players-button-secondary" disabled={busy} onClick={() => change(formId)}>Desactivar</button>
               </li>
             )

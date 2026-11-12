@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PlanVistaContexto } from '../context/PlanVistaContext.js'
 import { usePlayers } from '../hooks/usePlayers.js'
+import { createApplicationAnalysisService } from '../lib/services/applicationAnalysis.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
 import Reclutamiento from './Reclutamiento.jsx'
 
@@ -21,6 +22,7 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('../components/recruitment/EnlacesPostulacion.jsx', () => ({ default: () => null }))
 vi.mock('../hooks/usePlayers.js', () => ({ usePlayers: vi.fn(() => ({ rows: [], loading: false })) }))
+vi.mock('../lib/services/applicationAnalysis.js', () => ({ createApplicationAnalysisService: vi.fn() }))
 vi.mock('../lib/services/firestorePlayersService.js', () => ({
   createFirestorePlayersService: vi.fn(() => ({ assignApplication: vi.fn() })),
 }))
@@ -73,7 +75,7 @@ describe('Bandeja de reclutamiento', () => {
 
     const table = within(screen.getByRole('table', { name: 'Bandeja de postulaciones' }))
     expect(table.getAllByRole('row')).toHaveLength(4)
-    const search = screen.getByRole('searchbox', { name: 'Buscar por nombre o ciudad' })
+    const search = screen.getByRole('searchbox', { name: 'Buscar por nombre, ciudad o referencia' })
     await user.type(search, '  lucia ')
     expect(table.getByRole('cell', { name: 'Lucía Pérez' })).toBeTruthy()
     expect(table.queryByRole('cell', { name: 'Andrés Díaz' })).toBeNull()
@@ -84,6 +86,17 @@ describe('Bandeja de reclutamiento', () => {
     expect(table.queryByRole('cell', { name: 'Lucía Pérez' })).toBeNull()
     await user.selectOptions(screen.getByLabelText('Estado de postulación'), 'contactada')
     expect(screen.getByText('No hay coincidencias')).toBeTruthy()
+  })
+
+  it('muestra la referencia de cada postulación y permite buscarla (PCIT-186)', async () => {
+    const user = userEvent.setup()
+    render(page())
+    publish(application('ab12cd34', 'Lucía Pérez', 'Lima', 'nueva'), application('zz99yy88', 'Paula Flores', 'Cusco', 'nueva'))
+    const table = within(screen.getByRole('table', { name: 'Bandeja de postulaciones' }))
+    expect(table.getByRole('cell', { name: 'AC-AB12CD' })).toBeTruthy()
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar por nombre, ciudad o referencia' }), 'ac-ab12')
+    expect(table.getByRole('cell', { name: 'Lucía Pérez' })).toBeTruthy()
+    expect(table.queryByRole('cell', { name: 'Paula Flores' })).toBeNull()
   })
 
   it('reintenta tras un error y descarta los datos de la sesión anterior', async () => {
@@ -114,6 +127,41 @@ describe('Bandeja de reclutamiento', () => {
     const row = screen.getByRole('row', { name: /Lucía Pérez/ })
     expect(within(row).getByText('Video adjunto')).toBeTruthy()
     expect(row.textContent).not.toContain(path)
+  })
+
+  it('encola el video vinculado, permite reintentar y muestra el resultado del worker', async () => {
+    const user = userEvent.setup()
+    const path = 'orgs/equipo-a/applications/1/video.mp4'
+    const enqueue = vi.fn(async () => {})
+    const retry = vi.fn(async () => {})
+    let receive
+    createApplicationAnalysisService.mockReturnValueOnce({ enqueue, retry, subscribe: (rows) => {
+      receive = rows
+      receive([])
+    } })
+    usePlayers.mockReturnValue({ rows: [{ id: 'p-1' }], loading: false })
+    render(page())
+    publish(application('1', 'Lucía Pérez', 'Lima', 'nueva', session.orgId, {
+      playerId: 'p-1', videoPaths: [path], videoLinks: ['https://example.test/video'],
+    }))
+    await user.click(screen.getByRole('button', { name: 'Ver videos de Lucía Pérez' }))
+    const submit = await screen.findByRole('button', { name: 'Analizar video', exact: true })
+    expect(submit.disabled).toBe(true)
+    await user.selectOptions(screen.getByLabelText('Posición del postulante en el video 1'), 'arriba')
+    await user.click(submit)
+    expect(enqueue).toHaveBeenCalledExactlyOnceWith(path, 'arriba')
+    act(() => receive([{ id: 'm-1', videoPath: path, status: 'error', errorMessage: 'No se detectó la cancha.' }]))
+    expect(screen.getByRole('alert').textContent).toBe('No se detectó la cancha.')
+    await user.click(screen.getByRole('button', { name: 'Reintentar', exact: true }))
+    expect(retry).toHaveBeenCalledExactlyOnceWith('m-1')
+    act(() => receive([{ id: 'm-1', videoPath: path, status: 'listo', playerId: 'p-1', statistics: {
+      schemaVersion: 'acecam.match-stats.v1', durationSeconds: 23,
+      player: { shots: { count: 2, sumSpeedKmh: 100, maxSpeedKmh: 60 }, movement: { distanceMeters: 24 } },
+    } }]))
+    expect(screen.getByText('23 s')).toBeTruthy()
+    expect(screen.getByText('Golpes medidos').nextElementSibling.textContent).toBe('2')
+    expect(screen.getByText('24 m')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Analizar enlaces' }).disabled).toBe(true)
   })
 
   it('espera el plan y no consulta postulaciones con Básico', () => {

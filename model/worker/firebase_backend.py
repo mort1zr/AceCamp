@@ -74,7 +74,21 @@ class FirestoreMatchStore:
             snapshot = reference.get(transaction=transaction)
             if not snapshot.exists or snapshot.get("status") != PROCESSING:
                 return False  # el partido cambió mientras se analizaba: no se pisa su estado
+            match = snapshot.to_dict()
+            application_ref = None
+            if fields["status"] == READY and match.get("applicationId"):
+                application_ref = self.db.collection("applications").document(match["applicationId"])
+                application = application_ref.get(transaction=transaction).to_dict()
+                if (
+                    not application or application.get("orgId") != match.get("orgId")
+                    or application.get("playerId") != match.get("playerId")
+                    or match.get("videoPath") not in (application.get("videoPaths") or [])
+                    or application.get("status") not in ("nueva", "en revisión")
+                ):
+                    application_ref = None
             transaction.update(reference, {**fields, "finishedAt": firestore.SERVER_TIMESTAMP})
+            if application_ref is not None:
+                transaction.update(application_ref, {"status": "analizada", "updatedAt": firestore.SERVER_TIMESTAMP})
             return True
 
         return finish(self.db.transaction())

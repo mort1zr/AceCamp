@@ -7,6 +7,7 @@ export const SCHEMA_VERSION = 1
 
 export const COLLECTIONS = Object.freeze({
   users: 'users',
+  platformAdmins: 'platformAdmins',
   orgs: 'orgs',
   players: 'players',
   matches: 'matches',

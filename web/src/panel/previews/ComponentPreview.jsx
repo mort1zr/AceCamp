@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { DataTable, EmptyState, ErrorState, KpiCard, LoadingState, SegmentedControl, StatusBadge } from '../components/ui'
+import { DataTable, EmptyState, ErrorState, LoadingState, SegmentedControl, StatusBadge } from '../components/ui'
+import { TarjetasEstadisticas } from '../components/TarjetaEstadistica.jsx'
 
 // Fixtures belong to this development preview, never to a production metric.
 const rows = [
@@ -34,11 +35,12 @@ export default function ComponentPreview() {
 
         <section aria-labelledby="kpi-heading">
           <h2 id="kpi-heading">Indicadores</h2>
-          <div className="ac-preview__grid">
-            <KpiCard label="Velocidad de saque · ejemplo" value="128.5" unit="km/h" trend="+5.2 % frente al periodo anterior" trendTone="positive" description="Promedio del periodo seleccionado" />
-            <KpiCard label="Dobles faltas · ejemplo" value={0} trend="2 menos que el periodo anterior" trendTone="positive" />
-            <KpiCard label="Peloteos" value={null} description="Sin datos disponibles" />
-          </div>
+          <TarjetasEstadisticas cards={[
+            { id: 'saque', label: 'Velocidad de saque', value: 128.5, unit: 'km/h', comparison: '+5,2 % frente al partido anterior', comparisonTone: 'positive' },
+            { id: 'golpes', label: 'Velocidad de golpe', value: 82.4, unit: 'km/h' },
+            { id: 'desplazamiento', label: 'Desplazamiento', value: null, unit: 'm' },
+            { id: 'peloteos', label: 'Peloteos largos', value: 0 },
+          ]} />
         </section>
 
         <section aria-labelledby="badge-heading">

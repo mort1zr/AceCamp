@@ -125,9 +125,17 @@ def process_match(match_id, match, store, storage, analyze, workdir: Path) -> st
     """Procesa un partido ya reclamado (en 'procesando'). Devuelve el estado final: 'listo' o 'error'."""
     video_path = match.get("videoPath")
     player_position = match.get("playerPosition")
+    application_id = match.get("applicationId")
+    org_id = match.get("orgId", "")
     if not video_path or player_position not in ("arriba", "abajo"):
         store.mark_error(match_id, MESSAGE_BAD_MATCH_DATA)
         log.warning("%s: datos incompletos (videoPath=%r, playerPosition=%r)", match_id, video_path, player_position)
+        return "error"
+    if application_id and video_path not in (
+        f"orgs/{org_id}/applications/{application_id}/video.mp4",
+        f"orgs/{org_id}/applications/{application_id}/video.mov",
+    ):
+        store.mark_error(match_id, MESSAGE_BAD_MATCH_DATA)
         return "error"
 
     Path(workdir).mkdir(parents=True, exist_ok=True)
@@ -140,10 +148,9 @@ def process_match(match_id, match, store, storage, analyze, workdir: Path) -> st
         statistics = to_match_statistics(model_statistics, player_position)
         processed_path = None
         if isinstance(analysis, AnalysisResult):
-            org_id = match.get("orgId", "")
             expected_parent = f"orgs/{org_id}/matches/{match_id}"
             if (not org_id or any(part in ("", ".", "..") or "/" in part for part in (org_id, match_id))
-                    or str(Path(video_path).parent).replace("\\", "/") != expected_parent
+                    or (not application_id and str(Path(video_path).parent).replace("\\", "/") != expected_parent)
                     or analysis.output_video.resolve().parent != match_dir.resolve()
                     or not analysis.output_video.is_file()
                     or not 0 < analysis.output_video.stat().st_size <= 500 * 1024 * 1024):

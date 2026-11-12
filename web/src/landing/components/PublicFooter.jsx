@@ -9,6 +9,7 @@ const links = [
   { to: '/registro', clave: 'registro', desliza: true },
   { to: '/terminos', clave: 'terminos' },
   { to: '/privacidad', clave: 'privacidad' },
+  { to: '/admin', clave: 'administracion' },
 ]
 
 export default function PublicFooter() {

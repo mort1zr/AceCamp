@@ -24,12 +24,15 @@ import {
 } from 'firebase/firestore'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createFirestorePlayersService } from '../../src/panel/lib/services/firestorePlayersService.js'
+import { createApplicationAnalysisService } from '../../src/panel/lib/services/applicationAnalysis.js'
 import { createFirestoreMatchesService } from '../../src/panel/lib/services/firestoreMatchesService.js'
 import { createFirestoreMatchNotesService } from '../../src/panel/lib/services/firestoreMatchNotesService.js'
 import { createFirestoreDashboardService } from '../../src/panel/lib/services/firestoreDashboardService.js'
 import { buildPlayerComparisonHistory } from '../../src/panel/lib/comparisonHistory.js'
 import { usagePeriod } from '../../src/panel/lib/usage.js'
 import { publicFormExists, submitPublicApplication } from '../../src/panel/lib/publicApplications.js'
+import { readGoogleFormResponses } from '../../src/panel/lib/googleFormsApplications.js'
+import { importGoogleFormApplications } from '../../src/panel/lib/services/googleFormsRecruitment.js'
 
 const ORG = 'org-demo'
 const OTHER_ORG = 'org-club'
@@ -83,6 +86,95 @@ beforeEach(async () => {
 
 const coachDb = () => env.authenticatedContext(COACH, { email: 'coach@acecam.test' }).firestore()
 const anonDb = () => env.unauthenticatedContext().firestore()
+
+it('restringe la auditoría a plataforma y rechaza entradas sueltas y cambios retroactivos', async () => {
+  const uid = 'auditor-plataforma'
+  const platform = env.authenticatedContext(uid).firestore()
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore()
+    await setDoc(doc(db, 'platformAdmins', uid), {})
+    await setDoc(doc(db, 'platformAudit', 'registro'), { actorId: uid })
+  })
+  const entry = doc(platform, 'platformAudit', 'registro')
+  await assertSucceeds(getDoc(entry))
+  await assertFails(getDoc(doc(coachDb(), 'platformAudit', 'registro')))
+  await assertFails(getDocs(collection(anonDb(), 'platformAudit')))
+  await assertFails(updateDoc(entry, { actorId: COACH }))
+  await assertFails(deleteDoc(entry))
+  await assertFails(setDoc(doc(platform, 'platformAudit', 'suelto'), {
+    actorId: uid, createdAt: serverTimestamp(), entity: 'orgs', targetId: ORG,
+    before: null, after: { name: 'Otro nombre', plan: 'pro', archived: false },
+  }))
+})
+
+it('autoriza lecturas de plataforma con un permiso separado y revocable', async () => {
+  const platformUid = 'admin-plataforma'
+  const teamAdminUid = 'admin-equipo'
+  const platform = env.authenticatedContext(platformUid).firestore()
+  const teamAdmin = env.authenticatedContext(teamAdminUid).firestore()
+  const marker = database => doc(database, 'platformAdmins', platformUid)
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore()
+    await setDoc(marker(db), {})
+    await setDoc(doc(db, 'users', teamAdminUid), { orgId: ORG, role: 'admin' })
+    await setDoc(doc(db, 'orgs', OTHER_ORG, 'usage', '2026-11'), { analyses: 3 })
+  })
+
+  expect((await assertSucceeds(getDoc(marker(platform)))).exists()).toBe(true)
+  await assertFails(getDoc(marker(teamAdmin)))
+  await assertFails(getDoc(marker(anonDb())))
+  await assertFails(setDoc(doc(teamAdmin, 'platformAdmins', teamAdminUid), {}))
+  await assertFails(deleteDoc(marker(platform)))
+  await assertFails(getDocs(collection(platform, 'platformAdmins')))
+  await assertFails(getDocs(collection(teamAdmin, 'orgs')))
+
+  expect((await assertSucceeds(getDocs(collection(platform, 'orgs')))).size).toBe(2)
+  expect((await assertSucceeds(getDocs(collection(platform, 'users')))).size).toBe(3)
+  await assertSucceeds(getDoc(doc(platform, 'orgs', OTHER_ORG, 'usage', '2026-11')))
+  await assertFails(updateDoc(doc(platform, 'orgs', OTHER_ORG), { name: 'Otro nombre' }))
+  await assertFails(updateDoc(doc(platform, 'users', OTHER_COACH), { displayName: 'Otro nombre' }))
+  await assertFails(getDoc(doc(platform, 'matches', 'm-ready')))
+  await assertFails(getDoc(doc(platform, 'players', 'p-demo')))
+  await assertFails(getDoc(doc(platform, 'applications', 'a-demo')))
+
+  await env.withSecurityRulesDisabled(context => deleteDoc(marker(context.firestore())))
+  await assertFails(getDocs(collection(platform, 'orgs')))
+  await assertFails(getDoc(doc(platform, 'users', OTHER_COACH)))
+})
+
+it('registra en privado la hoja de Google e importa cada respuesta una sola vez', async () => {
+  const db = coachDb()
+  const other = env.authenticatedContext(OTHER_COACH).firestore()
+  const visitor = anonDb()
+  const source = { formUrl: 'https://forms.gle/RespuestaDePrueba', spreadsheetId: 'sheet-test', sheetId: 12 }
+  const integration = database => doc(database, 'orgs', ORG, 'recruitmentIntegrations', 'googleForms')
+  await assertFails(setDoc(integration(other), source))
+  await assertSucceeds(setDoc(integration(db), source))
+  await assertFails(getDoc(integration(visitor)))
+  await assertFails(getDoc(integration(other)))
+
+  const { rows, invalidRows } = readGoogleFormResponses([
+    ['Marca temporal', 'Nombre completo', 'Fecha de nacimiento', 'Ciudad', 'Correo de contacto', 'Año de graduación', 'Autorización'],
+    [46336.75, 'Postulante Google', '2000-02-15', 'Lima', 'google@example.test', 2027, 'Sí, autorizo'],
+    [46336.76, 'Postulante sin permiso', '2000-01-01', 'Lima', 'otro@example.test', 2027, 'No'],
+  ])
+  expect(invalidRows).toHaveLength(1)
+  const options = { orgId: ORG, uid: COACH, source, rows }
+  const first = await Promise.all([
+    importGoogleFormApplications(db, options),
+    importGoogleFormApplications(db, options),
+  ])
+  expect(first.flatMap(result => result.failed)).toEqual([])
+  expect(first.reduce((sum, result) => sum + result.imported, 0)).toBe(1)
+  const applications = await getDocs(query(collection(db, 'applications'), where('orgId', '==', ORG)))
+  const imported = applications.docs.filter(item => item.data().source === 'google-forms')
+  expect(imported).toHaveLength(1)
+  expect(imported[0].data()).toMatchObject({ fullName: 'Postulante Google', consent: { recordedBy: COACH } })
+  await assertFails(getDoc(doc(other, 'applications', imported[0].id)))
+  await assertSucceeds(updateDoc(imported[0].ref, { status: 'en revisión' }))
+  await expect(importGoogleFormApplications(db, options)).resolves.toEqual({ imported: 0, existing: 1, failed: [] })
+  expect((await getDoc(imported[0].ref)).data().status).toBe('en revisión')
+})
 
 const newPlayer = (overrides = {}) => ({
   orgId: ORG, fullName: 'Valentina Quispe', birthDate: '2010-03-02', academy: 'Club Las Lomas',
@@ -147,7 +239,14 @@ describe('aislamiento por organización', () => {
       const db = context.firestore()
       const ready = (await getDoc(doc(db, 'matches', 'm-ready'))).data()
       await setDoc(doc(db, 'users', admin), { orgId: ORG, role: 'admin' })
-      await setDoc(doc(db, 'matches', 'm-teammate'), { ...ready, createdBy: teammate, matchDate: '2026-11-01' })
+      const statistics = sumSpeedKmh => ({
+        schemaVersion: 'acecam.match-stats.v1',
+        player: { shots: { count: 1, sumSpeedKmh } },
+      })
+      await updateDoc(doc(db, 'matches', 'm-ready'), { statistics: statistics(50) })
+      await setDoc(doc(db, 'matches', 'm-teammate'), {
+        ...ready, createdBy: teammate, matchDate: '2026-11-01', statistics: statistics(90),
+      })
     })
     const player = { id: 'p-demo', orgId: ORG, createdBy: COACH }
     const coachIdentity = { db: coachDb(), orgId: ORG, actorId: COACH, role: 'coach' }
@@ -165,8 +264,11 @@ describe('aislamiento por organización', () => {
     const readHistory = (service, currentPlayer) => read((receive, fail) => service.subscribeAnalyzedMatches(currentPlayer, receive, fail))
 
     const history = await readHistory(coach, player)
-    expect(history).toEqual([{ id: 'm-ready', opponent: 'J. Luna', matchDate: '2026-10-31', tournament: '', result: '' }])
-    expect((await readHistory(administrator, player)).map(match => match.id)).toEqual(['m-teammate', 'm-ready'])
+    expect(history).toMatchObject([{
+      id: 'm-ready', opponent: 'J. Luna', matchDate: '2026-10-31', tournament: '', result: '', averageShotSpeed: 50,
+    }])
+    expect((await readHistory(administrator, player)).map(({ id, averageShotSpeed }) => [id, averageShotSpeed]))
+      .toEqual([['m-teammate', 90], ['m-ready', 50]])
     await expect(readHistory(coach, { ...player, createdBy: teammate })).rejects.toMatchObject({ code: 'permission-denied' })
     await expect(readHistory(administrator, { ...player, orgId: OTHER_ORG })).rejects.toMatchObject({ code: 'permission-denied' })
     expect((await read(createFirestoreMatchesService(coachIdentity).subscribe)).map(match => match.id)).toEqual(['m-ready'])
@@ -516,6 +618,31 @@ describe('uso mensual de análisis (PCIT-41)', () => {
 })
 
 describe('applications', () => {
+  it('encola solo un análisis del video confirmado, consume un cupo y reintenta el mismo partido', async () => {
+    const db = coachDb()
+    const path = `orgs/${ORG}/applications/a-demo/video.mp4`
+    await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'applications', 'a-demo'), {
+      playerId: 'p-demo', videoPaths: [path],
+    }))
+    const service = createApplicationAnalysisService({ db, orgId: ORG, uid: COACH, role: 'coach', applicationId: 'a-demo' })
+    await assertFails(createMatch(db, 'forged', { applicationId: 'a-club', videoPath: path }))
+    await assertFails(createMatch(db, 'unconfirmed', { applicationId: 'a-demo', videoPath: path.replace('.mp4', '.mov') }))
+    await assertSucceeds(service.enqueue(path, 'abajo'))
+    await assertSucceeds(service.enqueue(path, 'abajo'))
+    const usage = (await getDoc(usageDoc(db))).data()
+    expect(usage.analyses).toBe(1)
+    const ref = doc(db, 'matches', usage.lastMatchId)
+    expect((await getDoc(ref)).data()).toMatchObject({
+      status: 'en cola', applicationId: 'a-demo', playerId: 'p-demo', playerPosition: 'abajo', videoPath: path,
+    })
+    await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), 'matches', ref.id), {
+      status: 'error', errorMessage: 'No se detectó la cancha.',
+    }))
+    await assertSucceeds(service.retry(ref.id))
+    expect((await getDoc(ref)).data()).toMatchObject({ status: 'en cola', errorMessage: null })
+    expect((await getDoc(usageDoc(db))).data().analyses).toBe(1)
+  })
+
   it('cambia el estado de una postulación de su organización', async () => {
     await assertSucceeds(updateDoc(doc(coachDb(), 'applications', 'a-demo'), { status: 'en revisión' }))
   })

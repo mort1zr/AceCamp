@@ -62,11 +62,19 @@ describe('datos de ejemplo de Firestore', () => {
       expect(isIsoDate(doc.matchDate)).toBe(true)
       expect(doc.videoPath).toBe(`orgs/${doc.orgId}/matches/${id}/video.mp4`)
       if (doc.status === MATCH_STATUS.ready) {
-        expect(doc.statistics.schemaVersion).toBe(MATCH_STATS_VERSION)
-        const serve = doc.statistics.player.serve
+        expect(doc.processedVideoPath).toBe(`orgs/${doc.orgId}/matches/${id}/processed.mp4`)
+        const { schemaVersion, player, opponent, score, points, rallies } = doc.statistics
+        expect(schemaVersion).toBe(MATCH_STATS_VERSION)
+        const serve = player.serve
         expect(serve.firstServeIn).toBeLessThanOrEqual(serve.firstServeAttempts)
+        expect(serve.fromRight + serve.fromLeft).toBe(serve.count)
+        expect(opponent.serve.aces).toBeGreaterThanOrEqual(0)
+        expect(score.sets.map(set => `${set.playerGames}-${set.opponentGames}`).join(' ')).toBe(doc.result)
+        expect(points.playerWon + points.opponentWon).toBe(points.count)
+        expect(rallies.sumShots).toBeGreaterThan(rallies.count)
       } else {
         expect(doc.statistics).toBeNull()
+        expect(doc).not.toHaveProperty('processedVideoPath')
       }
       if (doc.status === MATCH_STATUS.error) expect(doc.errorMessage).toBeTruthy()
     }

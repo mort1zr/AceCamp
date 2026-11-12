@@ -1,30 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { KpiCard as BaseKpiCard } from '../ui'
+import { DataTable } from '../ui'
 import MatchNotes from './MatchNotes.jsx'
+import MatchStatistics from './MatchStatistics.jsx'
 import ProcessedVideo from './ProcessedVideo.jsx'
-import { useUnidades } from '../../hooks/useUnidades.js'
 import { formatMatchDate } from '../../lib/dashboardEvolution.js'
-import { convertirVelocidad, etiquetaVelocidad } from '../../lib/unidades.js'
 
-const numberFormat = new Intl.NumberFormat('es-PE', { maximumFractionDigits: 1 })
-
-function KpiCard({ value, description, ...props }) {
-  return <BaseKpiCard {...props} value={value} description={value == null ? 'Sin datos' : description} />
-}
-
-function Speed({ label, value, units }) {
-  return (
-    <KpiCard
-      label={label}
-      value={value == null ? null : numberFormat.format(convertirVelocidad(value, units))}
-      unit={etiquetaVelocidad(units)}
-      description={value == null ? 'Sin datos' : undefined}
-    />
-  )
-}
+const setColumns = [
+  { key: 'set', label: 'Set' },
+  { key: 'playerGames', label: 'Jugador', align: 'right' },
+  { key: 'opponentGames', label: 'Rival', align: 'right' },
+]
 
 export default function MatchReport({ match, playerName, notesService, videoService, onBack }) {
-  const units = useUnidades()
   const title = useRef(null)
   useEffect(() => { title.current?.focus() }, [])
 
@@ -42,40 +29,21 @@ export default function MatchReport({ match, playerName, notesService, videoServ
           <div><dt className="text-sm text-muted">Marcador</dt><dd>{match.result || 'Sin datos'}</dd></div>
         </dl>
       </header>
-      <section aria-labelledby="match-report-metrics">
-        <h3 id="match-report-metrics" className="mb-3 font-semibold">Indicadores del jugador</h3>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3">
-          <KpiCard label="Golpes medidos" value={match.measuredShots} description={match.measuredShots == null ? 'Sin datos' : 'Golpes con velocidad medible; puede ser menor que el total de golpes.'} />
-          <Speed label="Velocidad media de golpe" value={match.averageShotSpeed} units={units} />
-          <Speed label="Velocidad máxima de golpe" value={match.maxShotSpeed} units={units} />
-        </div>
-        <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3">
-          <KpiCard label="Distancia recorrida" value={match.distanceMeters == null ? null : numberFormat.format(match.distanceMeters)} unit="m" />
-          <Speed label="Velocidad media de desplazamiento" value={match.avgMovementSpeed} units={units} />
-          <Speed label="Velocidad máxima de desplazamiento" value={match.maxMovementSpeed} units={units} />
-          <KpiCard label="Saques detectados" value={match.serveCount} />
-          <Speed label="Velocidad media de saque" value={match.averageServeSpeed} units={units} />
-          <KpiCard label="Primer saque dentro" value={match.firstServeInRate == null ? null : numberFormat.format(match.firstServeInRate)} unit="%" />
-          <KpiCard label="Dobles faltas" value={match.doubleFaults} />
-        </div>
-        <p className="mt-3 text-sm text-muted">Las medidas son estimaciones del modelo. La velocidad de saque se mide hasta el bote y puede diferir de la de un radar.</p>
-      </section>
-      <section aria-labelledby="match-rallies">
-        <h3 id="match-rallies" className="mb-3 font-semibold">Peloteos del partido</h3>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3">
-          <KpiCard label="Peloteos detectados" value={match.ralliesCount} />
-          <KpiCard label="Golpes por peloteo" value={match.averageRallyShots == null ? null : numberFormat.format(match.averageRallyShots)} />
-          <KpiCard label="Peloteo más largo" value={match.longestRally} unit="golpes" />
-        </div>
-      </section>
+      <MatchStatistics match={match} />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-3">
         <section className="rounded-card border border-line bg-surface p-5">
           <h3 className="font-semibold">Video procesado</h3>
           <ProcessedVideo matchId={match.id} path={match.processedVideoPath} service={videoService} />
         </section>
         <section className="rounded-card border border-line bg-surface p-5">
-          <h3 className="font-semibold">Desglose por set</h3>
-          <p className="mt-2 text-sm text-muted">Sin datos del desglose por set.</p>
+          {match.setScores?.length > 0 ? (
+            <DataTable caption="Desglose por set" columns={setColumns} rows={match.setScores} rowKey="set" />
+          ) : (
+            <>
+              <h3 className="font-semibold">Desglose por set</h3>
+              <p className="mt-2 text-sm text-muted">Sin datos del desglose por set.</p>
+            </>
+          )}
         </section>
       </div>
       <MatchNotes matchId={match.id} service={notesService} />

@@ -30,6 +30,15 @@ def annotated(path):
     return AnalysisResult(model_stats(), output)
 
 
+def test_application_video_uses_its_private_input_and_the_match_output_path(tmp_path):
+    source = "orgs/org1/applications/a1/video.mp4"
+    store = OutputStore({"m1": queued_match(applicationId="a1", videoPath=source)})
+    storage = OutputStorage({source: b"source"})
+    assert run_once(store, storage, annotated, tmp_path, version="test") == ("m1", "listo")
+    assert store.matches["m1"]["processedVideoPath"] == "orgs/org1/matches/m1/processed.mp4"
+    assert storage.files[source] == b"source"
+
+
 @pytest.mark.parametrize("fail", [False, True])
 def test_upload_finishes_before_ready_and_failure_does_not_publish_statistics(tmp_path, fail):
     store = OutputStore({"m1": queued_match()})

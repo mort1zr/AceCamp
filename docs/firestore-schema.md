@@ -182,6 +182,7 @@ que el video terminó de subir** (PCIT-27). El worker (PCIT-35) lo procesa.
 | `result` | string | web | Opcional, ej. `'6-4 3-6 7-5'` |
 | `surface` | `'arcilla'` \| `'dura'` \| `'césped'` \| `'otra'` \| null | web | Opcional |
 | `videoPath` | string | web | Ruta en Storage que devuelve `uploadVideo()` |
+| `applicationId` | string opcional | web | Postulación de origen. En este caso `videoPath` apunta al archivo privado confirmado de la postulación. |
 | `inputFingerprint` | string | web | SHA-256 del formulario, para reintentos (PCIT-27) |
 | `createdBy` | string | web | `uid` |
 | `createdAt` | Timestamp | web | |
@@ -239,7 +240,7 @@ statistics: {
   opponent: { /* mismas claves */ },
   rallies: { count: 1, sumShots: 18, longestShots: 18, short: 0, medium: 0, long: 1 },
   // Opcionales (PCIT-85/86): marcador que propone el modelo y puntos ganados.
-  score:  { sets: [[6, 4]], games: [2, 1], points: ['30', '15'], winner: null },
+  score:  { sets: [{ playerGames: 6, opponentGames: 4 }], games: [2, 1], points: ['30', '15'], winner: null },
   points: { count: 12, playerWon: 7, opponentWon: 5, lowConfidence: 2, toReview: 2 },
 }
 ```
@@ -256,7 +257,8 @@ statistics: {
 | `serve.aces` | Puntos ganados con el saque sin que el rival la devolviera (incluye saques que toca sin devolver: la cámara no los distingue de un ace) | En partidos analizados antes de PCIT-84 |
 | `rallies.count`, `rallies.sumShots`, `rallies.longestShots` | Puntos (peloteos) del partido, golpes en total y el más largo | Nunca |
 | `rallies.short`, `rallies.medium`, `rallies.long` | Peloteos de 0-4, 5-8 y 9 o más golpes | Nunca |
-| `score.sets`, `score.games`, `score.points` | Marcador final que propone el modelo, `[player, opponent]`: sets terminados, juegos del set en curso y puntos del juego (`'0'`, `'15'`, `'30'`, `'40'`, `'AD'` o los del tie-break) | Si el modelo no se actualizó (partidos anteriores) |
+| `score.sets` | Sets terminados en orden, cada uno con `playerGames` y `opponentGames`. | Si el modelo no actualizó el marcador. La lista queda vacía si no hay sets completos. |
+| `score.games`, `score.points` | Juegos del set en curso y puntos del juego, en orden `[player, opponent]`. | Si el modelo no actualizó el marcador. |
 | `score.winner` | `'player'`, `'opponent'` o `null` si el partido no terminó en el vídeo | Igual que `score` |
 | `points.count`, `points.playerWon`, `points.opponentWon` | Puntos del vídeo y cuántos ganó cada uno (un punto sin ganador no suma a ninguno) | Igual que `score` |
 | `points.lowConfidence`, `points.toReview` | Puntos con confianza baja y cuántos conviene revisar a mano | Igual que `score` |
@@ -293,6 +295,10 @@ el conflicto de escritura y los rechazos de acceso en Firebase Emulator Suite.
 En el emulador, abre **Partidos → Ver reporte → Tu nota** con una cuenta de
 prueba y un partido Listo accesible.
 
+## `platformAdmins/{uid}`
+
+La existencia del documento autoriza a la cuenta de Firebase Auth a entrar en `/admin` y consultar organizaciones, usuarios y uso mensual. El cliente solo puede leer su propia marca. Un operador del proyecto administra las marcas mediante la consola o el Admin SDK.
+
 ## `applications/{appId}`
 
 Postulación que llega del formulario público (PCIT-54). Datos del jugador antes
@@ -316,6 +322,7 @@ de ser jugador del equipo.
 | `guardian` | `{ name, phone, email }` \| null | sí si es menor de 18 | |
 | `videoLinks` | string[] | no | Links de YouTube, máximo 5 |
 | `videoPaths` | string[] | no | Rutas privadas confirmadas por el servidor. La demo guarda un archivo opcional en `orgs/{orgId}/applications/{appId}/video.mp4` o `.mov`. |
+| `source` | string | no | `google-forms` en postulaciones importadas de una hoja privada. Su consentimiento registra el UID de quien hizo la importación. |
 | `videoUpload` | object | no | Reserva temporal de ruta y huella del archivo para reintentar sin sobrescribirlo. La escribe el servidor y la retira al confirmar `videoPaths`. |
 | `message` | string | no | Hasta 1000 caracteres |
 | `consent` | object | sí | Mismo formato que en `players`. El formulario usa `applications-v1` para datos y `applications-video-v1` al autorizar también un video. `method` es `'self'` o `'guardian'` y `recordedBy` es `'public-form'`. |

@@ -240,7 +240,10 @@ def to_match_statistics(model_statistics, player_position):
     if score:  # marcador del modelo (TA-29/TA-30), visto desde el jugador registrado
         winner = score.get("winner")
         statistics["score"] = {
-            "sets": [[s[order[0]], s[order[1]]] for s in score["sets"]],
+            "sets": [
+                {"playerGames": completed_set[order[0]], "opponentGames": completed_set[order[1]]}
+                for completed_set in score["sets"]
+            ],
             "games": [score["games"][order[0]], score["games"][order[1]]],
             "points": [score["points"][order[0]], score["points"][order[1]]],
             "winner": None if winner is None else ("player" if winner == player else "opponent"),
