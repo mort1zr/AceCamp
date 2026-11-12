@@ -7,6 +7,7 @@ import { formatMatchDate } from '../lib/dashboardEvolution.js'
 import { createFirestoreMatchesService } from '../lib/services/firestoreMatchesService.js'
 import { createFirestoreMatchNotesService } from '../lib/services/firestoreMatchNotesService.js'
 import { createFirestorePlayersService } from '../lib/services/firestorePlayersService.js'
+import { createAzureProcessedVideoService } from '../lib/azureVideos.js'
 import { createProcessedVideoService } from '../lib/services/processedVideoService.js'
 import './jugadores.css'
 
@@ -128,7 +129,7 @@ function MatchesList({ matchesService, playersService, notesService, videoServic
   )
 }
 
-export default function Partidos({ db, storage, session }) {
+export default function Partidos({ db, storage, session, videoApi }) {
   const { uid, orgId, role } = session ?? {}
   const services = useMemo(() => {
     if (!db || typeof uid !== 'string' || !uid.trim() || typeof orgId !== 'string' || !orgId.trim()
@@ -138,9 +139,11 @@ export default function Partidos({ db, storage, session }) {
       playersService: createFirestorePlayersService({ ...identity, onlyOwned: role === 'coach', includeDeleted: true }),
       matchesService: createFirestoreMatchesService(identity),
       notesService: createFirestoreMatchNotesService(identity),
-      videoService: storage ? createProcessedVideoService({ storage, orgId }) : null,
+      videoService: videoApi
+        ? createAzureProcessedVideoService({ client: videoApi, orgId })
+        : storage ? createProcessedVideoService({ storage, orgId }) : null,
     }
-  }, [db, storage, uid, orgId, role])
+  }, [db, storage, videoApi, uid, orgId, role])
 
   return (
     <section className="players-page" aria-labelledby="matches-title">
