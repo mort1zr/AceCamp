@@ -176,6 +176,13 @@ integración de Google y una invitación pendiente; club B con sus dos miembros.
 
 <!-- matriz:fin -->
 
+**Pruebas (PCIT-211).** `npm run test:rules` comprueba cada celda contra los
+emuladores: `tests/rules/accessMatrix.rules.test.js` (Firestore) y
+`tests/storage/accessMatrix.storage.test.js` (Storage). Cada escritura parte de los
+mismos datos. Si una regla cambia sin actualizar la matriz, falla la celda con su
+rol y su operación, por ejemplo
+`players.get · leer players/p-a > otroEntrenador → denegado`.
+
 Para cambiar un permiso: edita la regla, actualiza su fila en `accessMatrix.js`,
 ejecuta `node scripts/accessMatrixTable.mjs --write` desde `web/` y
 `npm run test:rules`.
