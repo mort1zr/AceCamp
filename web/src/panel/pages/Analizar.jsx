@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { DataTable, StatusBadge } from '../components/ui'
 import { usePlanVista } from '../context/PlanVistaContext.js'
@@ -22,6 +22,49 @@ const fechaCorta = (value) =>
 
 const sinConexion = { mode: 'offline', supportsLinks: false, supportsYouTube: false }
 
+const processingLabels = new Map([
+  ['preparing', 'Preparando el video…'],
+  ['analyzing', 'El modelo está analizando el video…'],
+  ['detecting', 'Detectando jugadores, pelota y cancha…'],
+  ['calculating', 'Calculando métricas…'],
+  ['rendering', 'Generando el video anotado…'],
+  ['encoding', 'Preparando el video para reproducirlo…'],
+  ['saving', 'Guardando el resultado…'],
+])
+
+function ProcessingProgress({ match, playerName }) {
+  const startedAt = match.startedAt?.toMillis?.()
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!Number.isFinite(startedAt)) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [startedAt])
+
+  const elapsed = Number.isFinite(startedAt)
+    ? Math.max(0, Math.floor((now - startedAt) / 1000))
+    : null
+  const { done, total } = match.analysisFrames ?? {}
+  const hasFrames = Number.isInteger(done) && Number.isInteger(total) && total > 0 && done >= 0 && done <= total
+  const label = `Análisis de ${playerName} contra ${match.opponent} (${match.matchDate})`
+
+  return (
+    <div className="analysis-processing">
+      {hasFrames
+        ? <progress className="analysis-processing-frames" aria-label={label} max={total} value={done} />
+        : <div className="analysis-processing-bar" role="progressbar" aria-label={label} />}
+      <span aria-live="polite">
+        {processingLabels.get(match.analysisStage) ?? processingLabels.get('analyzing')}
+      </span>
+      {hasFrames && <span>{done} de {total} fotogramas en esta etapa</span>}
+      {elapsed !== null && (
+        <span>Tiempo transcurrido: {elapsed >= 60 ? `${Math.floor(elapsed / 60)} min ` : ''}{elapsed % 60} s</span>
+      )}
+    </div>
+  )
+}
+
 function Cabecera() {
   return (
     <header className="analysis-head">
@@ -30,7 +73,7 @@ function Cabecera() {
         Analizar video<PelotaTitulo />
       </h1>
       <p>
-        Sube un partido o pega un enlace. El análisis tarda entre 30 y 40 minutos según la duración.
+        Consulta la etapa y el tiempo transcurrido en la cola mientras se analiza tu video.
       </p>
     </header>
   )
@@ -166,14 +209,7 @@ function AnalysisWorkspace({ service, playersService }) {
             <p className="analysis-muted">{match.errorMessage}</p>
           )}
           {status === MATCH_STATUS.processing && (
-            <div className="analysis-processing">
-              <div
-                className="analysis-processing-bar"
-                role="progressbar"
-                aria-label={`Análisis de ${playerName(match.playerId)} contra ${match.opponent} (${match.matchDate})`}
-              />
-              <span>El modelo está analizando el video. El tiempo depende de su duración.</span>
-            </div>
+            <ProcessingProgress match={match} playerName={playerName(match.playerId)} />
           )}
         </>
       ),

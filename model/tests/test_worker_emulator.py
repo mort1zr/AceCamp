@@ -13,7 +13,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from worker.processor import MESSAGE_VIDEO_NOT_FOUND, run_once
+from utils.progress import report_progress, report_stage
+from worker.processor import MESSAGE_VIDEO_NOT_FOUND, process_match, run_once
 
 pytestmark = pytest.mark.skipif(
     not (os.environ.get("FIRESTORE_EMULATOR_HOST") and os.environ.get("STORAGE_EMULATOR_HOST")),
@@ -114,6 +115,36 @@ def test_missing_video_ends_in_error(backend, tmp_path):
     doc = store.db.collection("matches").document(match_id).get().to_dict()
     assert doc["errorMessage"] == MESSAGE_VIDEO_NOT_FOUND
     assert doc["statistics"] is None
+
+
+def test_worker_publishes_and_clears_analysis_progress(backend, tmp_path):
+    store, videos, bucket, org = backend
+    match_id = f"{org}-progreso"
+    path = f"orgs/{org}/matches/{match_id}/video.mp4"
+    add_match(store, org, match_id, path)
+    reference = store.db.collection("matches").document(match_id)
+    blob = bucket.blob(path)
+    blob.upload_from_string(b"test video")
+
+    def analyze(local_video):
+        assert reference.get().get("analysisStage") == "analyzing"
+        report_progress("Detección", 10, 100, stage="detecting")
+        assert reference.get().get("analysisFrames") == {"done": 10, "total": 100}
+        report_stage("calculating")
+        match = reference.get().to_dict()
+        assert match["analysisStage"] == "calculating"
+        assert "analysisFrames" not in match
+        return model_stats(local_video)
+
+    try:
+        match = store._claim(reference, "test-progress")
+        assert reference.get().get("analysisStage") == "preparing"
+        assert process_match(match_id, match, store, videos, analyze, tmp_path) == "listo"
+        finished = reference.get().to_dict()
+        assert finished["status"] == "listo"
+        assert "analysisStage" not in finished and "analysisFrames" not in finished
+    finally:
+        blob.delete()
 
 
 def test_a_match_changed_while_processing_is_not_overwritten(backend):

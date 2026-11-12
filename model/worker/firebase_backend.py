@@ -1,4 +1,4 @@
-"""Conexión del worker con Firestore y Cloud Storage (PCIT-35).
+"""Conexión del worker con Firestore y el almacenamiento de videos (PCIT-35, PCIT-226).
 
 Credenciales: nunca en el repositorio. Se usa la cuenta de servicio de
 Firebase indicada por la variable de entorno GOOGLE_APPLICATION_CREDENTIALS
@@ -11,9 +11,10 @@ resto del modelo (y sus tests) no las necesite.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
-from .processor import VideoNotFoundError
+from .processor import VideoNotFoundError, VideoTooLargeError
 
 MATCHES = "matches"
 QUEUED, PROCESSING, READY, ERROR = "en cola", "procesando", "listo", "error"
@@ -55,6 +56,8 @@ class FirestoreMatchStore:
             transaction.update(reference, {
                 "status": PROCESSING,
                 "startedAt": firestore.SERVER_TIMESTAMP,
+                "analysisStage": "preparing",
+                "analysisFrames": firestore.DELETE_FIELD,
                 "finishedAt": None,
                 "errorMessage": None,
                 "statistics": None,
@@ -64,6 +67,18 @@ class FirestoreMatchStore:
             return snapshot.to_dict()
 
         return claim(self.db.transaction())
+
+    def mark_stage(self, match_id, stage, frames=None):
+        firestore = self._firestore
+        reference = self.db.collection(MATCHES).document(match_id)
+
+        @firestore.transactional
+        def update_stage(transaction):
+            snapshot = reference.get(transaction=transaction)
+            if snapshot.exists and snapshot.get("status") == PROCESSING:
+                transaction.update(reference, {"analysisStage": stage, "analysisFrames": frames or firestore.DELETE_FIELD})
+
+        update_stage(self.db.transaction())
 
     def _finish(self, match_id, fields):
         firestore = self._firestore
@@ -86,7 +101,9 @@ class FirestoreMatchStore:
                     or application.get("status") not in ("nueva", "en revisión")
                 ):
                     application_ref = None
-            transaction.update(reference, {**fields, "finishedAt": firestore.SERVER_TIMESTAMP})
+            transaction.update(reference, {**fields, "finishedAt": firestore.SERVER_TIMESTAMP,
+                                           "analysisStage": firestore.DELETE_FIELD,
+                                           "analysisFrames": firestore.DELETE_FIELD})
             if application_ref is not None:
                 transaction.update(application_ref, {"status": "analizada", "updatedAt": firestore.SERVER_TIMESTAMP})
             return True
@@ -120,3 +137,48 @@ class CloudStorageVideos:
         blob = self.bucket.blob(destination)
         blob.cache_control = "private, max-age=0"
         blob.upload_from_filename(str(source), content_type="video/mp4")
+
+
+class AzureBlobVideos:
+    """Videos en Azure Blob Storage (PCIT-226, historia PCIT-222).
+
+    Mismos métodos que CloudStorageVideos. Se autentica con la identidad administrada
+    de Azure (DefaultAzureCredential; AZURE_CLIENT_ID elige la identidad): ninguna clave.
+    Las rutas son las mismas que en Firebase Storage: orgs/{org}/matches/{id}/video.mp4.
+    """
+
+    MAX_BYTES = 500 * 1024 * 1024  # el mismo límite que la web (MAX_VIDEO_BYTES)
+
+    def __init__(self, account: str, container: str = "videos", container_client=None, max_bytes: int | None = None):
+        if container_client is None:
+            from azure.identity import DefaultAzureCredential
+            from azure.storage.blob import BlobServiceClient
+
+            credential = DefaultAzureCredential(managed_identity_client_id=os.environ.get("AZURE_CLIENT_ID"))
+            service = BlobServiceClient(f"https://{account}.blob.core.windows.net", credential=credential)
+            container_client = service.get_container_client(container)
+        self.container = container_client
+        self.max_bytes = max_bytes or self.MAX_BYTES
+
+    def download(self, video_path, destination):
+        from azure.core.exceptions import ResourceNotFoundError
+
+        blob = self.container.get_blob_client(video_path)
+        try:
+            size = blob.get_blob_properties().size
+        except ResourceNotFoundError as exc:
+            raise VideoNotFoundError(video_path) from exc
+        # Un enlace SAS no limita el tamaño (PCIT-224): se comprueba antes de descargar.
+        if not 0 < size <= self.max_bytes:
+            raise VideoTooLargeError(size, self.max_bytes)
+        with open(destination, "wb") as file:
+            blob.download_blob().readinto(file)
+
+    def upload_processed(self, source, destination):
+        from azure.storage.blob import ContentSettings
+
+        with open(source, "rb") as file:
+            self.container.get_blob_client(destination).upload_blob(
+                file, overwrite=True,
+                content_settings=ContentSettings(content_type="video/mp4", cache_control="private, max-age=0"),
+            )

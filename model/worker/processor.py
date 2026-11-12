@@ -24,6 +24,7 @@ store y storage son interfaces: en producción, Firestore y Cloud Storage
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
@@ -33,6 +34,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from stats import to_match_statistics
+from utils.progress import progress_listener
 
 from .video import ProcessedVideoError
 
@@ -46,6 +48,7 @@ MESSAGE_NOT_RECOGNIZED = (
 MESSAGE_BAD_MATCH_DATA = "Faltan datos del partido (posición del jugador o ruta del video). Vuelve a registrarlo."
 MESSAGE_INTERNAL = "Ocurrió un error al analizar el video. Inténtalo de nuevo más tarde."
 MESSAGE_VIDEO_OUTPUT = "No pudimos guardar el video procesado. Vuelve a intentarlo."
+MESSAGE_VIDEO_TOO_LARGE = "El video supera el máximo de 500 MB. Recórtalo o comprímelo y vuelve a subirlo."
 
 
 @dataclass
@@ -56,6 +59,13 @@ class AnalysisResult:
 
 class VideoNotFoundError(Exception):
     pass
+
+
+class VideoTooLargeError(Exception):
+    """El archivo subido está vacío o supera el tamaño máximo (PCIT-226)."""
+
+    def __init__(self, size: int, max_bytes: int):
+        super().__init__(f"el video pesa {size} bytes y el máximo es {max_bytes}")
 
 
 class VideoTooLongError(Exception):
@@ -110,7 +120,13 @@ def message_too_long(max_seconds: float) -> str:
 
 
 def worker_version() -> str:
-    """Versión del modelo que procesa el partido (commit de git si está disponible)."""
+    """Versión del modelo que procesa el partido (commit de git si está disponible).
+
+    En el contenedor no hay git: la imagen guarda su commit en ACECAM_VERSION (PCIT-226).
+    """
+    version = os.environ.get("ACECAM_VERSION", "").strip()
+    if version:
+        return f"acecam-model {version[:7]}"
     try:
         commit = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"], cwd=Path(__file__).resolve().parent,
@@ -119,6 +135,15 @@ def worker_version() -> str:
         return f"acecam-model {commit}"
     except (OSError, subprocess.SubprocessError):
         return "acecam-model dev"
+
+
+def _report_stage(store, match_id, stage, frames=None):
+    mark_stage = getattr(store, "mark_stage", None)
+    if mark_stage is not None:
+        try:
+            mark_stage(match_id, stage, frames)
+        except Exception:  # el indicador no debe interrumpir el análisis
+            log.warning("%s: no se pudo registrar la etapa %s", match_id, stage, exc_info=True)
 
 
 def process_match(match_id, match, store, storage, analyze, workdir: Path) -> str:
@@ -143,7 +168,24 @@ def process_match(match_id, match, store, storage, analyze, workdir: Path) -> st
     try:
         local_video = match_dir / f"video{Path(video_path).suffix or '.mp4'}"
         storage.download(video_path, local_video)
-        analysis = analyze(local_video)
+        _report_stage(store, match_id, "analyzing")
+        last_update = float("-inf")
+        last_stage = None
+
+        def report_frames(stage, done, total):
+            nonlocal last_update, last_stage
+            now = time.monotonic()
+            if stage != last_stage or now - last_update >= 5 or done == total:
+                last_update, last_stage = now, stage
+                frames = {"done": min(done, total), "total": total} if total else None
+                _report_stage(store, match_id, stage, frames)
+
+        token = progress_listener.set(report_frames)
+        try:
+            analysis = analyze(local_video)
+        finally:
+            progress_listener.reset(token)
+        _report_stage(store, match_id, "saving")
         model_statistics = analysis.statistics if isinstance(analysis, AnalysisResult) else analysis
         statistics = to_match_statistics(model_statistics, player_position)
         processed_path = None
@@ -160,6 +202,10 @@ def process_match(match_id, match, store, storage, analyze, workdir: Path) -> st
                 storage.upload_processed(analysis.output_video, processed_path)
             except Exception as exc:
                 raise ProcessedVideoError("No se pudo subir el resultado") from exc
+    except VideoTooLargeError as exc:
+        store.mark_error(match_id, MESSAGE_VIDEO_TOO_LARGE)
+        log.warning("%s: %s", match_id, exc)
+        return "error"
     except VideoNotFoundError:
         store.mark_error(match_id, MESSAGE_VIDEO_NOT_FOUND)
         log.warning("%s: no existe el video %s", match_id, video_path)

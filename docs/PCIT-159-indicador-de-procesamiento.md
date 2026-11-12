@@ -1,7 +1,15 @@
 # PCIT-159 · Indicador de procesamiento en Analizar video
 
 La cola muestra una barra indeterminada en cada partido que Firestore reporta como
-`procesando`. El texto de la fila explica que el modelo está analizando el video.
+`procesando`. El worker escribe `analysisStage` al preparar el video, iniciar el
+análisis y guardar el resultado. Los partidos sin ese campo muestran el mensaje
+general de análisis. La fila calcula el tiempo transcurrido desde `startedAt`,
+registrado por Firestore al reclamar el partido.
+
+Durante la detección y la generación del video anotado, el worker publica
+`analysisFrames` con los fotogramas recorridos y el total de esa etapa, como
+máximo cada cinco segundos y al finalizar el conteo. El resto de las etapas
+mantiene la barra indeterminada. El tiempo mostrado es el transcurrido.
 La barra de transferencia del formulario muestra el avance de la carga y es
 independiente del estado del análisis.
 
