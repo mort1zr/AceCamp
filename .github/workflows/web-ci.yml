@@ -94,5 +94,16 @@ jobs:
       - name: Instalar dependencias
         run: npm ci --no-audit --no-fund
 
+      # Incluye la puerta de cobertura (PCIT-212): cada `allow` de firestore.rules
+      # tiene que evaluarse en la matriz de acceso, o la PR falla.
       - name: Pruebas de reglas (emuladores)
         run: npm run test:rules
+
+      - name: Informe de cobertura de las reglas
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cobertura-reglas-firestore
+          path: web/rules-coverage/
+          if-no-files-found: ignore
+          retention-days: 14

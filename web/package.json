@@ -14,7 +14,7 @@
     "test": "vitest run",
     "emulators": "firebase emulators:start --project demo-acecam",
     "seed": "node scripts/seed.mjs",
-    "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-acecam \"vitest run --config vitest.rules.config.js\""
+    "test:rules": "firebase emulators:exec --only auth,firestore,storage --project demo-acecam \"vitest run --config vitest.rules.config.js tests/rules/accessMatrix.rules.test.js && node scripts/checkRulesCoverage.mjs --out rules-coverage && vitest run --config vitest.rules.config.js --exclude tests/rules/accessMatrix.rules.test.js\""
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.4",

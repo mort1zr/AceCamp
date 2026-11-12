@@ -6,7 +6,8 @@ Ley N.° 29733 de Protección de Datos Personales del Perú y su reglamento.
 | Parte | Contenido | Tarea |
 | --- | --- | --- |
 | 1 | [Inventario de datos personales](#1-inventario-de-datos-personales) | PCIT-209 |
-| 2 | [Matriz de acceso por rol y organización](#2-matriz-de-acceso-por-rol-y-organización) | PCIT-210 |
+| 2 | [Matriz de acceso por rol y organización](#2-matriz-de-acceso-por-rol-y-organización) | PCIT-210, PCIT-211 |
+| 3 | [Cobertura de las reglas](#3-cobertura-de-las-reglas) | PCIT-212 |
 
 Fuentes revisadas: `firebase/firestore.rules`, `firebase/storage.rules`,
 [`docs/firestore-schema.md`](firestore-schema.md), el servidor de videos
@@ -186,3 +187,36 @@ rol y su operación, por ejemplo
 Para cambiar un permiso: edita la regla, actualiza su fila en `accessMatrix.js`,
 ejecuta `node scripts/accessMatrixTable.mjs --write` desde `web/` y
 `npm run test:rules`.
+
+## 3. Cobertura de las reglas
+
+Ninguna regla de Firestore entra sin pruebas. `npm run test:rules` hace, en orden:
+
+1. Ejecuta la matriz de acceso (`tests/rules/accessMatrix.rules.test.js`).
+2. Descarga del emulador el informe de cobertura y ejecuta
+   [`scripts/checkRulesCoverage.mjs`](../web/scripts/checkRulesCoverage.mjs), que
+   comprueba que **cada `allow`** de `firestore.rules` se evaluó al menos una vez.
+3. Ejecuta el resto de pruebas de reglas.
+
+| Resultado del control | Qué significa | Qué hacer |
+| --- | --- | --- |
+| Probada | La matriz evalúa esa regla | Nada |
+| Cerrada | `allow …: if false`, deniega siempre | Nada |
+| **Sin pruebas** ❌ | Ninguna fila de la matriz llega a esa regla | Añade la fila en `accessMatrix.js` y su operación en `accessMatrix.rules.test.js` |
+| **Sin condición** ❌ | `allow …;` o `if true`: cualquiera pasa | Escribe la condición |
+
+En la CI, el resumen aparece en la página del run y el informe completo
+(`cobertura.html`, por expresión) queda como artefacto `cobertura-reglas-firestore`
+durante 14 días.
+
+**Por qué después de la matriz.** El informe del emulador incluye todas las
+expresiones, pero solo las evaluadas traen resultados, y se vacía cada vez que un
+archivo de pruebas vuelve a cargar las reglas. Medirlo justo después de la matriz
+da un criterio claro: toda regla tiene que tener su fila en la matriz.
+
+**Comprobado:** con una regla nueva sin fila en la matriz, el control falla con
+`::error file=firebase/firestore.rules,line=…::allow get no se evalúa en ninguna prueba de reglas`
+y el comando termina con código 1.
+
+Storage no tiene informe de cobertura en el emulador. Sus 5 rutas están cubiertas
+por las filas `storage.*` de la matriz.
