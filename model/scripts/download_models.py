@@ -60,8 +60,8 @@ SAMPLE_VIDEO = {
 # sha256 esperado de cada archivo. None = todavía sin registrar: el script avisa y
 # muestra el hash calculado para copiarlo aquí (o falla con --strict).
 EXPECTED_SHA256: dict[str, str | None] = {
-    "models/yolo5_last.pt": None,
-    "models/keypoints_model.pth": None,
+    "models/yolo5_last.pt": "78ee855b3cf621c28c481f3cf2ed9ef3fad96437cf6f58aeac70ed25b8be94db",
+    "models/keypoints_model.pth": "16ebb7e46dc88247440c86b388e4f07f0d4abb76ce0a01a22925d3163f7fb7f3",
     "models/yolov8x.pt": "3df4ada6b4dad6d657868f2fdf7faecfb34dcfccf3a25c4b82079064718524c8",
     "models/yolov8m.pt": "5d4a90cdc7a21786cc59cd19778e9eafff836df9e2da32524737c7ee6efe4fe5",
     "models/tracknet.pt": None,
