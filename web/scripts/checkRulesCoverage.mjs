@@ -118,9 +118,17 @@ export function coverageSummary({ statements, untested, open }) {
   return lines.join('\n')
 }
 
+// Acepta solo el emulador en esta máquina (localhost, 127.x o ::1) y un puerto.
+export function isLocalEmulator(host) {
+  return /^(localhost|127(?:\.\d{1,3}){3}|\[::1\]):\d{1,5}$/.test(host)
+}
+
 async function main() {
   const host = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080'
   const project = process.env.ACECAM_RULES_PROJECT || 'demo-acecam'
+  // Solo el emulador local: el informe nunca se pide a otro servidor.
+  if (!isLocalEmulator(host)) throw new Error(`FIRESTORE_EMULATOR_HOST debe ser el emulador local, no ${host}.`)
+  if (!/^demo-[a-z0-9-]+$/.test(project)) throw new Error(`El proyecto de las pruebas debe empezar por demo-, no ${project}.`)
   const base = `http://${host}/emulator/v1/projects/${project}:ruleCoverage`
   const outIndex = process.argv.indexOf('--out')
   const out = outIndex > 0 ? process.argv[outIndex + 1] : null
@@ -134,8 +142,6 @@ async function main() {
   if (out) {
     mkdirSync(out, { recursive: true })
     writeFileSync(join(out, 'resumen.md'), `${summary}\n`)
-    const html = await fetch(`${base}.html`)
-    if (html.ok) writeFileSync(join(out, 'cobertura.html'), Buffer.from(await html.arrayBuffer()))
   }
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`)
 

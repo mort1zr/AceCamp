@@ -206,9 +206,10 @@ Ninguna regla de Firestore entra sin pruebas. `npm run test:rules` hace, en orde
 | **Sin pruebas** ❌ | Ninguna fila de la matriz llega a esa regla | Añade la fila en `accessMatrix.js` y su operación en `accessMatrix.rules.test.js` |
 | **Sin condición** ❌ | `allow …;` o `if true`: cualquiera pasa | Escribe la condición |
 
-En la CI, el resumen aparece en la página del run y el informe completo
-(`cobertura.html`, por expresión) queda como artefacto `cobertura-reglas-firestore`
-durante 14 días.
+En la CI, el resumen aparece en la página del run y queda como artefacto
+`cobertura-reglas-firestore` (`resumen.md`) durante 14 días. El script solo consulta
+el emulador local y un proyecto `demo-*`, y no guarda el informe crudo del emulador
+(alerta de CodeQL "Network data written to file").
 
 **Por qué después de la matriz.** El informe del emulador incluye todas las
 expresiones, pero solo las evaluadas traen resultados, y se vacía cada vez que un

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { analyzeCoverage, coverageSummary, findAllowStatements, stripComments } from './checkRulesCoverage.mjs'
+import { analyzeCoverage, coverageSummary, findAllowStatements, isLocalEmulator, stripComments } from './checkRulesCoverage.mjs'
 
 const RULES = [
   "service cloud.firestore {",                                  // 1
@@ -70,5 +70,12 @@ describe('cobertura de reglas (PCIT-212)', () => {
     const statements = findAllowStatements(rules)
     expect(statements.length).toBeGreaterThan(40)
     expect(statements.every(s => s.condition !== null)).toBe(true)
+  })
+
+  it('solo pide el informe al emulador local', () => {
+    for (const host of ['127.0.0.1:8080', 'localhost:8080', '[::1]:8080']) expect(isLocalEmulator(host), host).toBe(true)
+    for (const host of ['example.com:8080', '10.0.0.5:8080', '127.0.0.1', 'localhost:8080/x', 'evil.localhost:80']) {
+      expect(isLocalEmulator(host), host).toBe(false)
+    }
   })
 })
