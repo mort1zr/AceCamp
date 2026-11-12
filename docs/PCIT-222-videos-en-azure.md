@@ -66,4 +66,37 @@ o el worker deben comprobar el tamaño (máximo 500 MB) y el tipo después de la
 
 ### 2. El modelo en CPU
 
-<!-- resultados de la medición -->
+Medido con el video de ejemplo del modelo (`input_videos/input_video.mp4`: 7 s,
+1080p, 30 fps, 214 fotogramas) y la configuración actual (`yolov8m` para los jugadores
+y `yolo5_last` para la pelota), con PyTorch para CPU y el video anotado incluido. Los dos
+análisis terminaron con estadísticas, informe y mapas de calor.
+
+| CPU | Tiempo del video de 7 s | Por minuto de video | Un video de 60 s (límite actual del worker) |
+| --- | --- | --- | --- |
+| 4 vCPU | 156 s | 1312 s (~22 min) | ~22 min |
+| 2 vCPU | 216 s | 1819 s (~30 min) | ~30 min |
+
+`docs/videos-largos-y-fuentes.md` registraba ~12 min por minuto en un PC sin GPU. Esta
+máquina es más lenta; en Azure Container Apps el resultado debería quedar entre ambas cifras.
+
+**Costo estimado en Azure Container Apps** (consumo; precios de referencia, por confirmar
+en la calculadora de Azure):
+
+| Configuración | Por video de 60 s | Cuántos videos entran en la cuota gratis mensual (180 000 vCPU·s y 360 000 GiB·s) | Fuera de la cuota |
+| --- | --- | --- | --- |
+| 2 vCPU · 4 GiB | ~3 600 vCPU·s y ~7 300 GiB·s | **~49 videos al mes** | ~US$0,11 por video |
+| 4 vCPU · 8 GiB | ~5 200 vCPU·s y ~10 500 GiB·s | ~34 videos al mes | ~US$0,16 por video |
+
+### Conclusión
+
+* **Viable con el límite actual de 60 s por video.** Cada análisis tarda unos 20–30 min en
+  CPU y unos 50 videos al mes entran en la cuota gratis. Con el crédito de US$100 sobran
+  cientos más.
+* **Configuración recomendada para el worker:** Container Apps Job con **2 vCPU y 4 GiB**,
+  que aprovecha mejor la cuota (4 vCPU es solo un 28 % más rápido y gasta más), un partido
+  por ejecución (`--once`), cada 5 minutos, con un tiempo máximo de ejecución de 1 hora.
+* **No es viable para partidos completos en CPU:** un partido de 1 h y media tardaría más
+  de 30 horas. Para eso haría falta GPU, que la suscripción de estudiante no tiene, u
+  optimizar el modelo para CPU (exportarlo a ONNX u OpenVINO, bajar la resolución,
+  analizar uno de cada dos fotogramas). Sin medir todavía; queda como mejora futura.
+* La web debe avisar que el análisis tarda unos 30 minutos.
