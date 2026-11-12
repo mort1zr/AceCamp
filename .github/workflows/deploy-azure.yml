@@ -41,7 +41,12 @@ jobs:
 
       - name: Construir la imagen
         working-directory: web/server/azure-videos
-        run: docker build --pull -t "$IMAGE:$GITHUB_SHA" .
+        # La etiqueta vincula la imagen al repositorio: sin ella, GitHub Packages
+        # rechaza la publicación con GITHUB_TOKEN ("denied").
+        run: |
+          docker build --pull -t "$IMAGE:$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.description=API de videos de AceCam (PCIT-222)" .
 
       # Sin configuración, la API debe negarse a arrancar con un mensaje claro.
       - name: Comprobar que la imagen arranca
