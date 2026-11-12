@@ -10,6 +10,8 @@ import { COLLECTIONS } from '../../lib/schema.js'
 const textos = {
   es: {
     title: 'Administración de AceCam',
+    directory: 'Directorio',
+    audit: 'Auditoría',
     home: 'Volver al inicio',
     logout: 'Cerrar sesión',
     leaving: 'Cerrando sesión…',
@@ -22,6 +24,8 @@ const textos = {
   },
   en: {
     title: 'AceCam Administration',
+    directory: 'Directory',
+    audit: 'Audit log',
     home: 'Back to home',
     logout: 'Sign out',
     leaving: 'Signing out…',
@@ -95,6 +99,10 @@ function AdminSession({ uid, logout }) {
         {access === 'allowed' && (
           <>
             <h1 className="font-display text-2xl font-bold sm:text-3xl">{t.title}</h1>
+            <nav aria-label={t.title} className="flex flex-wrap gap-4 text-sm">
+              <Link to="/admin" className="underline">{t.directory}</Link>
+              <Link to="/admin/auditoria" className="underline">{t.audit}</Link>
+            </nav>
             <Outlet />
           </>
         )}

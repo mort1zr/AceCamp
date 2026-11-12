@@ -44,6 +44,34 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
     }
 
+    function platformAuditState(entity, data) {
+      return entity == 'orgs'
+        ? { 'name': data.name, 'plan': data.plan, 'archived': data.get('archived', false) }
+        : entity == 'users'
+          ? { 'role': data.role, 'suspended': data.get('suspended', false) }
+          : { 'orgId': data.orgId, 'role': data.role, 'status': data.status };
+    }
+
+    function validPlatformAudit(id, entry) {
+      let target = /databases/$(database)/documents/$(entry.entity)/$(entry.targetId);
+      let next = getAfter(target).data;
+      return entry.keys().hasOnly(['actorId', 'createdAt', 'entity', 'targetId', 'before', 'after'])
+        && entry.actorId == request.auth.uid && entry.createdAt == request.time
+        && entry.entity in ['orgs', 'users', 'invites']
+        && entry.targetId is string && entry.targetId.matches('^[^/]+$')
+        && next.platformAuditId == id
+        && (!exists(target) || get(target).data.get('platformAuditId', null) != id)
+        && entry.before == (exists(target) ? platformAuditState(entry.entity, get(target).data) : null)
+        && entry.after == platformAuditState(entry.entity, next)
+        && entry.before != entry.after;
+    }
+
+    match /platformAudit/{id} {
+      allow read: if isPlatformAdmin();
+      allow create: if isPlatformAdmin() && validPlatformAudit(id, request.resource.data);
+      allow update, delete: if false;
+    }
+
     function canManage(data) {
       return inOrg(data.orgId) && (isAdmin() || data.createdBy == request.auth.uid);
     }

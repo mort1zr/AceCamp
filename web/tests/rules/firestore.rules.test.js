@@ -87,6 +87,26 @@ beforeEach(async () => {
 const coachDb = () => env.authenticatedContext(COACH, { email: 'coach@acecam.test' }).firestore()
 const anonDb = () => env.unauthenticatedContext().firestore()
 
+it('restringe la auditoría a plataforma y rechaza entradas sueltas y cambios retroactivos', async () => {
+  const uid = 'auditor-plataforma'
+  const platform = env.authenticatedContext(uid).firestore()
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore()
+    await setDoc(doc(db, 'platformAdmins', uid), {})
+    await setDoc(doc(db, 'platformAudit', 'registro'), { actorId: uid })
+  })
+  const entry = doc(platform, 'platformAudit', 'registro')
+  await assertSucceeds(getDoc(entry))
+  await assertFails(getDoc(doc(coachDb(), 'platformAudit', 'registro')))
+  await assertFails(getDocs(collection(anonDb(), 'platformAudit')))
+  await assertFails(updateDoc(entry, { actorId: COACH }))
+  await assertFails(deleteDoc(entry))
+  await assertFails(setDoc(doc(platform, 'platformAudit', 'suelto'), {
+    actorId: uid, createdAt: serverTimestamp(), entity: 'orgs', targetId: ORG,
+    before: null, after: { name: 'Otro nombre', plan: 'pro', archived: false },
+  }))
+})
+
 it('autoriza lecturas de plataforma con un permiso separado y revocable', async () => {
   const platformUid = 'admin-plataforma'
   const teamAdminUid = 'admin-equipo'

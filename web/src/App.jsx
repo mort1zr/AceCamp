@@ -25,6 +25,7 @@ const Login = lazy(() => import('./panel/pages/Login.jsx'))
 const Partidos = conPanel(() => import('./panel/pages/Partidos.jsx'))
 const PlatformAdmin = lazy(() => import('./panel/pages/admin/PlatformAdmin.jsx'))
 const AdminDirectory = lazy(() => import('./panel/pages/admin/AdminDirectory.jsx'))
+const AdminAudit = lazy(() => import('./panel/pages/admin/AdminAudit.jsx'))
 const Precios = lazy(() => import('./landing/pages/Precios.jsx'))
 const Postular = lazy(() => import('./landing/pages/Postular.jsx'))
 const Privacidad = lazy(() => import('./landing/pages/Privacidad.jsx'))
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/admin" element={<PlatformAdmin />}>
           <Route index element={<AdminDirectory />} />
+          <Route path="auditoria" element={<AdminAudit />} />
         </Route>
 
         <Route element={<RequireAuth />}>
