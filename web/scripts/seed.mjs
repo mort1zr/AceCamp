@@ -8,12 +8,19 @@
 // Por seguridad SOLO escribe en los emuladores con el proyecto demo-acecam:
 // nunca toca el proyecto real.
 
+import { readFile } from 'node:fs/promises'
 import { buildSeedData } from './seedData.mjs'
 
 const PROJECT_ID = 'demo-acecam'
 const HOST = process.env.SEED_EMULATOR_HOST || '127.0.0.1'
-const FIRESTORE = `${HOST}:8080`
-const AUTH = `${HOST}:9099`
+
+function localEmulatorAddress(address) {
+  const match = /^(?:127\.0\.0\.1|localhost):(\d{1,5})$/.exec(address)
+  if (!match || Number(match[1]) < 1 || Number(match[1]) > 65535) {
+    throw new Error('El seed solo admite emuladores locales (127.0.0.1 o localhost).')
+  }
+  return `127.0.0.1:${Number(match[1])}`
+}
 
 const data = buildSeedData()
 const summary = Object.entries(data).map(([name, list]) => `${name}: ${list.length}`).join(' · ')
@@ -24,9 +31,17 @@ if (process.argv.includes('--dry-run')) {
   process.exit(0)
 }
 
+const FIRESTORE = localEmulatorAddress(process.env.FIRESTORE_EMULATOR_HOST || `${HOST}:8080`)
+const AUTH = localEmulatorAddress(process.env.FIREBASE_AUTH_EMULATOR_HOST || `${HOST}:9099`)
+const STORAGE = localEmulatorAddress(process.env.FIREBASE_STORAGE_EMULATOR_HOST || `${HOST}:9199`)
+const readyMatches = data.matches.filter(match => match.doc.processedVideoPath)
+const demoVideo = await readFile(new URL('../public/demo.mp4', import.meta.url))
+
 // Las variables de los emuladores hacen que firebase-admin no salga a internet.
 process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE
 process.env.FIREBASE_AUTH_EMULATOR_HOST = AUTH
+process.env.FIREBASE_STORAGE_EMULATOR_HOST = STORAGE
+process.env.STORAGE_EMULATOR_HOST = `http://${STORAGE}`
 process.env.GCLOUD_PROJECT = PROJECT_ID
 delete process.env.GOOGLE_APPLICATION_CREDENTIALS
 
@@ -46,14 +61,14 @@ async function reachable(url) {
   }
 }
 
-console.log('1/4 Buscando los emuladores…')
-if (!(await reachable(`http://${FIRESTORE}/`)) || !(await reachable(`http://${AUTH}/`))) {
-  console.error('No encuentro los emuladores de Firestore y Auth.')
+console.log('1/5 Buscando los emuladores…')
+if (!(await Promise.all([FIRESTORE, AUTH, STORAGE].map(address => reachable(`http://${address}/`)))).every(Boolean)) {
+  console.error('No encuentro todos los emuladores de Firestore, Auth y Storage.')
   console.error('Primero ejecuta "npm run emulators" en otra terminal y vuelve a intentar.')
   process.exit(1)
 }
 
-console.log('2/4 Vaciando los emuladores…')
+console.log('2/5 Vaciando los emuladores…')
 // Vaciar los emuladores para que el script se pueda correr varias veces.
 const clear = await Promise.all([
   fetch(`http://${FIRESTORE}/emulator/v1/projects/${PROJECT_ID}/databases/(default)/documents`, { method: 'DELETE' }),
@@ -67,17 +82,27 @@ if (clear.some(response => !response.ok)) {
 const { initializeApp } = await import('firebase-admin/app')
 const { getAuth } = await import('firebase-admin/auth')
 const { getFirestore } = await import('firebase-admin/firestore')
+const { getStorage } = await import('firebase-admin/storage')
 
-const app = initializeApp({ projectId: PROJECT_ID })
+const app = initializeApp({ projectId: PROJECT_ID, storageBucket: `${PROJECT_ID}.appspot.com` })
 const auth = getAuth(app)
 const db = getFirestore(app)
 
-console.log('3/4 Creando usuarios en Auth…')
+console.log('3/5 Creando usuarios en Auth…')
 for (const user of data.users) {
   await auth.createUser({ uid: user.uid, email: user.email, password: user.password, displayName: user.doc.displayName })
 }
 
-console.log('4/4 Guardando documentos en Firestore…')
+console.log(`4/5 Subiendo videos de ${readyMatches.length} partidos a Storage…`)
+const bucket = getStorage(app).bucket()
+for (const { doc: match } of readyMatches) {
+  const metadata = { contentType: 'video/mp4', cacheControl: 'private, no-store', metadata: { uploadedBy: match.createdBy } }
+  await Promise.all([match.videoPath, match.processedVideoPath].map(path =>
+    bucket.file(path).save(demoVideo, { metadata, resumable: false }),
+  ))
+}
+
+console.log('5/5 Guardando documentos en Firestore…')
 const batch = db.batch()
 for (const user of data.users) batch.set(db.collection('users').doc(user.uid), user.doc)
 for (const name of ['orgs', 'players', 'matches', 'applications', 'invites']) {

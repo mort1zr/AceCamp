@@ -48,6 +48,7 @@ entorno Python se descargan en cada PC; no están incluidos en Git.
 - [Gestión de jugadores](docs/PCIT-42-gestion-completa-jugadores.md).
 - [Dashboard](docs/PCIT-43-dashboard-completo.md).
 - [Video procesado](docs/PCIT-161-video-procesado.md).
+- [Cargar partidos y videos de ejemplo con `npm run seed`](docs/PCIT-192-videos-y-estadisticas-de-demo.md).
 - [Requisitos y límites de los videos](docs/videos-largos-y-fuentes.md).
 
 La ejecución descrita usa emuladores locales y el proyecto `demo-acecam`.
