@@ -147,3 +147,40 @@ responda `ok`, crear la variable `VITE_VIDEO_API_URL` y volver a ejecutar "Deplo
 El siguiente despliegue de la web sube los videos a Azure.
 
 Si falta algo, `deploy-azure.yml` no despliega y deja un aviso, como `deploy-web.yml`.
+
+## Worker del modelo en Azure (PCIT-226)
+
+| Pieza | Dónde | Qué hace |
+| --- | --- | --- |
+| Almacenamiento | `model/worker/firebase_backend.py` (`AzureBlobVideos`) | Descarga el video y sube `processed.mp4` en Azure Blob con la identidad administrada, sin claves. Rechaza videos vacíos o de más de 500 MB antes de descargarlos |
+| Arranque | `model/worker/__main__.py` | Con `AZURE_STORAGE_ACCOUNT` usa Azure; si no, Firebase Storage. **Solo carga el modelo si hay un partido**: con la cola vacía termina en segundos y casi no gasta crédito. Lee la cuenta de servicio de `FIREBASE_SERVICE_ACCOUNT` |
+| Imagen | `model/Dockerfile` | Python 3.11 y PyTorch para CPU. Pesos del modelo **verificados con sha256 en modo estricto** (se registraron los de `yolo5_last.pt` y `keypoints_model.pth`). Usuario sin privilegios |
+| Despliegue | `deploy-azure.yml` (`imagen-worker`, `desplegar-worker`) | Publica `ghcr.io/mort1zr/acecam-worker` y crea la tarea programada `acecam-worker`: **cada 5 minutos, 2 vCPU y 4 GiB, máximo 1 hora**, `--once` |
+
+El worker usa la misma identidad que la API (`acecam-videos-api`), que ya tiene permiso
+sobre los videos. Para Firestore necesita **escribir** (cambia el estado del partido y
+guarda las estadísticas), así que usa una cuenta de servicio propia.
+
+### Paso de una sola vez: cuenta de servicio del worker
+
+En Google Cloud Shell (console.cloud.google.com → `>_`):
+
+```bash
+gcloud config set project acecam-e93a2
+gcloud iam service-accounts create azure-worker --display-name="Worker del modelo en Azure (lee y escribe Firestore)"
+gcloud projects add-iam-policy-binding acecam-e93a2 --member="serviceAccount:azure-worker@acecam-e93a2.iam.gserviceaccount.com" --role="roles/datastore.user" --condition=None -q > /dev/null && echo "Rol asignado"
+gcloud iam service-accounts keys create clave.json --iam-account=azure-worker@acecam-e93a2.iam.gserviceaccount.com && echo "Clave creada"
+```
+
+Descargar `clave.json` (⋮ → Descargar), pegar **todo** su contenido en GitHub → Settings →
+Secrets and variables → Actions → **Secrets** → `FIREBASE_SERVICE_ACCOUNT_WORKER`, y borrar la
+clave (`rm clave.json`) de Cloud Shell y del equipo. Nunca pegarla en un chat.
+
+Sin ese secreto, `deploy-azure.yml` publica la imagen pero no despliega el worker y deja un aviso.
+
+### Costo
+
+Con la cola vacía, cada ejecución dura unos segundos. Analizar un video de 60 s cuesta unos
+30 min de 2 vCPU, y unos 49 videos al mes entran en la cuota gratuita (ver la medición de PCIT-223).
+Si dos partidos llegan seguidos, cada ejecución toma uno distinto: el reclamo en Firestore es
+una transacción.

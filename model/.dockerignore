@@ -1,0 +1,14 @@
+# Lo que no entra en la imagen del worker (PCIT-226).
+**/__pycache__
+.coverage
+.pytest_cache
+.ruff_cache
+cache/
+output_videos/
+input_videos/
+models/*.pt
+models/*.pth
+tests/
+eval/
+training/
+Dockerfile
