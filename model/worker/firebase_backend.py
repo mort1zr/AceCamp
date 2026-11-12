@@ -55,6 +55,8 @@ class FirestoreMatchStore:
             transaction.update(reference, {
                 "status": PROCESSING,
                 "startedAt": firestore.SERVER_TIMESTAMP,
+                "analysisStage": "preparing",
+                "analysisFrames": firestore.DELETE_FIELD,
                 "finishedAt": None,
                 "errorMessage": None,
                 "statistics": None,
@@ -64,6 +66,18 @@ class FirestoreMatchStore:
             return snapshot.to_dict()
 
         return claim(self.db.transaction())
+
+    def mark_stage(self, match_id, stage, frames=None):
+        firestore = self._firestore
+        reference = self.db.collection(MATCHES).document(match_id)
+
+        @firestore.transactional
+        def update_stage(transaction):
+            snapshot = reference.get(transaction=transaction)
+            if snapshot.exists and snapshot.get("status") == PROCESSING:
+                transaction.update(reference, {"analysisStage": stage, "analysisFrames": frames or firestore.DELETE_FIELD})
+
+        update_stage(self.db.transaction())
 
     def _finish(self, match_id, fields):
         firestore = self._firestore
@@ -86,7 +100,9 @@ class FirestoreMatchStore:
                     or application.get("status") not in ("nueva", "en revisión")
                 ):
                     application_ref = None
-            transaction.update(reference, {**fields, "finishedAt": firestore.SERVER_TIMESTAMP})
+            transaction.update(reference, {**fields, "finishedAt": firestore.SERVER_TIMESTAMP,
+                                           "analysisStage": firestore.DELETE_FIELD,
+                                           "analysisFrames": firestore.DELETE_FIELD})
             if application_ref is not None:
                 transaction.update(application_ref, {"status": "analizada", "updatedAt": firestore.SERVER_TIMESTAMP})
             return True

@@ -28,6 +28,7 @@ import tempfile
 from pathlib import Path
 
 from config import load_config
+from utils.progress import report_stage
 
 from .processor import (
     AnalysisResult,
@@ -73,6 +74,7 @@ def make_analyzer(config_path=None, device=None, render_video=True):
         result = pipeline.run_pipeline(config, render=render_video)
         if not render_video:
             return result["model_statistics"]
+        report_stage("encoding")
         output = encode_browser_video(Path(result["output_video"]), video_path.parent / "processed.mp4")
         return AnalysisResult(result["model_statistics"], output)
 

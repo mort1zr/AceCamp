@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from stats import to_match_statistics
+from utils.progress import progress_listener
 
 from .video import ProcessedVideoError
 
@@ -121,6 +122,15 @@ def worker_version() -> str:
         return "acecam-model dev"
 
 
+def _report_stage(store, match_id, stage, frames=None):
+    mark_stage = getattr(store, "mark_stage", None)
+    if mark_stage is not None:
+        try:
+            mark_stage(match_id, stage, frames)
+        except Exception:  # el indicador no debe interrumpir el análisis
+            log.warning("%s: no se pudo registrar la etapa %s", match_id, stage, exc_info=True)
+
+
 def process_match(match_id, match, store, storage, analyze, workdir: Path) -> str:
     """Procesa un partido ya reclamado (en 'procesando'). Devuelve el estado final: 'listo' o 'error'."""
     video_path = match.get("videoPath")
@@ -143,7 +153,24 @@ def process_match(match_id, match, store, storage, analyze, workdir: Path) -> st
     try:
         local_video = match_dir / f"video{Path(video_path).suffix or '.mp4'}"
         storage.download(video_path, local_video)
-        analysis = analyze(local_video)
+        _report_stage(store, match_id, "analyzing")
+        last_update = float("-inf")
+        last_stage = None
+
+        def report_frames(stage, done, total):
+            nonlocal last_update, last_stage
+            now = time.monotonic()
+            if stage != last_stage or now - last_update >= 5 or done == total:
+                last_update, last_stage = now, stage
+                frames = {"done": min(done, total), "total": total} if total else None
+                _report_stage(store, match_id, stage, frames)
+
+        token = progress_listener.set(report_frames)
+        try:
+            analysis = analyze(local_video)
+        finally:
+            progress_listener.reset(token)
+        _report_stage(store, match_id, "saving")
         model_statistics = analysis.statistics if isinstance(analysis, AnalysisResult) else analysis
         statistics = to_match_statistics(model_statistics, player_position)
         processed_path = None

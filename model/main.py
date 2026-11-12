@@ -19,7 +19,7 @@ from trackers import BallTracker, PlayerTracker, TrackNetBallTracker
 from utils import VideoWriter, get_video_info, iter_frames
 from utils.detection_cache import cache_path_for, file_sha256, load_detections, save_detections
 from utils.player_stats_drawer_utils import StatsBox
-from utils.progress import report_progress
+from utils.progress import report_progress, report_stage
 
 MINI_COURT_BOUNCES = 6  # botes que se ven a la vez en la mini-pista
 # Color (BGR) de cada bote en el vídeo según su cantada (TA-24).
@@ -96,7 +96,7 @@ def detect_video(video_path, num_frames, player_tracker, ball_tracker, court_tra
         result.keypoints.append(frame_keypoints)
         result.homographies.append(homography)
         result.court_visible.append(court_tracker.court_visible)
-        report_progress("Detección", i + 1, num_frames)
+        report_progress("Detección", i + 1, num_frames, stage="detecting")
     return result
 
 
@@ -213,6 +213,7 @@ def run_pipeline(config, render=True):
     # La selección interpola las cajas en los huecos; fuera de la cámara principal no hay jugadores.
     player_detections = [d if main else {} for d, main in zip(player_detections, main_camera)]
 
+    report_stage("calculating")
     analysis = analyze_detections(ball_detections, player_detections, court_keypoints, homography, main_camera,
                                   video_info.fps, config,
                                   serve_filter=pose_serve_filter(config, input_video_path, player_detections))
@@ -318,7 +319,7 @@ def run_pipeline(config, render=True):
             cv2.putText(frame, f"Frame: {i}", (int(10 * text_scale), int(30 * text_scale)), cv2.FONT_HERSHEY_SIMPLEX,
                         text_scale, (0, 255, 0), max(1, int(round(2 * text_scale))))
             out.write(frame)
-            report_progress("Vídeo anotado", i + 1, num_frames)
+            report_progress("Vídeo anotado", i + 1, num_frames, stage="rendering")
     print(f"Vídeo guardado en {output_video_path}")
     result["output_video"] = output_video_path
     return result

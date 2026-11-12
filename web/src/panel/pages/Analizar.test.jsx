@@ -86,9 +86,9 @@ describe('Analizar video v1', () => {
     const [receivePlayers, receiveMatches] = onSnapshot.mock.calls.slice(-2).map(([, receive]) => receive)
     const base = { orgId: 'equipo-1', createdBy: 'coach-1' }
     const player = { id: 'player-1', data: () => ({ ...base, fullName: 'Valeria Torres' }) }
-    const match = (id, opponent, status, errorMessage) => ({
+    const match = (id, opponent, status, errorMessage, progress = {}) => ({
       id,
-      data: () => ({ ...base, opponent, status, errorMessage, playerId: player.id, matchDate: '2026-01-01' }),
+      data: () => ({ ...base, opponent, status, errorMessage, playerId: player.id, matchDate: '2026-01-01', ...progress }),
     })
 
     act(() => {
@@ -102,6 +102,15 @@ describe('Analizar video v1', () => {
     expect(first.getAttribute('aria-valuenow')).toBeNull()
     expect(within(first.closest('tr')).getByText(/El modelo está analizando/)).toBeTruthy()
     expect(screen.getAllByRole('progressbar')).toHaveLength(2)
+
+    const started = Date.now() - 65_000
+    const startedAt = { toMillis: () => started }
+    act(() => receiveMatches({ docs: [match('a', 'Rival A', 'procesando', undefined, {
+      startedAt, analysisStage: 'detecting', analysisFrames: { done: 40, total: 100 },
+    })] }))
+    expect(screen.getByRole('progressbar').value).toBe(40)
+    expect(screen.getByText('40 de 100 fotogramas en esta etapa')).toBeTruthy()
+    expect(screen.getByText(/Tiempo transcurrido: 1 min/)).toBeTruthy()
 
     const fpsError = 'El video debe tener entre 25 y 60 FPS. Grábalo o expórtalo dentro de ese rango.'
     act(() => receiveMatches({ docs: [match('a', 'Rival A', 'listo'), match('b', 'Rival B', 'error', fpsError)] }))
