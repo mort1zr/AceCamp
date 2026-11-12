@@ -3,7 +3,6 @@
 import sys
 from contextvars import ContextVar
 
-
 progress_listener = ContextVar("progress_listener", default=None)
 
 
