@@ -70,13 +70,12 @@ service cloud.firestore {
 
     // Análisis por mes según orgs/{orgId}.plan. Mismos valores que PLANES en
     // web/src/panel/lib/planes.js: cambiar ambos a la vez (lo comprueba planes.test.js).
-    // 'free' (sin plan) y cualquier valor desconocido no permiten análisis; 'ultra' no tiene tope.
+    // 'free' (sin plan) y cualquier valor desconocido no permiten análisis.
     function withinPlan(orgId, analyses) {
       let org = get(/databases/$(database)/documents/orgs/$(orgId)).data;
       let plan = org.get('plan', 'free');
       return !trialExpired(org)
-        && (plan == 'ultra'
-          || analyses <= {'prueba': 15, 'basico': 30, 'pro': 150}.get(plan, 0));
+        && analyses <= {'prueba': 15, 'basico': 30, 'pro': 150, 'ultra': 500}.get(plan, 0);
     }
 
     // El partido nuevo suma exactamente uno al contador del mes, en la misma escritura.

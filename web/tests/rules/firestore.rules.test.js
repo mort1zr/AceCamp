@@ -487,13 +487,15 @@ describe('uso mensual de análisis (PCIT-41)', () => {
       await assertFails(createMatch(coachDb(), 'm-151'))
     })
 
-    it('sin plan o con un plan desconocido no se analiza; Ultra no tiene tope', async () => {
+    it('sin plan o con un plan desconocido no se analiza; Ultra llega hasta 500', async () => {
       await preparar('free')
       await assertFails(createMatch(coachDb(), 'm-free'))
       await preparar('inventado')
       await assertFails(createMatch(coachDb(), 'm-inventado'))
-      await preparar('ultra', 5000)
+      await preparar('ultra', 499)
       await assertSucceeds(createMatch(coachDb(), 'm-ultra'))
+      await preparar('ultra', 500)
+      await assertFails(createMatch(coachDb(), 'm-ultra-tope'))
     })
 
     it('el contador es de la organización: suma los análisis de todos sus entrenadores', async () => {
