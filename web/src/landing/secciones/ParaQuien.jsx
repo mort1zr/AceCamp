@@ -89,6 +89,7 @@ const vistas = [Comparador, Plantel, Reporte]
 const textos = {
   es: {
     titulo: '¿Para quién es',
+    carrusel: 'Perfiles de AceCam',
     jugadorA: 'Jugador A',
     jugadorB: 'Jugador B',
     filas: ['Saque', 'Primer saque', 'Recorrido'],
@@ -115,6 +116,7 @@ const textos = {
   },
   en: {
     titulo: 'Who is',
+    carrusel: 'AceCam profiles',
     tituloFin: 'for?',
     jugadorA: 'Player A',
     jugadorB: 'Player B',
@@ -155,7 +157,12 @@ export default function ParaQuien() {
       }
       align="center"
     >
-      <div className="-mx-6 mt-8 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] md:mx-0 md:mt-12 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 md:pb-0 [&::-webkit-scrollbar]:hidden">
+      <div
+        role="region"
+        aria-label={t.carrusel}
+        tabIndex={0}
+        className="-mx-6 mt-8 flex snap-x snap-mandatory scroll-px-6 gap-3 overflow-x-auto px-6 pb-2 [scrollbar-width:none] md:mx-0 md:mt-12 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 md:pb-0 [&::-webkit-scrollbar]:hidden"
+      >
         {t.perfiles.map(({ etiqueta, clave, title, text }, index) => {
           const Vista = vistas[index]
           return (

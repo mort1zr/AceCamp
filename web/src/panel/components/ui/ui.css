@@ -20,7 +20,7 @@
   --ac-muted: var(--ace-ui-muted, #6b6358);
   --ac-accent: var(--ace-ui-accent, #5a6b00);
   --ac-info: var(--ace-ui-info, #00708f);
-  --ac-positive: var(--ace-ui-positive, #2f7a3f);
+  --ac-positive: var(--ace-ui-positive, #2b763b);
   --ac-negative: var(--ace-ui-negative, #b0432a);
 }
 .ac-kpi, .ac-table-state, .ac-table-scroll {

@@ -391,7 +391,7 @@ export default function BarraSuperior({
           value={busqueda}
           onChange={(evento) => setBusqueda(evento.target.value)}
           placeholder={t.placeholder}
-          className="h-11 w-full rounded-[10px] border border-line2 bg-surface pr-3.5 pl-10 text-[15px] text-text transition-colors placeholder:text-placeholder hover:border-line3 focus:border-accent-line focus:outline-none"
+          className="h-11 w-full rounded-[10px] border border-line2 bg-surface pr-3.5 pl-10 text-[15px] text-text transition-colors placeholder:text-placeholder hover:border-line3 focus:border-accent-ink focus:ring-1 focus:ring-accent-ink focus:outline-none"
         />
       </form>
 

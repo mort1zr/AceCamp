@@ -48,7 +48,7 @@
 .analysis-page .players-field label { font-size: 0.8125rem; font-weight: 600; color: var(--text2, var(--players-text)); }
 .players-field select { width: 100%; min-width: 0; min-height: 46px; padding: 0.7rem 0.85rem; border: 1px solid var(--players-line); border-radius: 0.5rem; background: var(--players-field); color: var(--players-text); font: inherit; }
 .analysis-page .players-field input, .analysis-page .players-field select { width: 100%; min-width: 0; min-height: 46px; padding: 0.7rem 0.85rem; border: 1px solid var(--line2, var(--players-line)); border-radius: 10px; background: var(--players-card); color: var(--players-text); font: inherit; }
-.analysis-page .players-field input:focus-visible, .analysis-page .players-field select:focus-visible { border-color: var(--accent-line, var(--players-ink)); outline: none; }
+.analysis-page .players-field input:focus-visible, .analysis-page .players-field select:focus-visible { border-color: var(--accent-ink, var(--players-ink)); box-shadow: 0 0 0 1px var(--accent-ink, var(--players-ink)); outline: none; }
 .players-field select[aria-invalid='true'] { border-color: var(--players-bad); }
 
 .analysis-court { position: relative; width: 100%; max-width: 640px; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; }
@@ -61,7 +61,7 @@
 .analysis-zone { position: absolute; left: 12%; right: 12%; display: flex; align-items: flex-start; justify-content: center; padding-top: 0.6rem; border: 2px dashed transparent; border-radius: 10px; background: transparent; color: transparent; font-size: 0.8125rem; font-weight: 600; cursor: pointer; transition: border-color 0.2s, background-color 0.2s, color 0.2s; }
 .analysis-zone-top { top: 6%; height: 34%; }
 .analysis-zone-bottom { bottom: 4%; height: 42%; align-items: flex-end; padding-bottom: 0.6rem; padding-top: 0; }
-.analysis-zone:hover, .analysis-zone:focus-visible { border-color: var(--line3, #4a443c); background: rgb(18 17 15 / 0.25); color: var(--text, #f2eee8); outline: none; }
+.analysis-zone:hover, .analysis-zone:focus-visible { border-color: var(--line3, #4a443c); background: rgb(18 17 15 / 0.25); color: var(--text, #f2eee8); }
 .analysis-zone[aria-pressed='true'] { border-style: solid; border-color: var(--accent, #d7f25c); background: rgb(215 242 92 / 0.14); color: var(--accent, #d7f25c); }
 .analysis-zone:disabled { cursor: not-allowed; }
 .analysis-position { max-width: 320px; }

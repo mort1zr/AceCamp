@@ -9,7 +9,7 @@
 .dashboard-select-wrap svg { position: absolute; top: 50%; right: 1.1rem; translate: 0 -50%; color: var(--players-muted); pointer-events: none; }
 .dashboard-player-select select { display: block; width: 100%; min-width: 0; min-height: 48px; padding: 0 3rem 0 1.25rem; appearance: none; -webkit-appearance: none; border: 1px solid var(--line, var(--players-line)); border-radius: 999px; background: var(--players-card); color: var(--players-text); font: inherit; font-weight: 600; font-size: 0.875rem; color-scheme: dark; cursor: pointer; transition: border-color 0.2s; }
 .dashboard-player-select select:hover:not(:disabled) { border-color: var(--line3, var(--players-line)); }
-.dashboard-player-select select:focus-visible { border-color: var(--accent-line, var(--players-ink)); outline: none; }
+.dashboard-player-select select:focus-visible { border-color: var(--accent-ink, var(--players-ink)); box-shadow: 0 0 0 1px var(--accent-ink, var(--players-ink)); outline: none; }
 .dashboard-player-select select:disabled { cursor: not-allowed; opacity: 0.6; }
 [data-theme='light'] .dashboard-player-select select { color-scheme: light; }
 .dashboard-chip { display: inline-flex; align-items: center; padding: 0.2rem 0.65rem; border-radius: 999px; background: var(--chip, var(--players-field)); color: var(--text3, var(--players-text)); font-size: 0.75rem; font-weight: 600; white-space: nowrap; }

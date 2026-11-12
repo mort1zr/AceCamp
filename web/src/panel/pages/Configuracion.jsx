@@ -249,7 +249,7 @@ const subtitulo = 'font-display text-[22px] leading-tight font-bold tracking-[0.
 const etiqueta = 'text-xs font-semibold tracking-[0.08em] text-muted uppercase'
 const campo = 'flex flex-col gap-1.5 text-[13px] font-semibold text-text2'
 const entrada =
-  'h-11 w-full min-w-0 rounded-[10px] border border-line2 bg-bg px-3.5 text-[15px] font-normal text-text transition-colors placeholder:text-placeholder hover:border-line3 focus:border-accent-line focus:outline-none read-only:text-muted read-only:hover:border-line2 disabled:cursor-not-allowed disabled:opacity-60'
+  'h-11 w-full min-w-0 rounded-[10px] border border-line2 bg-bg px-3.5 text-[15px] font-normal text-text transition-colors placeholder:text-placeholder hover:border-line3 focus:border-accent-ink focus:ring-1 focus:ring-accent-ink focus:outline-none read-only:text-muted read-only:hover:border-line2 disabled:cursor-not-allowed disabled:opacity-60'
 const boton =
   'inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[10px] border px-4 text-sm font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-50'
 const botonPrincipal = `${boton} border-accent-line bg-accent text-on-accent hover:opacity-90`
