@@ -1,5 +1,5 @@
 # Dependabot (PCIT-165): abre PRs semanales para actualizar dependencias.
-# Cada PR pasa por las mismas CI (model-ci, web-ci, security, codeql) antes de fusionarse.
+# Cada PR pasa por el mismo pipeline (.github/workflows/ci.yml) antes de fusionarse.
 # Las alertas de seguridad de Dependabot se activan aparte en Settings > Code security.
 version: 2
 updates:
