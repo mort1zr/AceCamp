@@ -1,7 +1,7 @@
 # Dependencias extra del worker (python -m worker). Python 3.11.
 -r requirements.txt
-google-cloud-firestore==2.33.0
-google-cloud-storage==3.16.0
+google-cloud-firestore==2.34.1
+google-cloud-storage==3.17.1
 imageio-ffmpeg==0.6.0
 # Videos en Azure Blob Storage con identidad administrada (PCIT-226).
 azure-storage-blob==12.31.1
