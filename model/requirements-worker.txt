@@ -2,7 +2,7 @@
 -r requirements.txt
 google-cloud-firestore==2.33.0
 google-cloud-storage==3.16.0
-imageio-ffmpeg==0.6.0
+imageio-ffmpeg==0.8.1
 # Videos en Azure Blob Storage con identidad administrada (PCIT-226).
 azure-storage-blob==12.31.1
 azure-identity==1.27.0
