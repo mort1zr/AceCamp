@@ -1,0 +1,795 @@
+name: Pipeline
+
+# Pipeline único del proyecto (antes repartido en model-ci, web-ci, security, codeql,
+# scorecard, deploy-web y deploy-azure). Todo vive aquí, como jobs separados con sus
+# dependencias (needs), para que quede como una sola entrada en la pestaña Actions por
+# cada PR o push.
+#
+# Disparadores:
+# - pull_request y push a main: valida y, en main, despliega.
+# - schedule (lunes): vuelve a correr seguridad y SAST aunque nadie suba código, para
+#   detectar vulnerabilidades nuevas en dependencias ya instaladas.
+# - workflow_dispatch: para lanzarlo a mano.
+#
+# Qué se ejecuta según lo que cambió lo decide el job "cambios" (dorny/paths-filter),
+# no el disparador: los jobs de modelo solo corren si cambió model/, los de web solo si
+# cambió web/ o firebase/, y los de Azure solo si cambió web/server/azure-videos/ o
+# model/ — tanto en pull_request como en push a main (paths-filter compara contra la
+# base del PR o contra el commit anterior), igual que antes de unificar los workflows.
+# En schedule y workflow_dispatch no hay un "antes" con qué comparar, así que esos jobs
+# no corren (tampoco corrían antes: ninguno de los workflows de origen tenía disparador
+# schedule). Los jobs de seguridad, SAST y OWASP no dependen de la ruta: corren siempre,
+# como antes.
+#
+# cancel-in-progress solo en pull_request: una PR con pushes seguidos cancela las
+# corridas viejas, pero un push a main (que puede estar desplegando en Firebase o en
+# Azure) nunca se cancela a medio camino.
+#
+# Configuración en GitHub (ver docs/devsecops.md):
+# - Secreto FIREBASE_SERVICE_ACCOUNT_ACECAM: JSON de la cuenta de servicio de despliegue.
+# - Variables VITE_FIREBASE_*, VITE_VIDEO_API_URL, DEPLOY_STORAGE_RULES: ver docs/devsecops.md.
+# - Variables AZURE_* y secretos FIREBASE_SERVICE_ACCOUNT_AZURE/_WORKER: despliegue en
+#   Azure (ver docs/PCIT-222-videos-en-azure.md).
+# - Checks obligatorios en la protección de main: ver la lista al final de ese documento.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 13 * * 1" # lunes 08:17 en Lima
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pipeline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FIREBASE_PROJECT: acecam-e93a2
+  IMAGE: ghcr.io/mort1zr/acecam-videos-api
+  APP_NAME: acecam-videos-api
+  WORKER_IMAGE: ghcr.io/mort1zr/acecam-worker
+  WORKER_JOB: acecam-worker
+
+jobs:
+  # ------------------------------------------------------------------ qué cambió
+  cambios:
+    name: Detectar cambios
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      modelo: ${{ steps.filtro.outputs.modelo }}
+      web: ${{ steps.filtro.outputs.web }}
+      azure: ${{ steps.filtro.outputs.azure }}
+    steps:
+      # fetch-depth: 0 (historial completo): con el valor por defecto (1, superficial)
+      # paths-filter no tiene con qué comparar en push/schedule y el job falla, lo que
+      # saltaría en cascada todos los jobs que dependen de "cambios".
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # continue-on-error: en schedule/workflow_dispatch no hay un "antes" claro que
+      # comparar y el paso puede fallar; da igual, porque entonces sus outputs quedan
+      # vacíos (falsy) y los jobs de modelo/web/azure simplemente no corren en esos
+      # eventos, que es el resultado correcto (ver el comentario de disparadores, arriba).
+      - id: filtro
+        continue-on-error: true
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          filters: |
+            modelo:
+              - 'model/**'
+              - '.pre-commit-config.yaml'
+              - '.github/workflows/ci.yml'
+            web:
+              - 'web/**'
+              - 'firebase/**'
+              - 'firebase.json'
+              - '.github/workflows/ci.yml'
+            azure:
+              - 'web/server/azure-videos/**'
+              - 'model/**'
+              - '.github/workflows/ci.yml'
+
+  # ---------------------------------------------------------------- lint del pipeline
+  lint-workflow:
+    name: Validar el workflow (actionlint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        uses: reviewdog/action-actionlint@cfa6a621f27735ccc88d35af9d0608692fd9b9f7 # v1.80.8
+        with:
+          fail_level: error
+
+  # =======================================================================  MODELO
+
+  modelo-tests:
+    name: "Modelo: lint y tests"
+    needs: cambios
+    if: needs.cambios.outputs.modelo == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: model
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: model/requirements*.txt
+      - name: Instalar PyTorch (CPU)
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1 torchvision==0.20.1
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Tests (pytest)
+        run: pytest --cov=scoring --cov-fail-under=100
+
+  # =========================================================================  WEB
+
+  web-tests:
+    name: "Web: lint, tests, build y CSP"
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # npm ci instala exactamente lo del package-lock (sin actualizar nada).
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Tests (vitest)
+        run: npm test
+
+      - name: Build (vite)
+        run: npm run build
+
+      # La CSP de firebase.json debe permitir los scripts en línea del build (PCIT-169).
+      - name: Comprobar la CSP
+        run: npm run check:csp
+
+  web-reglas:
+    name: "Web: reglas de Firestore y Storage"
+    needs: cambios
+    if: needs.cambios.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Caché de los emuladores
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ hashFiles('web/package-lock.json') }}
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+
+      # Incluye la puerta de cobertura (PCIT-212): cada `allow` de firestore.rules
+      # tiene que evaluarse en la matriz de acceso, o la PR falla.
+      - name: Pruebas de reglas (emuladores)
+        run: npm run test:rules
+
+      - name: Informe de cobertura de las reglas
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cobertura-reglas-firestore
+          path: web/rules-coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ====================================================================  SEGURIDAD
+
+  secretos:
+    name: "Seguridad: secretos (gitleaks)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Buscar secretos (gitleaks)
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependencias-python:
+    name: "Seguridad: dependencias Python (pip-audit)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: model/requirements*.txt
+      - name: Instalar el entorno del worker
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.5.1 torchvision==0.20.1
+          pip install -r model/requirements-worker.txt -r model/requirements-dev.txt
+          pip install pip-audit==2.10.1
+      - name: Auditar (pip-audit)
+        run: |
+          pip-audit --progress-spinner off -f json -o pip-audit.json || true
+          python .github/scripts/pip_audit_gate.py pip-audit.json
+
+  dependencias-web:
+    name: "Seguridad: dependencias web (npm audit)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Auditar dependencias de producción (npm audit)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Informar dependencias de desarrollo
+        run: npm audit --audit-level=critical || echo "::warning::npm audit encontró vulnerabilidades críticas en dependencias de desarrollo"
+
+  revision-dependencias:
+    name: "Seguridad: Dependency Review"
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  # ------------------------------------------------------------- capa OWASP (nueva)
+
+  owasp-dependency-check:
+    name: "OWASP: Dependency-Check (SCA)"
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Caché de la base NVD
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: owasp-dependency-check-nvd-${{ github.run_id }}
+          restore-keys: owasp-dependency-check-nvd-
+      - name: OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@75ba02d6183445fe0761d26e836bde58b1560600 # v1.1.0
+        with:
+          project: AceCam
+          path: |
+            model/requirements.txt
+            model/requirements-worker.txt
+            web/package-lock.json
+          format: SARIF
+          args: >
+            --failOnCVSS 9
+            --enableRetired
+            ${{ secrets.NVD_API_KEY && format('--nvdApiKey {0}', secrets.NVD_API_KEY) || '' }}
+      - name: Subir a Code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: reports/dependency-check-report.sarif
+
+  owasp-zap-baseline:
+    name: "OWASP: ZAP Baseline (DAST)"
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: "https://acecam-e93a2.web.app"
+          cmd_options: "-a"
+          allow_issue_writing: false
+          fail_action: false
+
+  # -------------------------------------------------------------------------  SAST
+
+  codeql:
+    name: "SAST: CodeQL (${{ matrix.language }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python, actions]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Inicializar CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - web/dist
+              - "**/node_modules"
+              - model/models
+      - name: Analizar
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+
+  scorecard:
+    name: "SAST: OpenSSF Scorecard"
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Ejecutar Scorecard
+        uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+      - name: Guardar el resultado
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+      - name: Subir a Code scanning
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: results.sarif
+
+  # ------------------------------------------------------------------------  DEPLOY
+
+  deploy:
+    name: "Deploy: Firebase Hosting"
+    needs: [web-tests, web-reglas]
+    if: |
+      always() && needs.web-tests.result == 'success' && needs.web-reglas.result == 'success'
+      && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Comprobar configuración
+        id: config
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ACECAM }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::warning::Falta el secreto FIREBASE_SERVICE_ACCOUNT_ACECAM: no se despliega (ver docs/devsecops.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.config.outputs.ok == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.config.outputs.ok == 'true'
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build de producción
+        if: steps.config.outputs.ok == 'true'
+        working-directory: web
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_USE_FIREBASE_EMULATORS: "false"
+          # PCIT-225: con esta variable los videos se suben a Azure (PCIT-222); vacía, a Firebase Storage.
+          VITE_VIDEO_API_URL: ${{ vars.VITE_VIDEO_API_URL }}
+          # PCIT-198: el commit queda en <meta name="acecam-version"> del HTML publicado.
+          ACECAM_VERSION: ${{ github.sha }}
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npm run check:csp
+      - name: Publicar en Firebase Hosting
+        id: hosting
+        if: steps.config.outputs.ok == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # v0.11.0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ACECAM }}
+          projectId: ${{ env.FIREBASE_PROJECT }}
+          channelId: ${{ github.event_name != 'pull_request' && 'live' || '' }}
+          expires: 7d
+          firebaseToolsVersion: 15.34.2
+      - name: Publicar reglas e índices
+        id: rules
+        if: steps.config.outputs.ok == 'true' && github.event_name != 'pull_request'
+        working-directory: web
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_ACECAM }}
+          DEPLOY_STORAGE_RULES: ${{ vars.DEPLOY_STORAGE_RULES }}
+        run: |
+          key_file="$RUNNER_TEMP/firebase-sa.json"
+          printf '%s' "$SERVICE_ACCOUNT" > "$key_file"
+          chmod 600 "$key_file"
+          trap 'rm -f "$key_file"' EXIT
+          targets="firestore:rules,firestore:indexes"
+          if [ "$DEPLOY_STORAGE_RULES" = "true" ]; then
+            targets="$targets,storage"
+          else
+            echo "::notice::Reglas de Storage omitidas (requieren el plan Blaze). Define DEPLOY_STORAGE_RULES=true para publicarlas."
+          fi
+          GOOGLE_APPLICATION_CREDENTIALS="$key_file" npx --no-install firebase deploy \
+            --only "$targets" \
+            --project "$FIREBASE_PROJECT" --non-interactive --config ../firebase.json
+
+      # PCIT-199: comprobar que producción responde y sirve el commit recién publicado.
+      # Reintenta unos segundos por la caché del CDN; si no, el despliegue falla.
+      # Va después de las reglas: si falla, las reglas nuevas ya están publicadas
+      # y la web no queda en línea con las reglas viejas.
+      - name: Comprobar la web publicada
+        id: check
+        if: steps.config.outputs.ok == 'true' && github.event_name != 'pull_request'
+        working-directory: web
+        env:
+          EXPECTED_VERSION: ${{ github.sha }}
+        run: node scripts/checkDeploy.mjs "https://${FIREBASE_PROJECT}.web.app/" "$EXPECTED_VERSION"
+
+      # PCIT-200: tabla con lo que se publicó en la página del run, también si algo falló.
+      - name: Resumen del despliegue
+        if: always() && steps.config.outputs.ok == 'true'
+        working-directory: web
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PRODUCTION_URL: https://${{ env.FIREBASE_PROJECT }}.web.app/
+          PREVIEW_URL: ${{ steps.hosting.outputs.details_url }}
+          VERSION: ${{ github.sha }}
+          HOSTING_OUTCOME: ${{ steps.hosting.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          RULES_OUTCOME: ${{ steps.rules.outcome }}
+          DEPLOY_STORAGE_RULES: ${{ vars.DEPLOY_STORAGE_RULES }}
+        run: node scripts/deploySummary.mjs
+
+  # --------------------------------------------------------------  DEPLOY: AZURE
+
+  imagen:
+    name: "Azure: construir imagen de la API de videos"
+    needs: cambios
+    if: needs.cambios.outputs.azure == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write # publicar la imagen en GitHub Packages (solo en main)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Construir la imagen
+        working-directory: web/server/azure-videos
+        # La etiqueta vincula la imagen al repositorio: sin ella, GitHub Packages
+        # rechaza la publicación con GITHUB_TOKEN ("denied").
+        run: |
+          docker build --pull -t "$IMAGE:$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.description=API de videos de AceCam (PCIT-222)" .
+
+      # Sin configuración, la API debe negarse a arrancar con un mensaje claro.
+      - name: Comprobar que la imagen arranca
+        run: |
+          if docker run --rm "$IMAGE:$GITHUB_SHA" > arranque.log 2>&1; then
+            echo "::error::La API arrancó sin configuración."; exit 1
+          fi
+          grep -q "Falta la variable de entorno" arranque.log || { cat arranque.log; exit 1; }
+
+      - name: Publicar en GitHub Packages
+        if: github.event_name != 'pull_request'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker logout ghcr.io
+
+  desplegar:
+    name: "Azure: desplegar la API de videos"
+    needs: imagen
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # inicio de sesión en Azure sin contraseña (OIDC)
+    steps:
+      - name: Comprobar configuración
+        id: config
+        env:
+          CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          API_IDENTITY: ${{ vars.AZURE_VIDEOS_API_IDENTITY_ID }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AZURE }}
+        run: |
+          if [ -z "$CLIENT_ID" ] || [ -z "$API_IDENTITY" ] || [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::Faltan variables AZURE_* o el secreto FIREBASE_SERVICE_ACCOUNT_AZURE: no se despliega (ver docs/PCIT-222-videos-en-azure.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Iniciar sesión en Azure
+        if: steps.config.outputs.ok == 'true'
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Desplegar en Azure Container Apps
+        id: deploy
+        if: steps.config.outputs.ok == 'true'
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          ENVIRONMENT: ${{ vars.AZURE_CONTAINERAPPS_ENV }}
+          STORAGE: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          API_IDENTITY: ${{ vars.AZURE_VIDEOS_API_IDENTITY_ID }}
+          API_CLIENT_ID: ${{ vars.AZURE_VIDEOS_API_IDENTITY_CLIENT_ID }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AZURE }}
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          ENV_VARS=(
+            "AZURE_STORAGE_ACCOUNT=$STORAGE" "AZURE_STORAGE_CONTAINER=videos" "AZURE_CLIENT_ID=$API_CLIENT_ID"
+            "FIREBASE_PROJECT_ID=acecam-e93a2" "ALLOWED_ORIGIN=https://acecam-e93a2.web.app"
+            "FIREBASE_SERVICE_ACCOUNT=secretref:firebase-sa"
+          )
+          if az containerapp show -n "$APP_NAME" -g "$RG" -o none 2>/dev/null; then
+            az containerapp secret set -n "$APP_NAME" -g "$RG" --secrets "firebase-sa=$FIREBASE_SA" -o none
+            az containerapp update -n "$APP_NAME" -g "$RG" --image "$IMAGE:$GITHUB_SHA" --set-env-vars "${ENV_VARS[@]}" -o none
+          else
+            az containerapp create -n "$APP_NAME" -g "$RG" --environment "$ENVIRONMENT" \
+              --image "$IMAGE:$GITHUB_SHA" --ingress external --target-port 8080 \
+              --min-replicas 0 --max-replicas 2 --cpu 0.25 --memory 0.5Gi \
+              --user-assigned "$API_IDENTITY" --secrets "firebase-sa=$FIREBASE_SA" \
+              --env-vars "${ENV_VARS[@]}" --tags proyecto=acecam -o none
+          fi
+          FQDN=$(az containerapp show -n "$APP_NAME" -g "$RG" --query properties.configuration.ingress.fqdn -o tsv)
+          echo "url=https://$FQDN" >> "$GITHUB_OUTPUT"
+
+      - name: Comprobar la API publicada
+        if: steps.config.outputs.ok == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if [ "$(curl -s --max-time 15 "$URL/healthz")" = "ok" ]; then
+              status=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Origin: https://acecam-e93a2.web.app' "$URL/api/videos/sign")
+              [ "$status" = "401" ] || { echo "::error::Sin sesión debería responder 401 y respondió $status."; exit 1; }
+              echo "API de videos en línea: $URL"; exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::La API no respondió en $URL/healthz."; exit 1
+
+      - name: Resumen del despliegue
+        if: always() && steps.config.outputs.ok == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+          OUTCOME: ${{ steps.deploy.outcome }}
+        run: |
+          {
+            echo "### Despliegue de la API de videos (Azure)"
+            echo ""
+            echo "| Paso | Resultado |"
+            echo "| --- | --- |"
+            echo "| Imagen | \`$IMAGE:${GITHUB_SHA:0:12}\` |"
+            echo "| Despliegue | $OUTCOME |"
+            echo "| URL | ${URL:-sin URL} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------- Worker del modelo (PCIT-226) ----------
+  imagen-worker:
+    name: "Azure: construir imagen del worker"
+    needs: cambios
+    if: needs.cambios.outputs.azure == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write # publicar la imagen en GitHub Packages (solo en main)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Incluye PyTorch para CPU y los pesos verificados con sha256 (--strict).
+      - name: Construir la imagen del worker
+        working-directory: model
+        run: |
+          docker build --pull -t "$WORKER_IMAGE:$GITHUB_SHA" --build-arg "ACECAM_VERSION=$GITHUB_SHA" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.description=Worker del modelo de AceCam (PCIT-226)" .
+
+      - name: Comprobar la imagen del worker
+        run: |
+          docker run --rm "$WORKER_IMAGE:$GITHUB_SHA" python -c "import torch, ultralytics, worker.__main__, azure.storage.blob; print('dependencias ok')"
+          docker run --rm "$WORKER_IMAGE:$GITHUB_SHA" python scripts/download_models.py --verify --strict --no-video
+          docker image ls "$WORKER_IMAGE"
+
+      - name: Publicar en GitHub Packages
+        if: github.event_name != 'pull_request'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker push "$WORKER_IMAGE:$GITHUB_SHA"
+          docker logout ghcr.io
+
+  desplegar-worker:
+    name: "Azure: desplegar el worker"
+    needs: imagen-worker
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # inicio de sesión en Azure sin contraseña (OIDC)
+    steps:
+      - name: Comprobar configuración
+        id: config
+        env:
+          CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          IDENTITY: ${{ vars.AZURE_VIDEOS_API_IDENTITY_ID }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WORKER }}
+        run: |
+          if [ -z "$CLIENT_ID" ] || [ -z "$IDENTITY" ] || [ -z "$FIREBASE_SA" ]; then
+            echo "::warning::Falta el secreto FIREBASE_SERVICE_ACCOUNT_WORKER o variables AZURE_*: no se despliega el worker (ver docs/PCIT-222-videos-en-azure.md)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Iniciar sesión en Azure
+        if: steps.config.outputs.ok == 'true'
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Tarea programada cada 5 minutos: con la cola vacía termina en segundos;
+      # con un partido, lo analiza (unos 30 min en CPU, máximo 1 h).
+      - name: Desplegar el worker como tarea programada
+        id: deploy
+        if: steps.config.outputs.ok == 'true'
+        env:
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          ENVIRONMENT: ${{ vars.AZURE_CONTAINERAPPS_ENV }}
+          STORAGE: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+          IDENTITY: ${{ vars.AZURE_VIDEOS_API_IDENTITY_ID }}
+          IDENTITY_CLIENT_ID: ${{ vars.AZURE_VIDEOS_API_IDENTITY_CLIENT_ID }}
+          FIREBASE_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WORKER }}
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          ENV_VARS=(
+            "AZURE_STORAGE_ACCOUNT=$STORAGE" "AZURE_STORAGE_CONTAINER=videos" "AZURE_CLIENT_ID=$IDENTITY_CLIENT_ID"
+            "FIREBASE_PROJECT_ID=acecam-e93a2" "FIREBASE_SERVICE_ACCOUNT=secretref:firebase-sa"
+          )
+          if az containerapp job show -n "$WORKER_JOB" -g "$RG" -o none 2>/dev/null; then
+            az containerapp job secret set -n "$WORKER_JOB" -g "$RG" --secrets "firebase-sa=$FIREBASE_SA" -o none
+            az containerapp job update -n "$WORKER_JOB" -g "$RG" --image "$WORKER_IMAGE:$GITHUB_SHA" \
+              --set-env-vars "${ENV_VARS[@]}" -o none
+          else
+            az containerapp job create -n "$WORKER_JOB" -g "$RG" --environment "$ENVIRONMENT" \
+              --trigger-type Schedule --cron-expression "*/5 * * * *" \
+              --replica-timeout 3600 --replica-retry-limit 0 --parallelism 1 --replica-completion-count 1 \
+              --image "$WORKER_IMAGE:$GITHUB_SHA" --cpu 2 --memory 4Gi \
+              --mi-user-assigned "$IDENTITY" --secrets "firebase-sa=$FIREBASE_SA" \
+              --env-vars "${ENV_VARS[@]}" --tags proyecto=acecam -o none
+          fi
+          az containerapp job show -n "$WORKER_JOB" -g "$RG" \
+            --query "{estado:properties.provisioningState, imagen:properties.template.containers[0].image}" -o table
+
+      - name: Resumen del worker
+        if: always() && steps.config.outputs.ok == 'true'
+        env:
+          OUTCOME: ${{ steps.deploy.outcome }}
+        run: |
+          {
+            echo "### Worker del modelo (Azure)"
+            echo ""
+            echo "| Paso | Resultado |"
+            echo "| --- | --- |"
+            echo "| Imagen | \`$WORKER_IMAGE:${GITHUB_SHA:0:12}\` |"
+            echo "| Tarea programada \`$WORKER_JOB\` | $OUTCOME |"
+            echo "| Frecuencia | cada 5 minutos, 2 vCPU y 4 GiB, máximo 1 h |"
+          } >> "$GITHUB_STEP_SUMMARY"

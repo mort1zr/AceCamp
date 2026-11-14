@@ -5,15 +5,45 @@ Firebase, y qué hacer cuando un control falla. Historias: PCIT-164 a PCIT-169.
 
 ## 1. Pipeline
 
-| Workflow | Cuándo corre | Qué hace | ¿Bloquea? |
+Un solo workflow, `.github/workflows/ci.yml` (antes repartido en `model-ci`, `web-ci`,
+`security`, `codeql`, `scorecard`, `deploy-web` y `deploy-azure`): queda como una sola
+entrada en la pestaña Actions por cada PR o push. El job `cambios` (`dorny/paths-filter`)
+decide qué jobs de modelo/web/Azure corren según la carpeta que tocó el cambio; los de
+seguridad, SAST y OWASP corren siempre, sin importar la ruta.
+
+| Job | Cuándo corre | Qué hace | ¿Bloquea? |
 |---|---|---|---|
-| `model-ci.yml` | PR y push a main que tocan `model/` | ruff y pytest, con 100 % de cobertura en `scoring` | Sí |
-| `web-ci.yml` | PR y push a main que tocan `web/`, `firebase/` o `firebase.json` | oxlint, vitest, build de Vite, chequeo de la CSP y pruebas de reglas en emuladores | Sí |
-| `security.yml` | Toda PR, push a main y cada lunes | gitleaks (historial completo), pip-audit, npm audit de producción y Dependency Review | Sí |
-| `codeql.yml` | Toda PR, push a main y cada miércoles | SAST de JavaScript, Python y los workflows | Los hallazgos aparecen en la PR |
-| `scorecard.yml` | Push a main y cada viernes | OpenSSF Scorecard: puntúa las prácticas del repo | No; informa |
-| `deploy-web.yml` | PR y push a main de la web | CI de la web; luego vista previa (PR) o producción y reglas (main) | Despliega solo si la CI pasa |
-| Dependabot | Cada lunes | PRs para actualizar pip, npm y Actions | Pasan por las mismas CI |
+| `cambios` | Siempre | Detecta qué carpetas cambiaron, para los jobs con filtro de ruta | No |
+| `lint-workflow` | Siempre | `actionlint` valida el propio `ci.yml` | Sí |
+| `modelo-tests` | PR y push a main que tocan `model/` | ruff y pytest, con 100 % de cobertura en `scoring` | Sí |
+| `web-tests` | PR y push a main que tocan `web/`, `firebase/` o `firebase.json` | oxlint, vitest, build de Vite y chequeo de la CSP | Sí |
+| `web-reglas` | Igual que `web-tests` | Pruebas de reglas de Firestore/Storage contra emuladores, con informe de cobertura | Sí |
+| `secretos` | Siempre | gitleaks sobre el historial completo | Sí |
+| `dependencias-python` | Siempre | pip-audit sobre `model/requirements*.txt` | Sí |
+| `dependencias-web` | Siempre | npm audit de producción | Sí |
+| `revision-dependencias` | Solo PR | Dependency Review: bloquea dependencias nuevas vulnerables | Sí |
+| `owasp-dependency-check` | push a main y cada lunes | SCA contra la base NVD/CVE (ver más abajo) | No; sube a Code scanning |
+| `owasp-zap-baseline` | Solo tras desplegar en main | DAST (ZAP) contra la web ya publicada | No; informa |
+| `codeql` | Siempre | SAST de JavaScript, Python y los workflows | Los hallazgos aparecen en la PR |
+| `scorecard` | push a main y cada lunes | OpenSSF Scorecard: puntúa las prácticas del repo | No; informa |
+| `deploy` | Tras pasar `web-tests`/`web-reglas` | Firebase Hosting: vista previa (PR) o producción y reglas (main) | Despliega solo si la CI pasa |
+| `imagen` / `desplegar` | PR y push que tocan `web/server/azure-videos/` o `model/` | Construye y (en main) despliega la API de videos en Azure Container Apps | Despliega solo si la imagen pasa |
+| `imagen-worker` / `desplegar-worker` | Igual que `imagen`/`desplegar` | Construye y (en main) despliega el worker del modelo como tarea programada en Azure | Igual |
+| Dependabot | Cada lunes | PRs para actualizar pip, npm y Actions | Pasan por el mismo pipeline |
+
+Configuración específica de Azure (variables `AZURE_*` y secretos
+`FIREBASE_SERVICE_ACCOUNT_AZURE`/`_WORKER`): ver
+[PCIT-222 · Videos en Azure](PCIT-222-videos-en-azure.md).
+
+**La capa OWASP no es redundante con lo anterior.** `owasp-dependency-check` usa la base
+de datos NVD/CVE, distinta de OSV/GHSA (lo que usan pip-audit, npm audit y Dependency
+Review): detecta vulnerabilidades que una fuente reporta y la otra todavía no.
+`owasp-zap-baseline` es el único análisis **dinámico** (DAST) del pipeline: en vez de leer
+el código fuente, ataca la web ya publicada en producción, como lo haría un usuario real.
+
+**`cancel-in-progress` solo aplica en pull_request:** una PR con pushes seguidos cancela
+las corridas viejas, pero un push a `main` (que puede estar desplegando en Firebase o en
+Azure) nunca se cancela a medio camino.
 
 **Otras medidas**
 
@@ -45,7 +75,7 @@ En **Settings → Advanced Security** (en algunas cuentas se llama *Code securit
 - **Dependabot alerts** y **Dependabot security updates**.
 - **Secret Protection**: el escaneo de secretos, con **Push protection** activada. GitHub rechaza un push que contenga una clave conocida.
 - **Private vulnerability reporting**: es el canal que indica `SECURITY.md`.
-- **Code scanning → CodeQL analysis**: elige **Advanced** o déjalo desactivado. No actives *Default setup*: GitHub rechaza los resultados de `codeql.yml` si las dos configuraciones están activas a la vez.
+- **Code scanning → CodeQL analysis**: elige **Advanced** o déjalo desactivado. No actives *Default setup*: GitHub rechaza los resultados del job `codeql` si las dos configuraciones están activas a la vez. `scorecard` y `owasp-dependency-check` también suben sus resultados a Code scanning.
 
 ### 2.2 Proteger main
 
@@ -57,16 +87,21 @@ En **Settings → Rules → Rulesets → New branch ruleset**:
   - 1 aprobación;
   - **Dismiss stale approvals** al subir cambios nuevos;
   - **Require review from Code Owners** (`.github/CODEOWNERS`).
-- Marca **Require status checks to pass**. Añade solo los checks que corren en todas las PRs:
-  - `secretos`
-  - `dependencias-python`
-  - `dependencias-web`
-  - `revision-dependencias`
-  - `Analizar (javascript-typescript)`
-  - `Analizar (python)`
-  - `Analizar (actions)`
+- Marca **Require status checks to pass**. Añade solo los checks que corren en todas las PRs (son el `name:` de cada job en `ci.yml`, no el id):
+  - `Validar el workflow (actionlint)`
+  - `Seguridad: secretos (gitleaks)`
+  - `Seguridad: dependencias Python (pip-audit)`
+  - `Seguridad: dependencias web (npm audit)`
+  - `Seguridad: Dependency Review`
+  - `SAST: CodeQL (javascript-typescript)`
+  - `SAST: CodeQL (python)`
+  - `SAST: CodeQL (actions)`
 
-**Cuidado con los checks con filtro de ruta.** `model-ci` (`lint-y-tests`) y `web-ci` (`lint-tests-build`, `reglas`) solo corren cuando la PR toca su carpeta. Si los marcas como obligatorios, una PR que no toca esa carpeta queda esperando para siempre. Cuando corren y fallan, aparecen en rojo en la PR: no la fusiones hasta que estén en verde.
+  GitHub solo deja elegir un check desde el buscador de "Add checks" si ya corrió al menos
+  una vez con ese nombre exacto en el repo; si lo escribes a mano antes de eso, queda sin
+  validar ("Any source") hasta que el pipeline corra una vez.
+
+**Cuidado con los checks con filtro de ruta.** `modelo-tests`, `web-tests`, `web-reglas`, `imagen`, `desplegar`, `imagen-worker` y `desplegar-worker` solo corren cuando el cambio toca su carpeta. Si los marcas como obligatorios, una PR que no toca esa carpeta queda esperando para siempre. Por la misma razón, nunca marques `OWASP: Dependency-Check` ni `OWASP: ZAP Baseline` como obligatorios: no corren en pull_request (solo en push a main y los lunes), así que bloquearían cualquier PR para siempre. Cuando los demás corren y fallan, aparecen en rojo en la PR: no la fusiones hasta que estén en verde.
 
 **Si trabajas solo,** GitHub no deja que apruebes tu propia PR. Añade tu rol en **Bypass list** con la opción *For pull requests only*. Así puedes fusionar tus PRs, pero nadie puede hacer push directo a main.
 
@@ -148,8 +183,16 @@ la variable `DEPLOY_STORAGE_RULES` con valor `true` para publicar también `stor
 | npm audit | `npm audit fix` en `web/`. Si exige una versión mayor, revisa el changelog antes |
 | Dependency Review | La PR añade una dependencia vulnerable: elige otra versión |
 | CodeQL | Abre el hallazgo en **Security → Code scanning**: explica el flujo de datos. Corrígelo o descártalo con justificación |
+| OWASP Dependency-Check | Abre el hallazgo en **Security → Code scanning**. Si el CVE es de una versión que ya no se usa (`--enableRetired`), puede ser ruido; si no, actualiza la dependencia |
+| OWASP ZAP Baseline | No bloquea: revisa el resumen del job en Actions. Los falsos positivos comunes (cabeceras informativas, cookies de terceros) se documentan en el propio resumen |
 | `check:csp` | Copia el hash que muestra el error en `script-src` de `firebase.json` |
 | `download_models.py`: `sha256 no coincide` | **No uses ese archivo.** Vuelve a descargarlo con `--force`. Si se repite, el origen cambió: avisa al equipo antes de registrar un hash nuevo |
+
+**`NVD_API_KEY` (opcional).** `owasp-dependency-check` descarga la base NVD en cada corrida;
+sin clave, el límite de peticiones hace que tarde más (la caché de GitHub Actions ayuda,
+pero expira). Pide una clave gratis en https://nvd.nist.gov/developers/request-an-api-key
+y guárdala en **GitHub → Settings → Secrets and variables → Actions → New repository
+secret** con el nombre `NVD_API_KEY`.
 
 ## 5. Pendientes
 
