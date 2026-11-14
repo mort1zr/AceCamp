@@ -534,3 +534,4 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS="$key_file" npx --no-install firebase deploy \
             --only "$targets" \
             --project "$FIREBASE_PROJECT" --non-interactive --config ../firebase.json
+
